@@ -175,7 +175,7 @@ function StoreButton({
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-h-[60px] items-center gap-3 rounded-xl border border-asphalt-700 bg-asphalt-900/80 px-4 py-2.5 text-left transition hover:border-brand-500/60 hover:bg-asphalt-850"
+      className="group flex min-h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-asphalt-700 bg-asphalt-900/80 px-4 py-2.5 text-center transition hover:border-brand-500/60 hover:bg-asphalt-850 sm:min-h-[60px] sm:w-auto sm:justify-start sm:text-left"
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
         {icon}
@@ -384,19 +384,19 @@ export function Hero() {
         <HeroBackdrop />
       </MotionConfig>
 
-      <div className="wrap relative z-10 grid flex-1 items-center gap-10 pb-10 pt-8 sm:pt-12 lg:grid-cols-[1.04fr_0.96fr] lg:gap-8 lg:pb-14 lg:pt-12">
+      <div className="wrap relative z-10 grid flex-1 items-center gap-6 pb-8 pt-7 sm:pt-12 lg:grid-cols-[1.04fr_0.96fr] lg:items-start lg:gap-8 lg:pb-9 lg:pt-9">
         <Stagger gap={0.14}>
           <StaggerItem>
-            <Logo className="h-12 sm:h-14 lg:h-[72px]" link={false} />
+            <Logo className="mx-auto h-12 sm:h-14 lg:mx-0 lg:h-[68px]" link={false} />
           </StaggerItem>
           <StaggerItem>
-            <Badge tone="brand" className="mb-5 mt-6 uppercase tracking-[0.16em]">
+            <Badge tone="brand" className="mb-3 mt-4 uppercase tracking-[0.16em] lg:mb-4 lg:mt-5">
               <span className="h-2 w-2 rounded-full bg-brand-500 animate-pulse-dot" aria-hidden="true" />
               Venezuela · Próximo lanzamiento
             </Badge>
           </StaggerItem>
           <StaggerItem>
-            <h1 className="heading text-[48px] font-black uppercase leading-[0.95] tracking-tight text-white sm:text-[68px] lg:text-[84px]">
+            <h1 className="heading text-[48px] font-black uppercase leading-[0.95] tracking-tight text-white sm:text-[68px] lg:text-[82px]">
               <span className="block">Pide.</span>
               <span className="block">Súbete.</span>
               <span className="block italic text-brand-500 drop-shadow-[0_10px_20px_rgba(255,107,0,0.3)]">
@@ -405,17 +405,18 @@ export function Hero() {
             </h1>
           </StaggerItem>
           <StaggerItem>
-            <p className="mt-5 max-w-xl text-[15.5px] leading-relaxed text-ink-300 sm:text-[16.5px]">
+            <p className="mt-4 max-w-xl text-[15.5px] leading-relaxed text-ink-300 sm:text-[16.5px]">
+              La primera app multimodal de movilidad en Venezuela.{" "}
               <strong className="font-semibold text-white">
-                Mototaxi, taxi, delivery, minivan o autobús: tú eliges.
+                Mototaxi, taxis, delivery, minivan o autobús... ¡Tú eliges!
               </strong>{" "}
-              Seis servicios en una sola app, con la tarifa clara antes de pedir y pago en
-              bolívares o dólares.
+              Viaja sin esperas ni regateos: con tarifa clara. Sin sorpresas ni esperas: precios
+              transparentes y conductores 100% verificados con llegada en minutos.
             </p>
           </StaggerItem>
 
           <StaggerItem>
-            <div className="mt-6 flex flex-wrap gap-2.5">
+            <div className="mt-4 flex flex-wrap gap-2.5 lg:mt-5">
               <StoreButton
                 eyebrow="Disponible en"
                 label="Google Play"
@@ -432,7 +433,7 @@ export function Hero() {
           </StaggerItem>
 
           <StaggerItem>
-            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-ink-300">
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-ink-300 lg:mt-4">
               <span className="inline-flex items-center gap-1.5">
                 <Check className="h-3.5 w-3.5 text-brand-400" strokeWidth={3} /> Precio antes de pedir
               </span>
@@ -446,8 +447,8 @@ export function Hero() {
           </StaggerItem>
 
           <StaggerItem>
-            <p className="mt-4 text-[11.5px] text-ink-500">
-              Prototipo de rediseño. La app está en preparación.{" "}
+            <p className="mt-3 text-[11.5px] text-ink-500">
+              Prototipo de rediseño.{" "}
               <Link to="/app" className="font-semibold text-brand-400 hover:text-brand-300">
                 Prueba la demo web <ArrowRight className="inline h-3 w-3" />
               </Link>
@@ -456,12 +457,12 @@ export function Hero() {
         </Stagger>
 
         <Reveal
-          className="relative mx-auto w-full max-w-[300px] sm:max-w-[350px]"
+          className="relative mx-auto w-full max-w-[350px]"
           y={24}
           delay={0.25}
         >
           <MotionConfig reducedMotion="never">
-            <div className="relative mx-auto w-full max-w-[250px] sm:max-w-[280px]">
+            <div className="relative mx-auto w-full max-w-[250px] sm:max-w-[272px]">
               <motion.div
                 className="absolute inset-x-8 bottom-8 top-8 rounded-full bg-brand-500/20 blur-[70px]"
                 aria-hidden="true"
@@ -475,7 +476,7 @@ export function Hero() {
 
               <motion.div
                 className="relative"
-                animate={{ y: [0, -12, 0], rotate: [-1.2, 1.2, -1.2] }}
+                animate={{ y: [0, -8, 0], rotate: [-1.2, 1.2, -1.2] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div className="relative aspect-[1/2] w-full [filter:drop-shadow(0_28px_50px_rgba(0,0,0,0.6))]">
@@ -493,15 +494,15 @@ export function Hero() {
             </div>
           </MotionConfig>
 
-          <div className="relative mt-6 grid gap-2.5 sm:grid-cols-2">
+          <div className="relative mt-5 grid gap-2.5 sm:grid-cols-2">
             <Link
               to="/registro"
-              className="group flex min-h-[64px] items-center gap-2.5 rounded-2xl border border-brand-500/45 bg-brand-500/12 px-3 py-2.5 transition hover:border-brand-500/80 hover:bg-brand-500/18"
+              className="group flex min-h-[64px] items-center justify-center gap-2.5 rounded-2xl border border-brand-500/45 bg-brand-500/12 px-3 py-2.5 transition hover:border-brand-500/80 hover:bg-brand-500/18 sm:justify-start"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-asphalt-950">
                 <UserPlus className="h-4.5 w-4.5" />
               </span>
-              <span className="min-w-0 flex-1">
+              <span className="min-w-0 text-center sm:text-left">
                 <span className="block text-[8.5px] font-bold uppercase tracking-[0.14em] text-brand-300">
                   Cliente
                 </span>
@@ -512,12 +513,12 @@ export function Hero() {
             </Link>
             <Link
               to="/servicios"
-              className="group flex min-h-[64px] items-center gap-2.5 rounded-2xl border border-asphalt-700 bg-asphalt-900/80 px-3 py-2.5 transition hover:border-brand-500/60 hover:bg-asphalt-850"
+              className="group flex min-h-[64px] items-center justify-center gap-2.5 rounded-2xl border border-asphalt-700 bg-asphalt-900/80 px-3 py-2.5 transition hover:border-brand-500/60 hover:bg-asphalt-850 sm:justify-start"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-brand-400">
                 <LayoutGrid className="h-4.5 w-4.5" />
               </span>
-              <span className="min-w-0 flex-1">
+              <span className="min-w-0 text-center sm:text-left">
                 <span className="block text-[8.5px] font-bold uppercase tracking-[0.14em] text-ink-400">
                   Servicios
                 </span>
@@ -528,7 +529,7 @@ export function Hero() {
             </Link>
           </div>
 
-          <div className="relative mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-ink-400">
+          <div className="relative mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-ink-400">
             <span className="inline-flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 text-brand-400" strokeWidth={3} /> Registro 100% gratuito
             </span>

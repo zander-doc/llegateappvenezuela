@@ -332,19 +332,19 @@
   .hero-grid {
     position: relative; z-index: 10;
     display: grid; grid-template-columns: 1fr;
-    align-items: center; gap: 40px;
+    align-items: center; gap: 24px;
     flex: 1;
     width: 100%; max-width: 1280px; margin-inline: auto;
-    padding: 40px 20px;
+    padding: 28px 20px 32px;
   }
   @media (min-width: 640px) { .hero-grid { padding-top: 56px; } }
   @media (min-width: 1024px) {
-    .hero-grid { grid-template-columns: 1.02fr .98fr; gap: 56px; padding: 64px 32px; }
+    .hero-grid { grid-template-columns: 1.04fr .96fr; align-items: start; gap: 32px; padding: 36px 32px; }
   }
 
-  .hero-logo { display: block; width: auto; height: 48px; margin-bottom: 24px; }
+  .hero-logo { display: block; width: auto; height: 48px; margin: 0 auto 16px; }
   @media (min-width: 640px) { .hero-logo { height: 56px; } }
-  @media (min-width: 1024px) { .hero-logo { height: 72px; } }
+  @media (min-width: 1024px) { .hero-logo { height: 68px; margin: 0 0 20px; } }
 
   .item { animation: rise .55s var(--ease) both; }
   .item:nth-child(1) { animation-delay: .04s; }
@@ -395,10 +395,10 @@
     filter: drop-shadow(0 10px 20px rgba(255, 107, 0, .3));
   }
   @media (min-width: 640px) { .hero-title { font-size: 68px; } }
-  @media (min-width: 1024px) { .hero-title { font-size: 84px; } }
+  @media (min-width: 1024px) { .hero-title { font-size: 82px; } }
 
   .hero-lede {
-    margin: 20px 0 0;
+    margin: 16px 0 0;
     max-width: 32rem;
     font-size: 16px; line-height: 1.625;
     color: var(--asphalt-300);
@@ -413,7 +413,7 @@
     .hero-ctas .btn { width: auto; }
   }
 
-  .store-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .store-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
   .store-btn {
     display: flex; align-items: center; gap: 10px;
     min-height: 44px; padding: 8px 14px;
@@ -436,6 +436,11 @@
     color: var(--asphalt-500);
   }
   .store-btn-lg { min-height: 60px; padding: 10px 14px; gap: 12px; }
+  @media (max-width: 639px) {
+    .store-row { flex-direction: column; }
+    .store-btn-lg { width: 100%; min-height: 56px; justify-content: center; text-align: center; }
+  }
+  @media (min-width: 1024px) { .store-row { margin-top: 20px; } }
   .store-btn-lg .store-ico {
     display: flex; align-items: center; justify-content: center;
     width: 36px; height: 36px; flex: none;
@@ -448,13 +453,13 @@
 
   .trust-row {
     display: flex; flex-wrap: wrap; gap: 8px 20px;
-    margin-top: 20px;
+    margin-top: 12px;
     font-size: 12px; color: var(--asphalt-300);
   }
   .trust-row span { display: inline-flex; align-items: center; gap: 6px; }
   .trust-row .ico { width: 14px; height: 14px; color: var(--brand-400); stroke-width: 3; }
 
-  .hero-note { margin: 20px 0 0; font-size: 11.5px; color: var(--asphalt-500); }
+  .hero-note { margin: 12px 0 0; font-size: 11.5px; color: var(--asphalt-500); }
 
   /* ---------- Phone ---------- */
   .phone-wrap {
@@ -463,7 +468,9 @@
     margin: 0 auto;
     animation: rise24 .55s var(--ease) .25s both;
   }
-  .phone-stage { position: relative; width: 100%; max-width: 280px; margin: 0 auto; }
+  .hero-copy .badge { margin-bottom: 12px; }
+  @media (min-width: 1024px) { .hero-copy .badge { margin-bottom: 16px; } }
+  .phone-stage { position: relative; width: 100%; max-width: 272px; margin: 0 auto; }
   @media (max-width: 639px) { .phone-stage { max-width: 250px; } }
   @keyframes rise24 {
     from { opacity: 0; transform: translateY(24px); }
@@ -492,12 +499,12 @@
   .phone-float { position: relative; animation: phoneFloat 4s ease-in-out infinite; will-change: transform; }
   @keyframes phoneFloat {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-14px); }
+    50% { transform: translateY(-8px); }
   }
   .phone-tilt { animation: phoneTilt 6s ease-in-out infinite; will-change: transform; }
   @keyframes phoneTilt {
-    0%, 100% { transform: rotate(-1.5deg); }
-    50% { transform: rotate(1.5deg); }
+    0%, 100% { transform: rotate(-1.2deg); }
+    50% { transform: rotate(1.2deg); }
   }
   .phone-screen {
     position: relative;
@@ -511,7 +518,7 @@
     width: 228.57%; height: auto; max-width: none;
   }
 
-  .phone-actions { display: grid; gap: 10px; margin-top: 24px; }
+  .phone-actions { display: grid; gap: 10px; margin-top: 20px; }
   @media (min-width: 640px) { .phone-actions { grid-template-columns: 1fr 1fr; } }
   .phone-action {
     display: flex; align-items: center; gap: 10px;
@@ -535,6 +542,9 @@
   }
   .phone-action .action-ico .ico { width: 18px; height: 18px; }
   .phone-action .action-copy { min-width: 0; }
+  @media (max-width: 639px) {
+    .phone-action { justify-content: center; text-align: center; }
+  }
   .phone-action .action-copy small {
     display: block; font-size: 8.5px; font-weight: 700;
     letter-spacing: .14em; text-transform: uppercase; color: var(--asphalt-400);
@@ -547,7 +557,7 @@
   }
   .phone-trust {
     display: flex; flex-wrap: wrap; justify-content: center;
-    gap: 8px 16px; margin-top: 16px;
+    gap: 8px 16px; margin-top: 12px;
     font-size: 11px; color: var(--asphalt-400);
   }
   .phone-trust span { display: inline-flex; align-items: center; gap: 6px; }
@@ -811,9 +821,10 @@
         </h1>
 
         <p class="hero-lede item">
-          <strong>Mototaxi, taxi, delivery, minivan o autobús: tú eliges.</strong>
-          Seis servicios en una sola app, con la tarifa clara antes de pedir y pago en
-          bolívares o dólares.
+          La primera app multimodal de movilidad en Venezuela.
+          <strong>Mototaxi, taxis, delivery, minivan o autobús... ¡Tú eliges!</strong>
+          Viaja sin esperas ni regateos: con tarifa clara. Sin sorpresas ni esperas: precios
+          transparentes y conductores 100% verificados con llegada en minutos.
         </p>
 
         <div class="store-row item">
@@ -840,7 +851,7 @@
         </div>
 
         <p class="hero-note item">
-          La app está en preparación.
+          En preparación.
           <button type="button" class="linklike" data-open="download">
             Ver estado del lanzamiento
             <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"/></svg>
