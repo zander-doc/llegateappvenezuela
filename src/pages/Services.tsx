@@ -25,8 +25,8 @@ import {
 } from "../components/ui";
 import { ServiceCard } from "../components/ServiceCard";
 import { useUI } from "../lib/ui";
-import { SERVICES, getService } from "../data/services";
-import { estimateFare, formatKm, formatUSD } from "../lib/format";
+import { LAUNCH_SERVICES, UPCOMING_SERVICES, getService, serviceStatusLabel } from "../data/services";
+import { estimateFare, estimateTripFare, formatKm, formatUSD } from "../lib/format";
 
 export function ServiciosPage() {
   const { openModal } = useUI();
@@ -39,10 +39,10 @@ export function ServiciosPage() {
           <>
             Una app.
             <br />
-            Seis formas de moverte.
+            Tres servicios para arrancar.
           </>
         }
-        description="Moto para lo rápido, carro para el grupo, minivan para el aeropuerto, autobús para la frontera, delivery para un paquete y carga para lo que no cabe en el maletero."
+        description="Empezamos con mototaxi, taxi y delivery: la base para afinar el piloto. Cuando estén ajustados, sumamos minivan, autobús y carga por fases, sin cambiar de app."
         crumbs={[{ label: "Servicios", to: "/servicios" }]}
         actions={
           <>
@@ -61,12 +61,12 @@ export function ServiciosPage() {
               <div className="rounded-lg border border-white/8 bg-white/[0.025] p-3">
                 <p className="text-[11px] text-ink-400">Más económico</p>
                 <p className="mt-1 text-[15px] font-semibold text-white">Mototaxi</p>
-                <p className="mono text-[11.5px] text-racing-400">Desde $1,50</p>
+                <p className="mono text-[11.5px] text-racing-400">Desde {formatUSD(getService("mototaxi")!.minFareUSD)}</p>
               </div>
               <div className="rounded-lg border border-white/8 bg-white/[0.025] p-3">
-                <p className="text-[11px] text-ink-400">Para grupos</p>
-                <p className="mt-1 text-[15px] font-semibold text-white">Minivan VIP</p>
-                <p className="mono text-[11.5px] text-racing-400">7 plazas</p>
+                <p className="text-[11px] text-ink-400">Para enviar</p>
+                <p className="mt-1 text-[15px] font-semibold text-white">Delivery Express</p>
+                <p className="mono text-[11.5px] text-racing-400">Desde {formatUSD(getService("delivery")!.minFareUSD)}</p>
               </div>
             </div>
             <Link to="/tarifas" className="mt-3 flex items-center justify-between text-[12.5px] font-semibold text-brand-400">
@@ -77,10 +77,42 @@ export function ServiciosPage() {
       />
 
       <section className="wrap py-12 sm:py-16">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICES.map((service, i) => (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-brand-400">Disponibles al lanzar</p>
+            <h2 className="heading mt-2 text-[24px] font-bold text-white sm:text-[28px]">
+              Los tres servicios piloto
+            </h2>
+          </div>
+          <Badge tone="success">
+            <Check className="h-3 w-3" /> Operan desde el día uno
+          </Badge>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {LAUNCH_SERVICES.map((service, i) => (
             <ServiceCard key={service.slug} service={service} index={i} />
           ))}
+        </div>
+
+        <div className="mt-12">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-racing-500">Próximas fases</p>
+              <h2 className="heading mt-2 text-[24px] font-bold text-white sm:text-[28px]">
+                Se suman cuando el piloto esté afinado
+              </h2>
+            </div>
+            <Badge tone="yellow">Aún no operan</Badge>
+          </div>
+          <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-ink-400">
+            Las fichas y tarifas de estos servicios son de referencia. Se activan por etapas, empezando por la
+            minivan y luego autobús y carga.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {UPCOMING_SERVICES.map((service, i) => (
+              <ServiceCard key={service.slug} service={service} index={i} />
+            ))}
+          </div>
         </div>
       </section>
 
@@ -143,7 +175,7 @@ export function ServiceDetailPage() {
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-400">Servicio</p>
         <h1 className="heading mt-3 text-[34px] font-bold text-white">No encontramos ese servicio</h1>
         <p className="mx-auto mt-2 max-w-md text-[15px] text-ink-300">
-          Puede que el enlace esté incompleto. Mira los seis servicios disponibles.
+          Puede que el enlace esté incompleto. Mira los servicios disponibles.
         </p>
         <Button to="/servicios" className="mt-6">
           Ver servicios <ArrowRight className="h-4 w-4" />
@@ -152,9 +184,16 @@ export function ServiceDetailPage() {
     );
   }
 
+  const isLaunch = service.status === "launch";
   const exampleKm = 8;
-  const exampleFare = estimateFare(service.fromUSD, service.perKmUSD, exampleKm);
-  const others = SERVICES.filter((s) => s.slug !== service.slug).slice(0, 3);
+  const exampleFare = estimateFare(service.minFareUSD, service.perKmUSD, exampleKm);
+  const exampleRound = estimateTripFare(service.minFareUSD, service.perKmUSD, exampleKm, {
+    roundTrip: true,
+  }).totalUSD;
+  const others = [
+    ...LAUNCH_SERVICES.filter((s) => s.slug !== service.slug),
+    ...UPCOMING_SERVICES.filter((s) => s.slug !== service.slug),
+  ].slice(0, 3);
 
   return (
     <>
@@ -173,7 +212,7 @@ export function ServiceDetailPage() {
         actions={
           <>
             <Button size="lg" onClick={() => openModal({ type: "download" })}>
-              <Download className="h-4 w-4" /> Pedir en la app
+              <Download className="h-4 w-4" /> {isLaunch ? "Pedir en la app" : "Avísame del lanzamiento"}
             </Button>
             <Button
               size="lg"
@@ -190,15 +229,17 @@ export function ServiceDetailPage() {
               <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-brand-500/25 bg-brand-500/10 text-brand-400">
                 <ServiceIcon icon={service.icon} className="h-5.5 w-5.5" />
               </span>
-              <Badge tone="success">
-                <Check className="h-3 w-3" /> Disponible al lanzar
+              <Badge tone={isLaunch ? "success" : "yellow"}>
+                {isLaunch ? <Check className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                {serviceStatusLabel(service)}
               </Badge>
             </div>
-            <p className="mt-4 text-[11px] uppercase tracking-wider text-ink-500">Tarifa de referencia</p>
-            <Money usd={service.fromUSD} size="lg" className="mt-1" />
+            <p className="mt-4 text-[11px] uppercase tracking-wider text-ink-500">Tarifa mínima</p>
+            <Money usd={service.minFareUSD} size="lg" className="mt-1" />
             <p className="mt-1 text-[12px] text-ink-400">
-              + <span className="mono">${service.perKmUSD.toFixed(2)}</span> por km
+              + <span className="mono">{formatUSD(service.perKmUSD)}</span> por km
             </p>
+            <p className="mt-1 text-[10.5px] text-ink-500">El mínimo puede variar según la ciudad.</p>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/8 pt-3 text-[11.5px]">
               <span className="flex items-center gap-1.5 text-ink-300">
                 <Users className="h-3.5 w-3.5 text-brand-400" /> {service.capacity}
@@ -210,6 +251,28 @@ export function ServiceDetailPage() {
           </div>
         }
       />
+
+      {!isLaunch && (
+        <section className="wrap pt-8 sm:pt-10">
+          <div className="flex flex-col gap-3 rounded-2xl border border-racing-500/25 bg-racing-500/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="flex items-start gap-2.5 text-[13px] leading-relaxed text-ink-200">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-racing-500" />
+              <span>
+                <strong className="text-white">{service.name} llega en la {service.phase}.</strong> Primero
+                ajustamos mototaxi, taxi y delivery; esta ficha y su tarifa son de referencia.
+              </span>
+            </p>
+            <Button
+              size="sm"
+              variant="yellow"
+              className="shrink-0"
+              onClick={() => openModal({ type: "download" })}
+            >
+              Avisarme <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </section>
+      )}
 
       <section className="wrap grid gap-10 py-12 sm:py-16 lg:grid-cols-[1.4fr_0.6fr]">
         <div>
@@ -277,15 +340,22 @@ export function ServiceDetailPage() {
             <Money usd={exampleFare} size="lg" className="mt-1" />
             <div className="mt-3 grid gap-1.5 border-t border-white/8 pt-3 text-[12px] text-ink-400">
               <div className="flex justify-between">
-                <span>Tarifa base</span>
-                <span className="mono">{formatUSD(service.fromUSD)}</span>
+                <span>Tarifa mínima</span>
+                <span className="mono">{formatUSD(service.minFareUSD)}</span>
               </div>
               <div className="flex justify-between">
                 <span>
-                  {formatKm(exampleKm)} × ${service.perKmUSD.toFixed(2)}
+                  {formatKm(exampleKm)} × {formatUSD(service.perKmUSD)}
                 </span>
                 <span className="mono">{formatUSD(service.perKmUSD * exampleKm)}</span>
               </div>
+            </div>
+            <div className="mt-3 rounded-lg border border-brand-500/25 bg-brand-500/[0.06] px-3 py-2">
+              <div className="flex justify-between text-[11.5px] text-ink-200">
+                <span>Ida y vuelta</span>
+                <span className="mono font-semibold text-white">{formatUSD(exampleRound)}</span>
+              </div>
+              <p className="mt-0.5 text-[10px] text-ink-500">Mínimo + ida + regreso</p>
             </div>
             <Button full className="mt-4" onClick={() => openModal({ type: "fare", serviceSlug: service.slug })}>
               Ajustar distancia

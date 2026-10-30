@@ -1,5 +1,7 @@
 export type ServiceIcon = "bike" | "car" | "van" | "bus" | "package" | "truck";
 
+export type ServiceStatus = "launch" | "upcoming";
+
 export interface Service {
   slug: string;
   name: string;
@@ -7,10 +9,12 @@ export interface Service {
   tagline: string;
   description: string;
   icon: ServiceIcon;
-  fromUSD: number;
+  minFareUSD: number;
   perKmUSD: number;
   capacity: string;
   eta: string;
+  status: ServiceStatus;
+  phase?: string;
   bestFor: string[];
   features: string[];
   routes: { from: string; to: string; usd: number }[];
@@ -26,10 +30,11 @@ export const SERVICES: Service[] = [
     description:
       "Para trayectos cortos dentro de la ciudad: de la casa al trabajo, al mercado o a la parada. Pides desde la app, ves el precio antes de confirmar y compartes tu ruta con quien quieras.",
     icon: "bike",
-    fromUSD: 1.5,
-    perKmUSD: 0.6,
+    minFareUSD: 1,
+    perKmUSD: 0.3,
     capacity: "1 pasajero",
     eta: "3 a 7 min",
+    status: "launch",
     bestFor: ["Distancias de 1 a 6 km", "Calles angostas o tráfico pesado", "Viajes rápidos y económicos"],
     features: [
       "Casco y chaleco disponibles para el pasajero",
@@ -38,9 +43,9 @@ export const SERVICES: Service[] = [
       "Pago en bolívares o dólares",
     ],
     routes: [
-      { from: "Sabana Grande", to: "Bellas Artes", usd: 2.1 },
-      { from: "Chacao", to: "Altamira", usd: 2.4 },
-      { from: "Centro de Maracaibo", to: "Bella Vista", usd: 2.8 },
+      { from: "Sabana Grande", to: "Bellas Artes", usd: 1.7 },
+      { from: "Chacao", to: "Altamira", usd: 1.85 },
+      { from: "Centro de Maracaibo", to: "Bella Vista", usd: 1.95 },
     ],
     faqs: [
       {
@@ -61,10 +66,11 @@ export const SERVICES: Service[] = [
     description:
       "Un carro privado para hasta cuatro pasajeros. Ideal para diligencias, salidas familiares o cuando llevas equipaje. Tarifa calculada por distancia, sin regateos.",
     icon: "car",
-    fromUSD: 3.5,
-    perKmUSD: 1.1,
+    minFareUSD: 3,
+    perKmUSD: 0.5,
     capacity: "Hasta 4 pasajeros",
     eta: "5 a 10 min",
+    status: "launch",
     bestFor: ["Diligencias y compras", "Salidas familiares", "Viajes con equipaje mediano"],
     features: [
       "Carro privado solo para tu grupo",
@@ -73,9 +79,9 @@ export const SERVICES: Service[] = [
       "Recibo digital del viaje",
     ],
     routes: [
-      { from: "Caracas · Centro", to: "Las Mercedes", usd: 6.2 },
-      { from: "Valencia · Naguanagua", to: "Centro", usd: 4.9 },
-      { from: "Barquisimeto · Este", to: "Centro", usd: 5.5 },
+      { from: "Caracas · Centro", to: "Las Mercedes", usd: 6.75 },
+      { from: "Valencia · Naguanagua", to: "Centro", usd: 5.6 },
+      { from: "Barquisimeto · Este", to: "Centro", usd: 5.25 },
     ],
     faqs: [
       {
@@ -96,10 +102,12 @@ export const SERVICES: Service[] = [
     description:
       "Minivans de 7 plazas para traslados al aeropuerto, reuniones de trabajo o grupos. Se reserva con anticipación y el conductor te espera con tu nombre en la salida.",
     icon: "van",
-    fromUSD: 25,
+    minFareUSD: 25,
     perKmUSD: 1.4,
     capacity: "Hasta 7 pasajeros",
     eta: "Reserva programada",
+    status: "upcoming",
+    phase: "Fase 2",
     bestFor: ["Aeropuerto Maiquetía y La Chinita", "Traslados corporativos", "Grupos con equipaje"],
     features: [
       "Reserva desde 2 horas antes",
@@ -131,10 +139,12 @@ export const SERVICES: Service[] = [
     description:
       "Puestos en unidades de 14 a 24 plazas para rutas entre ciudades y hacia la frontera. Compra tu puesto con anticipación, elige tu hora de salida y recibe los datos de la unidad.",
     icon: "bus",
-    fromUSD: 12,
+    minFareUSD: 12,
     perKmUSD: 0.25,
     capacity: "14 a 24 puestos",
     eta: "Salidas programadas",
+    status: "upcoming",
+    phase: "Fase 3",
     bestFor: ["Rutas Caracas–Valencia–Barquisimeto", "San Antonio y Cúcuta", "Viajes con equipaje grande"],
     features: [
       "Puesto asignado al comprar",
@@ -166,10 +176,11 @@ export const SERVICES: Service[] = [
     description:
       "Entregas dentro de la ciudad en moto o carro. Útil para documentos, comida, medicinas o cualquier paquete de hasta 5 kg. Quien recibe puede confirmar la entrega desde su teléfono.",
     icon: "package",
-    fromUSD: 1.8,
-    perKmUSD: 0.7,
+    minFareUSD: 1,
+    perKmUSD: 0.35,
     capacity: "Hasta 5 kg",
     eta: "20 a 45 min",
+    status: "launch",
     bestFor: ["Documentos y llaves", "Comida y medicinas", "Paquetes de hasta 5 kg"],
     features: [
       "Código de entrega para quien recibe",
@@ -178,9 +189,9 @@ export const SERVICES: Service[] = [
       "Tarifa por distancia, sin regateo",
     ],
     routes: [
-      { from: "Chacao", to: "Sabana Grande", usd: 2.9 },
-      { from: "Maracaibo · Centro", to: "Bella Vista", usd: 3.2 },
-      { from: "Valencia · Prebo", to: "Naguanagua", usd: 3.6 },
+      { from: "Chacao", to: "Sabana Grande", usd: 2 },
+      { from: "Maracaibo · Centro", to: "Bella Vista", usd: 2.1 },
+      { from: "Valencia · Prebo", to: "Naguanagua", usd: 2.4 },
     ],
     faqs: [
       {
@@ -201,10 +212,12 @@ export const SERVICES: Service[] = [
     description:
       "Camionetas y camiones para encomiendas, mobiliario o carga de hasta 500 kg. Reserva con medida y peso aproximado para asignar la unidad correcta y recibir un precio cerrado.",
     icon: "truck",
-    fromUSD: 18,
+    minFareUSD: 18,
     perKmUSD: 1.3,
     capacity: "Hasta 500 kg",
     eta: "Reserva programada",
+    status: "upcoming",
+    phase: "Fase 3",
     bestFor: ["Mudanzas pequeñas", "Mobiliario y electrodomésticos", "Encomiendas entre ciudades"],
     features: [
       "Unidad según peso y volumen",
@@ -230,7 +243,13 @@ export const SERVICES: Service[] = [
   },
 ];
 
+export const LAUNCH_SERVICES = SERVICES.filter((s) => s.status === "launch");
+export const UPCOMING_SERVICES = SERVICES.filter((s) => s.status === "upcoming");
+
 export const getService = (slug?: string) => SERVICES.find((s) => s.slug === slug);
+
+export const serviceStatusLabel = (service: Service) =>
+  service.status === "launch" ? "Disponible al lanzar" : `Próximamente · ${service.phase}`;
 
 export const SERVICE_ICON_LABEL: Record<ServiceIcon, string> = {
   bike: "Moto",

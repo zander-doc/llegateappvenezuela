@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEMO_BCV_RATE, estimateFare, formatBs, formatKm, formatRate, formatUSD } from "./format";
+import { DEMO_BCV_RATE, estimateFare, estimateTripFare, formatBs, formatKm, formatRate, formatUSD } from "./format";
 
 describe("formatUSD", () => {
   it("formatea con dos decimales y coma decimal", () => {
@@ -34,6 +34,27 @@ describe("estimateFare", () => {
 
   it("redondea a dos decimales", () => {
     expect(estimateFare(1.111, 0.222, 3)).toBe(1.78);
+  });
+});
+
+describe("estimateTripFare", () => {
+  it("nunca baja de la tarifa mínima", () => {
+    const fare = estimateTripFare(3, 0.5, 0);
+    expect(fare.totalUSD).toBe(3);
+    expect(fare.distanceUSD).toBe(0);
+  });
+
+  it("suma el regreso en ida y vuelta sin duplicar la mínima", () => {
+    const fare = estimateTripFare(1, 0.3, 5, { roundTrip: true });
+    expect(fare.distanceKm).toBe(10);
+    expect(fare.distanceUSD).toBe(3);
+    expect(fare.totalUSD).toBe(4);
+  });
+
+  it("mantiene la distancia simple cuando es solo ida", () => {
+    const fare = estimateTripFare(1, 0.3, 5);
+    expect(fare.distanceKm).toBe(5);
+    expect(fare.totalUSD).toBe(2.5);
   });
 });
 

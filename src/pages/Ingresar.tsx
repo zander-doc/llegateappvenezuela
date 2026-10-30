@@ -16,9 +16,15 @@ import {
 } from "lucide-react";
 import { Badge, Button, DemoNote, Money } from "../components/ui";
 import { Reveal } from "../components/Motion";
+import { isContact } from "../lib/validation";
 import { useUI } from "../lib/ui";
 
 type Mode = "login" | "recover";
+
+type FieldErrors = {
+  contact?: string;
+  password?: string;
+};
 
 const copy: Record<Mode, { title: string; subtitle: string }> = {
   login: {
@@ -46,6 +52,7 @@ function IconField({
   label,
   icon: Icon,
   hint,
+  error,
   className = "",
   id,
   ...props
@@ -53,17 +60,34 @@ function IconField({
   label: string;
   icon: ComponentType<{ className?: string }>;
   hint?: string;
+  error?: string;
 }) {
   const autoId = useId();
   const inputId = id ?? autoId;
+  const describedBy =
+    [error ? `${inputId}-error` : null, hint ? `${inputId}-hint` : null].filter(Boolean).join(" ") || undefined;
   return (
     <label className="block" htmlFor={inputId}>
       <span className="label">{label}</span>
       <span className="relative block">
         <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-        <input id={inputId} className={`field pl-10 ${className}`} {...props} />
+        <input
+          id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`field pl-10 ${error ? "border-red-500/60 focus:border-red-400" : ""} ${className}`}
+          {...props}
+        />
       </span>
-      {hint && <span className="mt-1.5 block text-[11.5px] text-ink-500">{hint}</span>}
+      {error ? (
+        <span id={`${inputId}-error`} className="mt-1.5 block text-[11.5px] leading-snug text-red-300">
+          {error}
+        </span>
+      ) : hint ? (
+        <span id={`${inputId}-hint`} className="mt-1.5 block text-[11.5px] text-ink-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -71,16 +95,28 @@ function IconField({
 function PasswordField({
   label,
   hint,
+  error,
+  id,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string }) {
   const [visible, setVisible] = useState(false);
-  const id = useId();
+  const autoId = useId();
+  const inputId = id ?? autoId;
+  const describedBy =
+    [error ? `${inputId}-error` : null, hint ? `${inputId}-hint` : null].filter(Boolean).join(" ") || undefined;
   return (
-    <label className="block" htmlFor={id}>
+    <label className="block" htmlFor={inputId}>
       <span className="label">{label}</span>
       <span className="relative block">
         <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-        <input id={id} className="field pl-10 pr-12" type={visible ? "text" : "password"} {...props} />
+        <input
+          id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`field pl-10 pr-12 ${error ? "border-red-500/60 focus:border-red-400" : ""}`}
+          type={visible ? "text" : "password"}
+          {...props}
+        />
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
@@ -91,7 +127,15 @@ function PasswordField({
           {visible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
         </button>
       </span>
-      {hint && <span className="mt-1.5 block text-[11.5px] text-ink-500">{hint}</span>}
+      {error ? (
+        <span id={`${inputId}-error`} className="mt-1.5 block text-[11.5px] leading-snug text-red-300">
+          {error}
+        </span>
+      ) : hint ? (
+        <span id={`${inputId}-hint`} className="mt-1.5 block text-[11.5px] text-ink-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -101,37 +145,50 @@ export function IngresarPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [done, setDone] = useState<Mode | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [form, setForm] = useState({
     contact: "",
     password: "",
     remember: true,
   });
+  const contactId = useId();
+  const passwordId = useId();
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (key === "contact" && errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
+    if (key === "password" && errors.password) setErrors((current) => ({ ...current, password: undefined }));
   }
 
   function changeMode(next: Mode) {
     setMode(next);
     setDone(null);
-    setError("");
+    setErrors({});
     setLoading(false);
   }
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const contact = form.contact.trim();
-    if (contact.length < 7) {
-      setError("Escribe un correo o un número de teléfono válido.");
-      return;
+    const next: FieldErrors = {};
+    if (!form.contact.trim()) {
+      next.contact = "Escribe tu correo o teléfono.";
+    } else if (!isContact(form.contact)) {
+      next.contact = "Escribe un correo válido o un teléfono de al menos 7 dígitos.";
     }
     if (mode !== "recover" && form.password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
+      next.password = "La contraseña debe tener al menos 6 caracteres.";
+    }
+
+    setErrors(next);
+    if (next.contact) {
+      document.getElementById(contactId)?.focus();
+      return;
+    }
+    if (next.password) {
+      document.getElementById(passwordId)?.focus();
       return;
     }
 
-    setError("");
     setLoading(true);
     window.setTimeout(() => {
       setLoading(false);
@@ -166,7 +223,7 @@ export function IngresarPage() {
                 <span className="italic text-brand-500">aquí.</span>
               </h2>
               <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-300">
-                Una sola cuenta para pedir moto, carro, minivan o delivery; pagar en bolívares o dólares y seguir
+                Una sola cuenta para pedir moto, carro o delivery; pagar en bolívares o dólares y seguir
                 cada viaje con la ruta compartida.
               </p>
             </div>
@@ -276,6 +333,7 @@ export function IngresarPage() {
 
                 <form className="mt-5 grid gap-4" onSubmit={submit} noValidate>
                   <IconField
+                    id={contactId}
                     label="Correo o teléfono"
                     icon={Mail}
                     placeholder="tucorreo@ejemplo.com o 0414 000 0000"
@@ -283,17 +341,18 @@ export function IngresarPage() {
                     inputMode="email"
                     value={form.contact}
                     onChange={(e) => set("contact", e.target.value)}
-                    aria-invalid={Boolean(error) && form.contact.trim().length < 7}
+                    error={errors.contact}
                   />
 
                   {mode !== "recover" && (
                     <PasswordField
+                      id={passwordId}
                       label="Contraseña"
                       placeholder="Tu contraseña"
                       autoComplete="current-password"
                       value={form.password}
                       onChange={(e) => set("password", e.target.value)}
-                      aria-invalid={Boolean(error) && form.password.length < 6}
+                      error={errors.password}
                     />
                   )}
 
@@ -316,15 +375,6 @@ export function IngresarPage() {
                         ¿Olvidaste tu contraseña?
                       </button>
                     </div>
-                  )}
-
-                  {error && (
-                    <p
-                      role="alert"
-                      className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-[12.5px] leading-relaxed text-red-300"
-                    >
-                      {error}
-                    </p>
                   )}
 
                   <Button type="submit" full disabled={loading} aria-busy={loading}>

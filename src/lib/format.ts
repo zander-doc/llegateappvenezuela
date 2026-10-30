@@ -27,8 +27,32 @@ export function formatRate(rate = DEMO_BCV_RATE): string {
   return rateFmt.format(rate);
 }
 
-export function estimateFare(fromUSD: number, perKmUSD: number, km: number, minutes = 0): number {
-  return Math.round((fromUSD + perKmUSD * km + minutes * 0.04) * 100) / 100;
+export interface FareEstimate {
+  minUSD: number;
+  distanceKm: number;
+  distanceUSD: number;
+  totalUSD: number;
+}
+
+export function estimateTripFare(
+  minFareUSD: number,
+  perKmUSD: number,
+  km: number,
+  options: { roundTrip?: boolean; minutes?: number } = {}
+): FareEstimate {
+  const distanceKm = Math.round(km * (options.roundTrip ? 2 : 1) * 10) / 10;
+  const rawDistance = perKmUSD * distanceKm;
+  const total = minFareUSD + rawDistance + (options.minutes ?? 0) * 0.04;
+  return {
+    minUSD: minFareUSD,
+    distanceKm,
+    distanceUSD: Math.round(rawDistance * 100) / 100,
+    totalUSD: Math.round(Math.max(minFareUSD, total) * 100) / 100,
+  };
+}
+
+export function estimateFare(minFareUSD: number, perKmUSD: number, km: number, minutes = 0): number {
+  return estimateTripFare(minFareUSD, perKmUSD, km, { minutes }).totalUSD;
 }
 
 export function formatKm(km: number): string {

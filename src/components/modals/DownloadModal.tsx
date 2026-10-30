@@ -2,11 +2,18 @@ import { useState } from "react";
 import { ArrowRight, Check, Download, Globe, Play, ShieldCheck, Smartphone } from "lucide-react";
 import { Modal } from "../Modal";
 import { Button, DemoNote } from "../ui";
-import { FormSuccess, OptionCard, SelectField, TextField, saveDemoLead } from "./shared";
+import { FieldError, FormSuccess, OptionCard, SelectField, TextField } from "./shared";
+import { saveDemoLead } from "../../lib/demoStorage";
+import { isContact } from "../../lib/validation";
 import { useUI } from "../../lib/ui";
 import { HUBS } from "../../data/site";
 
 type Platform = "ios" | "android" | "web";
+
+type FieldErrors = {
+  contact?: string;
+  consent?: string;
+};
 
 const platformLabel: Record<Platform, string> = {
   ios: "iPhone",
@@ -28,22 +35,33 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
   const [contact, setContact] = useState("");
   const [city, setCity] = useState(HUBS[0].city);
   const [consent, setConsent] = useState(false);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [done, setDone] = useState(false);
 
   const isSignin = intent === "signin";
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (contact.trim().length < 7) {
-      setError("Escribe un correo o un número de teléfono válido.");
-      return;
+    const next: FieldErrors = {};
+    if (!contact.trim()) {
+      next.contact = "Escribe un correo o un número de teléfono.";
+    } else if (!isContact(contact)) {
+      next.contact = "Escribe un correo válido o un teléfono de al menos 7 dígitos.";
     }
     if (!consent) {
-      setError("Marca la casilla para autorizar el aviso de lanzamiento.");
+      next.consent = "Marca la casilla para autorizar el aviso de lanzamiento.";
+    }
+
+    setErrors(next);
+    if (next.contact) {
+      document.getElementById("download-contact")?.focus();
       return;
     }
-    setError("");
+    if (next.consent) {
+      document.getElementById("download-consent")?.focus();
+      return;
+    }
+
     saveDemoLead("llegate_sim_waitlist", { platform, contact, city, intent: intent ?? "download" });
     setDone(true);
     notify("Listo. Guardamos tu aviso en este navegador (demo).");
@@ -61,9 +79,9 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
           title={isSignin ? "Tu cuenta vive en la app" : "Te avisamos el día del lanzamiento"}
           text={
             <>
-              Guardamos tu contacto para la versión de <strong className="text-white">{platformLabel[platform]}</strong>{" "}
-              y tu ciudad (<strong className="text-white">{city}</strong>). En producción recibirías un enlace personal
-              para crear tu cuenta o descargar la app.
+              Anotamos la versión de <strong className="text-white">{platformLabel[platform]}</strong> y tu ciudad (
+              <strong className="text-white">{city}</strong>). En producción te enviaríamos un enlace personal al
+              contacto que dejaste para crear tu cuenta o descargar la app.
             </>
           }
           actions={
@@ -164,12 +182,18 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
         </div>
       )}
 
-      <form onSubmit={submit} className="mt-5 grid gap-3">
+      <form onSubmit={submit} noValidate className="mt-5 grid gap-3">
         <TextField
+          id="download-contact"
           label={isSignin ? "Correo o teléfono de tu cuenta" : "Correo o teléfono"}
           placeholder="tucorreo@ejemplo.com o 0414 000 0000"
           value={contact}
-          onChange={(e) => setContact(e.target.value)}
+          onChange={(e) => {
+            setContact(e.target.value);
+            if (errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
+          }}
+          error={errors.contact}
+          hint="En esta demo no se envía fuera del navegador."
           autoComplete="email"
           required
         />
@@ -184,9 +208,15 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
 
         <label className="flex items-start gap-2.5 text-[12px] leading-relaxed text-ink-300">
           <input
+            id="download-consent"
             type="checkbox"
             checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
+            onChange={(e) => {
+              setConsent(e.target.checked);
+              if (errors.consent) setErrors((current) => ({ ...current, consent: undefined }));
+            }}
+            aria-invalid={errors.consent ? true : undefined}
+            aria-describedby={errors.consent ? "download-consent-error" : undefined}
             className="mt-0.5 h-4 w-4 shrink-0 accent-brand-500"
           />
           <span>
@@ -194,12 +224,7 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
             <span className="ml-1 text-ink-500">(En esta demo no se envía nada.)</span>
           </span>
         </label>
-
-        {error && (
-          <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
-            {error}
-          </p>
-        )}
+        {errors.consent && <FieldError id="download-consent-error">{errors.consent}</FieldError>}
 
         <Button type="submit" full>
           <Download className="h-4 w-4" />

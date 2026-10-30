@@ -32,7 +32,8 @@ import {
 } from "lucide-react";
 import { Badge, Button, DemoNote } from "../components/ui";
 import { Reveal } from "../components/Motion";
-import { saveDemoLead } from "../components/modals/shared";
+import { saveDemoLead } from "../lib/demoStorage";
+import { isCedula, isEmail, isPersonName, isVenezuelanPhone } from "../lib/validation";
 import { HUBS } from "../data/site";
 
 type FieldKey = "name" | "email" | "phone" | "idCard" | "city" | "password" | "confirm" | "consent";
@@ -52,33 +53,26 @@ type FormValues = {
 
 const FIELD_ORDER: FieldKey[] = ["name", "email", "phone", "idCard", "password", "confirm", "city", "consent"];
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
-const NAME_RE = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{3,}$/;
-
 function validate(field: FieldKey, form: FormValues): string | undefined {
   switch (field) {
     case "name": {
       const value = form.name.trim();
       if (!value) return "Escribe tu nombre y apellido.";
-      if (!NAME_RE.test(value)) return "Usa al menos 3 caracteres y evita números o símbolos.";
+      if (!isPersonName(value)) return "Usa al menos 3 caracteres y evita números o símbolos.";
       return undefined;
     }
     case "email":
       if (!form.email.trim()) return "Escribe tu correo electrónico.";
-      if (!EMAIL_RE.test(form.email.trim())) return "Escribe un correo válido, por ejemplo nombre@correo.com.";
+      if (!isEmail(form.email)) return "Escribe un correo válido, por ejemplo nombre@correo.com.";
       return undefined;
     case "phone": {
-      const digits = form.phone.replace(/\D/g, "");
-      if (!digits) return "Escribe tu número de teléfono.";
-      if (!/^(0\d{10}|58\d{10}|\d{10})$/.test(digits)) {
-        return "Escribe un número venezolano, por ejemplo 0414 1234567.";
-      }
+      if (!form.phone.trim()) return "Escribe tu número de teléfono.";
+      if (!isVenezuelanPhone(form.phone)) return "Escribe un número venezolano, por ejemplo 0414 1234567.";
       return undefined;
     }
     case "idCard": {
-      const value = form.idCard.trim().replace(/[-.\s]/g, "").toUpperCase();
-      if (!value) return "Escribe tu cédula de identidad.";
-      if (!/^[VE]\d{6,9}$/.test(value)) return "Usa el formato V-12345678 o E-12345678.";
+      if (!form.idCard.trim()) return "Escribe tu cédula de identidad.";
+      if (!isCedula(form.idCard)) return "Usa el formato V-12345678 o E-12345678.";
       return undefined;
     }
     case "city":
@@ -375,7 +369,7 @@ export function CuentaRegistroPage() {
                   <span className="italic text-brand-500">minutos.</span>
                 </h2>
                 <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-300">
-                  Registra tus datos una vez y pide moto, carro, minivan o delivery sin volver a escribir direcciones.
+                  Registra tus datos una vez y pide moto, carro o delivery sin volver a escribir direcciones.
                 </p>
               </div>
 

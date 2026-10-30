@@ -2,9 +2,16 @@ import { useState } from "react";
 import { BadgeCheck, Clock, MapPin, Store } from "lucide-react";
 import { Modal } from "../Modal";
 import { Badge, Button } from "../ui";
-import { FormSuccess, TextAreaField, TextField, saveDemoLead } from "./shared";
+import { FormSuccess, TextAreaField, TextField } from "./shared";
+import { saveDemoLead } from "../../lib/demoStorage";
+import { isContact, isPersonName } from "../../lib/validation";
 import { getVendor } from "../../data/vendors";
 import { useUI } from "../../lib/ui";
+
+type FieldErrors = {
+  name?: string;
+  contact?: string;
+};
 
 export function VendorModal({ vendorSlug, onClose }: { vendorSlug: string; onClose: () => void }) {
   const { notify } = useUI();
@@ -14,22 +21,41 @@ export function VendorModal({ vendorSlug, onClose }: { vendorSlug: string; onClo
   const [message, setMessage] = useState(
     vendor ? `Hola, vi su ficha en Llégate y quiero consultar por: ${vendor.offer}` : ""
   );
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [done, setDone] = useState(false);
 
   if (!vendor) return null;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim().length < 2) {
-      setError("Escribe tu nombre.");
+    const next: FieldErrors = {};
+    if (!name.trim()) {
+      next.name = "Escribe tu nombre.";
+    } else if (!isPersonName(name)) {
+      next.name = "Usa al menos 3 caracteres, sin números ni símbolos.";
+    }
+    if (!contact.trim()) {
+      next.contact = "Escribe un correo o teléfono para que te respondan.";
+    } else if (!isContact(contact)) {
+      next.contact = "Escribe un correo válido o un teléfono de al menos 7 dígitos.";
+    }
+
+    setErrors(next);
+    if (next.name) {
+      document.getElementById("vendor-name")?.focus();
       return;
     }
-    if (contact.trim().length < 7) {
-      setError("Escribe un correo o teléfono para que te respondan.");
+    if (next.contact) {
+      document.getElementById("vendor-contact")?.focus();
       return;
     }
-    saveDemoLead("llegate_sim_vendor_messages", { vendor: vendor.slug, name, contact, message });
+
+    saveDemoLead("llegate_sim_vendor_messages", {
+      vendor: vendor.slug,
+      name: name.trim(),
+      contact,
+      message,
+    });
     notify("Mensaje guardado en este navegador (demo).");
     setDone(true);
   };
@@ -83,21 +109,34 @@ export function VendorModal({ vendorSlug, onClose }: { vendorSlug: string; onClo
         </div>
       </div>
 
-      <form onSubmit={submit} className="mt-4 grid gap-3">
-        <TextField label="Tu nombre" value={name} onChange={(e) => setName(e.target.value)} required />
+      <form onSubmit={submit} noValidate className="mt-4 grid gap-3">
         <TextField
+          id="vendor-name"
+          label="Tu nombre"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (errors.name) setErrors((current) => ({ ...current, name: undefined }));
+          }}
+          error={errors.name}
+          autoComplete="name"
+          required
+        />
+        <TextField
+          id="vendor-contact"
           label="Correo o teléfono"
           placeholder="tucorreo@ejemplo.com"
           value={contact}
-          onChange={(e) => setContact(e.target.value)}
+          onChange={(e) => {
+            setContact(e.target.value);
+            if (errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
+          }}
+          error={errors.contact}
+          hint="Solo para que te respondan. En esta demo no se envía fuera del navegador."
+          autoComplete="email"
           required
         />
         <TextAreaField label="Mensaje" value={message} onChange={(e) => setMessage(e.target.value)} />
-        {error && (
-          <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
-            {error}
-          </p>
-        )}
         <Button type="submit" full>
           Enviar mensaje
         </Button>

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { ArrowRight, Calculator, Clock, MapPin, Route } from "lucide-react";
 import { Button, Money, RateNote, ServiceIcon } from "./ui";
-import { SERVICES, getService } from "../data/services";
-import { estimateFare, formatKm, formatUSD } from "../lib/format";
+import { LAUNCH_SERVICES, getService } from "../data/services";
+import { estimateTripFare, formatKm, formatUSD } from "../lib/format";
 
 export function FareEstimator({
-  initialService = "taxi-pana",
+  initialService = "mototaxi",
   onPrimary,
   primaryLabel = "Pedir en la app",
   compact = false,
@@ -16,11 +16,12 @@ export function FareEstimator({
   compact?: boolean;
 }) {
   const [slug, setSlug] = useState(initialService);
-  const [km, setKm] = useState(8);
-  const service = getService(slug) ?? SERVICES[0];
-  const fare = estimateFare(service.fromUSD, service.perKmUSD, km);
+  const [km, setKm] = useState(5);
+  const [roundTrip, setRoundTrip] = useState(false);
+  const service = getService(slug) ?? LAUNCH_SERVICES[0];
+  const fare = estimateTripFare(service.minFareUSD, service.perKmUSD, km, { roundTrip });
   const speed = service.icon === "bus" || service.icon === "van" ? 0.85 : service.icon === "bike" ? 0.42 : 0.34;
-  const minutes = Math.max(5, Math.round(km / speed));
+  const minutes = Math.max(5, Math.round(fare.distanceKm / speed));
   const pct = ((km - 1) / 59) * 100;
 
   return (
@@ -37,7 +38,7 @@ export function FareEstimator({
 
       <div className={`${compact ? "px-5" : ""} mt-4`}>
         <div className="flex flex-wrap gap-1.5">
-          {SERVICES.map((s) => (
+          {LAUNCH_SERVICES.map((s) => (
             <button
               key={s.slug}
               type="button"
@@ -59,7 +60,7 @@ export function FareEstimator({
       <div className={`${compact ? "px-5" : ""} mt-5`}>
         <div className="flex items-end justify-between gap-3">
           <label htmlFor="fare-distance" className="text-[13px] font-semibold text-white">
-            Distancia del recorrido
+            Distancia de ida
           </label>
           <span className="mono text-[15px] font-semibold text-racing-400">{formatKm(km)}</span>
         </div>
@@ -79,13 +80,39 @@ export function FareEstimator({
           <span>30 km</span>
           <span>60 km</span>
         </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-xl border border-white/10 bg-ink-950/60 p-1" role="group" aria-label="Tipo de recorrido">
+          {[
+            { value: false, label: "Solo ida" },
+            { value: true, label: "Ida y vuelta" },
+          ].map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              onClick={() => setRoundTrip(option.value)}
+              aria-pressed={roundTrip === option.value}
+              className={`min-h-[36px] rounded-lg text-[11.5px] font-semibold transition ${
+                roundTrip === option.value
+                  ? "bg-brand-500/15 text-white"
+                  : "text-ink-400 hover:text-white"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[10.5px] leading-relaxed text-ink-500">
+          Ida y vuelta suma los mismos kilómetros de regreso. La tarifa mínima se cobra una sola vez.
+        </p>
       </div>
 
       <div className={`${compact ? "mx-5 mb-5" : ""} mt-5 rounded-xl border border-white/10 bg-ink-950/60 p-4`}>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-ink-500">Estimado para {formatKm(km)}</p>
-            <Money usd={fare} size="lg" className="mt-1" />
+            <p className="text-[11px] uppercase tracking-wider text-ink-500">
+              Estimado {roundTrip ? "ida y vuelta" : "solo ida"} · {formatKm(fare.distanceKm)}
+            </p>
+            <Money usd={fare.totalUSD} size="lg" className="mt-1" />
           </div>
           <div className="flex flex-col items-end gap-1 text-[11.5px] text-ink-400">
             <span className="inline-flex items-center gap-1.5">
@@ -98,16 +125,19 @@ export function FareEstimator({
         </div>
         <div className="mt-3 grid gap-1 border-t border-white/8 pt-3 text-[12px] text-ink-400">
           <div className="flex justify-between">
-            <span>Tarifa base</span>
-            <span className="mono">{formatUSD(service.fromUSD)}</span>
+            <span>Tarifa mínima</span>
+            <span className="mono">{formatUSD(fare.minUSD)}</span>
           </div>
           <div className="flex justify-between">
             <span>
-              Distancia ({formatKm(km)} × ${service.perKmUSD.toFixed(2)})
+              Distancia ({formatKm(fare.distanceKm)} × {formatUSD(service.perKmUSD)})
             </span>
-            <span className="mono">{formatUSD(service.perKmUSD * km)}</span>
+            <span className="mono">{formatUSD(fare.distanceUSD)}</span>
           </div>
         </div>
+        <p className="mt-3 border-t border-white/8 pt-2.5 text-[10.5px] leading-relaxed text-ink-500">
+          El mínimo puede variar según la ciudad. La app muestra el monto de tu zona antes de confirmar.
+        </p>
       </div>
 
       <div className={`${compact ? "px-5 pb-5" : ""} mt-4 flex flex-col gap-2 sm:flex-row`}>

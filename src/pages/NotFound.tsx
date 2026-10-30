@@ -17,7 +17,7 @@ const suggestions = [
   {
     icon: Car,
     title: "Servicios",
-    text: "Moto, carro, minivan, autobús, delivery y carga.",
+    text: "Mototaxi, taxi y delivery desde el lanzamiento.",
     to: "/servicios",
   },
   {

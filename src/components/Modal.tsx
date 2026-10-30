@@ -20,15 +20,16 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const subtitleId = useId();
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     document.body.classList.add("modal-open");
     const timer = window.setTimeout(() => {
       const focusable = panelRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href]'
       );
-      focusable?.focus();
+      (focusable ?? panelRef.current)?.focus();
     }, 40);
 
     const onKey = (e: KeyboardEvent) => {
@@ -83,6 +84,8 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={subtitle ? subtitleId : undefined}
+        tabIndex={-1}
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 320, damping: 30, mass: 0.9 }}
@@ -97,7 +100,11 @@ export function Modal({
             <h2 id={titleId} className="heading text-[21px] font-bold text-white sm:text-[23px]">
               {title}
             </h2>
-            {subtitle && <p className="mt-1 text-[13.5px] leading-relaxed text-ink-400">{subtitle}</p>}
+            {subtitle && (
+              <p id={subtitleId} className="mt-1 text-[13.5px] leading-relaxed text-ink-400">
+                {subtitle}
+              </p>
+            )}
           </div>
           <button
             type="button"

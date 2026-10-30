@@ -2,10 +2,17 @@ import { useState } from "react";
 import { ArrowRight, Building2, Handshake, MessageCircle } from "lucide-react";
 import { Modal } from "../Modal";
 import { Button } from "../ui";
-import { FormSuccess, SelectField, TextAreaField, TextField, saveDemoLead } from "./shared";
+import { FormSuccess, SelectField, TextAreaField, TextField } from "./shared";
+import { saveDemoLead } from "../../lib/demoStorage";
+import { isContact, isPersonName } from "../../lib/validation";
 import { useUI } from "../../lib/ui";
 
 type Intent = "empresa" | "aliado" | "contacto";
+
+type FieldErrors = {
+  name?: string;
+  contact?: string;
+};
 
 const config: Record<
   Intent,
@@ -73,23 +80,39 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
     topic: c.topics[0],
     message: "",
   });
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [done, setDone] = useState(false);
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+    if (key === "name" && errors.name) setErrors((current) => ({ ...current, name: undefined }));
+    if (key === "contact" && errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (form.name.trim().length < 2) {
-      setError("Escribe tu nombre.");
+    const next: FieldErrors = {};
+    if (!form.name.trim()) {
+      next.name = "Escribe tu nombre.";
+    } else if (!isPersonName(form.name)) {
+      next.name = "Usa al menos 3 caracteres, sin números ni símbolos.";
+    }
+    if (!form.contact.trim()) {
+      next.contact = "Escribe un correo o teléfono para responderte.";
+    } else if (!isContact(form.contact)) {
+      next.contact = "Escribe un correo válido o un teléfono de al menos 7 dígitos.";
+    }
+
+    setErrors(next);
+    if (next.name) {
+      document.getElementById("lead-name")?.focus();
       return;
     }
-    if (form.contact.trim().length < 7) {
-      setError("Escribe un correo o teléfono válido.");
+    if (next.contact) {
+      document.getElementById("lead-contact")?.focus();
       return;
     }
+
     saveDemoLead(`llegate_sim_${intent}`, form);
     notify("Mensaje guardado en este navegador (demo).");
     setDone(true);
@@ -121,21 +144,34 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
         </div>
       )}
 
-      <form onSubmit={submit} className="grid gap-3">
+      <form onSubmit={submit} noValidate className="grid gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Tu nombre" value={form.name} onChange={(e) => set("name", e.target.value)} required />
+          <TextField
+            id="lead-name"
+            label="Tu nombre"
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
+            error={errors.name}
+            autoComplete="name"
+            required
+          />
           <TextField
             label={c.orgLabel ?? "Empresa u organización"}
             value={form.org}
             onChange={(e) => set("org", e.target.value)}
             placeholder={intent === "contacto" ? "Opcional" : ""}
+            autoComplete="organization"
           />
         </div>
         <TextField
-          label={intent === "contacto" ? "Correo o teléfono" : "Correo corporativo"}
+          id="lead-contact"
+          label={intent === "contacto" ? "Correo o teléfono" : "Correo corporativo o teléfono"}
           value={form.contact}
           onChange={(e) => set("contact", e.target.value)}
+          error={errors.contact}
+          hint="Solo para responderte. En esta demo no se envía fuera del navegador."
           placeholder="tucorreo@ejemplo.com"
+          autoComplete="email"
           required
         />
         <SelectField label={c.topicLabel} value={form.topic} onChange={(e) => set("topic", e.target.value)}>
@@ -153,11 +189,6 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
               : "Cuéntanos brevemente qué tienes en mente"
           }
         />
-        {error && (
-          <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
-            {error}
-          </p>
-        )}
         <Button type="submit" full>
           <Icon className="h-4 w-4" />
           {c.submit} <ArrowRight className="h-3.5 w-3.5" />

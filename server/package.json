@@ -1,0 +1,22 @@
+{
+  "name": "llegate-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "test": "node --test",
+    "check": "node --check src/index.js && node --check src/app.js && node --check src/config.js && node --check src/supabase.js && node --check src/schemas.js && node --check src/http.js && node --check src/middleware.js && node --check src/routes/auth.js && node --check src/routes/drivers.js && node --check src/routes/wallet.js && node --check src/routes/admin.js && node --check src/routes/trips.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "zod": "^3.24.1"
+  }
+}

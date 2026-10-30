@@ -4,9 +4,11 @@ import {
   Check,
   Crown,
   Download,
+  Gift,
   MapPin,
   MessageCircle,
   Percent,
+  ReceiptText,
   Route,
   ShieldCheck,
   Share2,
@@ -24,17 +26,19 @@ import {
   InlineLink,
   Money,
   SectionHead,
+  ServiceIcon,
 } from "../components/ui";
 import { Hero } from "../components/Hero";
+import { Ticker } from "../components/Ticker";
 import { Stagger, StaggerItem } from "../components/Motion";
 import { ServiceCard } from "../components/ServiceCard";
-import { PlanCard } from "../components/PlanCard";
 import { VendorCard } from "../components/VendorCard";
 import { FareEstimator } from "../components/FareEstimator";
 import { CoverageSearch } from "../components/CoverageSearch";
 import { useUI } from "../lib/ui";
-import { SERVICES } from "../data/services";
-import { DRIVER_PLANS } from "../data/plans";
+import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
+import { PILOT_RULES } from "../data/prepaid";
+import { formatUSD } from "../lib/format";
 import { VENDORS } from "../data/vendors";
 import { homeFaqs } from "../data/faqs";
 import { SAFETY_POINTS, STEPS } from "../data/site";
@@ -50,31 +54,59 @@ export function HomePage() {
   return (
     <>
       <Hero />
+      <Ticker />
 
       {/* Services */}
       <section className="wrap py-14 sm:py-20">
         <SectionHead
-          kicker="Un solo lugar"
+          kicker="Arranque por fases"
           title={
             <>
-              Seis formas de moverte.
+              Tres servicios para empezar.
               <br className="hidden sm:block" /> Una sola app.
             </>
           }
-          text="Cada servicio tiene su propia tarifa, capacidad y reglas. Elige el que necesitas y compara antes de pedir."
+          text="El lanzamiento se concentra en mototaxi, taxi y delivery. Cuando estos pilotos estén afinados, sumamos minivan, autobús y carga."
           action={
             <Button variant="secondary" to="/servicios">
-              Ver todos <ArrowRight className="h-4 w-4" />
+              Ver servicios <ArrowRight className="h-4 w-4" />
             </Button>
           }
         />
         <Stagger className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICES.map((service, i) => (
+          {LAUNCH_SERVICES.map((service, i) => (
             <StaggerItem key={service.slug} className="h-full">
               <ServiceCard service={service} index={i} />
             </StaggerItem>
           ))}
         </Stagger>
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-racing-500" aria-hidden="true" />
+              <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-ink-300">En camino</p>
+            </div>
+            <p className="text-[11.5px] text-ink-500">Se abren a medida que los servicios piloto se ajustan</p>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {UPCOMING_SERVICES.map((service) => (
+              <Link
+                key={service.slug}
+                to={`/servicios/${service.slug}`}
+                className="group flex items-center gap-3 rounded-xl border border-white/8 bg-ink-900/60 px-3 py-2.5 transition hover:border-brand-500/40"
+              >
+                <span className="text-brand-400">
+                  <ServiceIcon icon={service.icon} className="h-4.5 w-4.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-white">{service.name}</span>
+                  <span className="block text-[11px] text-ink-500">Próximamente · {service.phase}</span>
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-ink-500 transition group-hover:text-brand-400" />
+              </Link>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* How it works */}
@@ -125,7 +157,7 @@ export function HomePage() {
             <CheckList
               className="mt-5"
               items={[
-                "Tarifa base y distancia desglosadas",
+                "Tarifa mínima y distancia desglosadas",
                 "Una sola tasa BCV para web, app y recibo",
                 "Sin cargos que aparezcan al final del viaje",
               ]}
@@ -181,7 +213,7 @@ export function HomePage() {
           <SectionHead
             kicker="Para conductores"
             title="Tu carro, tu moto, tus reglas."
-            text="Elige cómo pagar: 10% por viaje o un plan mensual con 0% de comisión. Sin letras pequeñas."
+            text={`Sin mensualidad: recargas desde ${formatUSD(PILOT_RULES.minRechargeUSD)} y la app descuenta 10% por viaje completado. Empiezas con ${formatUSD(PILOT_RULES.welcomeUSD)} de bienvenida.`}
             action={
               <Button variant="yellow" to="/conductores">
                 Trabaja con Llégate <ArrowRight className="h-4 w-4" />
@@ -189,16 +221,41 @@ export function HomePage() {
             }
           />
           <div className="mt-8 grid gap-3 md:grid-cols-3">
-            {DRIVER_PLANS.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} compact />
-            ))}
+            {[
+              {
+                icon: Gift,
+                title: "Saldo de bienvenida",
+                text: `${formatUSD(PILOT_RULES.welcomeUSD)} al activar tu cuenta piloto, sin vencimiento.`,
+              },
+              {
+                icon: Wallet,
+                title: `Recargas desde ${formatUSD(PILOT_RULES.minRechargeUSD)}`,
+                text: `Pago Móvil o Binance. Aprobación manual con SLA de ${PILOT_RULES.approvalSlaMinutes} minutos.`,
+              },
+              {
+                icon: ReceiptText,
+                title: "10% por viaje completado",
+                text: "No se cobra al aceptar: se reserva y se descuenta al finalizar, con recibo.",
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="card p-5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-500/25 bg-brand-500/10 text-brand-400">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="heading mt-3.5 text-[16px] font-bold text-white">{item.title}</h3>
+                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-300">{item.text}</p>
+                </div>
+              );
+            })}
           </div>
           <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-2xl border border-racing-500/20 bg-racing-500/[0.05] p-4 sm:flex-row sm:items-center sm:px-5">
             <p className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-ink-300">
               <Percent className="mt-0.5 h-4 w-4 shrink-0 text-racing-500" />
               <span>
-                <strong className="text-white">Ejemplo:</strong> 30 viajes por semana con un ticket promedio de $5.
-                Con el plan mensual pagas $12 y te quedas con el resto, sin comisión por viaje.
+                <strong className="text-white">Ejemplo:</strong> 30 viajes por semana con un ticket promedio de $5
+                generan unos $15 de comisión semanal. Una recarga de $20 cubre más de una semana completa.
               </span>
             </p>
             <Link
@@ -341,8 +398,8 @@ export function HomePage() {
               </div>
               <ul className="mt-3 grid gap-2.5">
                 {[
-                  "Viajes en moto, carro y minivan",
-                  "Delivery y encomiendas",
+                  "Mototaxi, taxi y delivery desde el día uno",
+                  "Minivan, autobús y carga por fases",
                   "Pagos en bolívares y dólares",
                   "Ruta compartida y botón de emergencia",
                   "Soporte y recibo digital",

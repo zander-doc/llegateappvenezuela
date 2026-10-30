@@ -18,7 +18,7 @@ import {
 import { Accordion, Badge, Button, Eyebrow, PageHero, ServiceIcon } from "../components/ui";
 import { useUI } from "../lib/ui";
 import { FAQ_GROUPS } from "../data/faqs";
-import { SERVICES } from "../data/services";
+import { LAUNCH_SERVICES, UPCOMING_SERVICES, type Service } from "../data/services";
 
 const quickLinks = [
   {
@@ -225,29 +225,21 @@ export function AyudaPage() {
           <Eyebrow>Guía rápida</Eyebrow>
           <h2 className="heading mt-3 text-[28px] font-bold text-white sm:text-[34px]">¿Qué servicio te conviene?</h2>
           <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-ink-400">
-            Elige por lo que necesitas mover, no por el nombre del vehículo. Cada ficha incluye tarifa base, capacidad
-            y ejemplos de ruta.
+            Arrancamos con mototaxi, taxi y delivery. Minivan, autobús y carga aparecen como próximas fases y se
+            activan cuando los servicios piloto estén ajustados.
           </p>
 
-          <div className="mt-6 grid gap-2">
-            {SERVICES.map((service) => (
-              <Link
-                key={service.slug}
-                to={`/servicios/${service.slug}`}
-                className="group grid items-center gap-3 rounded-xl border border-white/8 bg-white/[0.025] p-4 transition hover:border-brand-400/40 hover:bg-white/[0.04] sm:grid-cols-[auto_1.1fr_1.4fr_auto]"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-ink-950 text-brand-400">
-                  <ServiceIcon icon={service.icon} className="h-5 w-5" />
-                </span>
-                <div>
-                  <p className="text-[14.5px] font-semibold text-white">{service.name}</p>
-                  <p className="text-[11.5px] text-ink-500">Hasta {service.capacity}</p>
-                </div>
-                <p className="text-[12.5px] leading-relaxed text-ink-400">{service.bestFor}</p>
-                <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand-400">
-                  Desde {service.fromUSD.toFixed(2).replace(".", ",")}$ <ArrowRight className="h-3.5 w-3.5" />
-                </span>
-              </Link>
+          <p className="mt-6 text-[10.5px] font-bold uppercase tracking-[0.18em] text-ink-500">Disponibles al lanzar</p>
+          <div className="mt-2 grid gap-2">
+            {LAUNCH_SERVICES.map((service) => (
+              <ServiceGuideRow key={service.slug} service={service} />
+            ))}
+          </div>
+
+          <p className="mt-5 text-[10.5px] font-bold uppercase tracking-[0.18em] text-ink-500">Próximas fases</p>
+          <div className="mt-2 grid gap-2">
+            {UPCOMING_SERVICES.map((service) => (
+              <ServiceGuideRow key={service.slug} service={service} />
             ))}
           </div>
 
@@ -327,5 +319,37 @@ export function AyudaPage() {
         </div>
       </section>
     </>
+  );
+}
+
+function ServiceGuideRow({ service }: { service: Service }) {
+  const isLaunch = service.status === "launch";
+
+  return (
+    <Link
+      to={`/servicios/${service.slug}`}
+      className={`group grid items-center gap-3 rounded-xl border border-white/8 bg-white/[0.025] p-4 transition hover:border-brand-400/40 hover:bg-white/[0.04] sm:grid-cols-[auto_1.1fr_1.4fr_auto] ${
+        isLaunch ? "" : "opacity-80"
+      }`}
+    >
+      <span
+        className={`flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-ink-950 ${
+          isLaunch ? "text-brand-400" : "text-ink-400"
+        }`}
+      >
+        <ServiceIcon icon={service.icon} className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="flex flex-wrap items-center gap-2 text-[14.5px] font-semibold text-white">
+          {service.name}
+          {!isLaunch && <Badge tone="yellow">Próximamente · {service.phase}</Badge>}
+        </p>
+        <p className="text-[11.5px] text-ink-500">Hasta {service.capacity}</p>
+      </div>
+      <p className="text-[12.5px] leading-relaxed text-ink-400">{service.short}</p>
+      <span className={`inline-flex items-center gap-1 text-[12px] font-semibold ${isLaunch ? "text-brand-400" : "text-ink-400"}`}>
+        {isLaunch ? "Desde" : "Ref."} {service.minFareUSD.toFixed(2).replace(".", ",")}$ <ArrowRight className="h-3.5 w-3.5" />
+      </span>
+    </Link>
   );
 }

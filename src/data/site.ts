@@ -85,7 +85,11 @@ export function hubCityLabel(stateName: string) {
 }
 
 export const STATS = [
-  { value: "6", label: "servicios en una sola app", detail: "Moto, carro, minivan, autobús, delivery y carga" },
+  {
+    value: "3",
+    label: "servicios desde el día uno",
+    detail: "Mototaxi, taxi y delivery; el resto llega por fases",
+  },
   { value: "2", label: "monedas de pago", detail: "Bolívares a tasa BCV o dólares en efectivo" },
   { value: "0%", label: "de comisión con plan Pro", detail: "Pagas el plan, no un porcentaje por viaje" },
   { value: "3", label: "pasos para pedir", detail: "Elige, confirma y muévete" },
@@ -95,7 +99,7 @@ export const STEPS = [
   {
     n: "01",
     title: "Elige tu servicio",
-    text: "Moto para lo rápido, carro para el grupo, minivan para el aeropuerto o carga para lo pesado.",
+    text: "Moto para lo rápido, carro para el grupo o delivery para un paquete. Minivan, autobús y carga se suman en próximas fases.",
   },
   {
     n: "02",

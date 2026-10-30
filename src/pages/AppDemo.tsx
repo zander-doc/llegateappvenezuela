@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BadgeCheck,
@@ -16,7 +17,10 @@ import {
   Wallet,
 } from "lucide-react";
 import { Badge, Button, Eyebrow, PageHero, SectionHead, ServiceIcon } from "../components/ui";
+import { PilotWalletMini } from "../components/PilotWallet";
 import { useUI } from "../lib/ui";
+import { usePilotWallet, type PilotTripReceipt } from "../lib/pilotWallet";
+import { PILOT_RULES, commissionFor, requiredBalanceFor } from "../data/prepaid";
 import { getService } from "../data/services";
 import { estimateFare, formatUSD } from "../lib/format";
 
@@ -24,8 +28,15 @@ type Mode = "ride" | "package" | "driver";
 
 const places = ["Altamira", "Sabana Grande", "Bellas Artes", "Chacao"];
 
+const PACKAGE_PRICES: Record<string, number> = {
+  Sobre: 1.5,
+  "Caja mediana": 2.5,
+  "Hasta 5 kg": 3.5,
+};
+
 export function AppDemoPage() {
   const { openModal, notify } = useUI();
+  const { releaseHold } = usePilotWallet();
   const [mode, setMode] = useState<Mode>("ride");
   const [step, setStep] = useState(0);
   const [destination, setDestination] = useState("Altamira");
@@ -34,7 +45,11 @@ export function AppDemoPage() {
   const [online, setOnline] = useState(false);
 
   const service = getService(serviceSlug)!;
-  const fare = estimateFare(service.fromUSD, service.perKmUSD, 2.5);
+  const fare = estimateFare(service.minFareUSD, service.perKmUSD, 2.5);
+
+  useEffect(() => {
+    if (mode !== "driver") releaseHold();
+  }, [mode, releaseHold]);
 
   function reset(nextMode: Mode = mode) {
     setMode(nextMode);
@@ -224,6 +239,7 @@ export function AppDemoPage() {
                       onNext={() => setStep((s) => Math.min(3, s + 1))}
                       onBack={() => setStep((s) => Math.max(0, s - 1))}
                       onReset={() => reset()}
+                      onContinue={() => setStep(0)}
                     />
                   )}
                 </div>
@@ -382,7 +398,7 @@ function RideFlow({
   onShare: () => void;
 }) {
   const service = getService(serviceSlug)!;
-  const options = ["mototaxi", "taxi-pana", "minivan-vip"].map((slug) => getService(slug)!);
+  const options = ["mototaxi", "taxi-pana"].map((slug) => getService(slug)!);
 
   return (
     <div className="animate-fade-in">
@@ -417,7 +433,7 @@ function RideFlow({
           <p className="heading mt-0.5 text-[16px] font-bold text-white">Elige cómo moverte</p>
           <div className="mt-2 grid gap-1.5">
             {options.map((s) => {
-              const price = estimateFare(s.fromUSD, s.perKmUSD, 2.5);
+              const price = estimateFare(s.minFareUSD, s.perKmUSD, 2.5);
               return (
                 <button
                   key={s.slug}
@@ -439,6 +455,9 @@ function RideFlow({
               );
             })}
           </div>
+          <p className="mt-1.5 text-[8px] text-ink-500">
+            Delivery se prueba en el modo Paquete. Minivan llega en una próxima fase.
+          </p>
           <div className="mt-2 flex gap-1.5">
             <button type="button" onClick={onBack} className="rounded-lg border border-white/10 px-2 py-1.5 text-[9.5px] text-ink-300">
               Atrás
@@ -472,7 +491,7 @@ function RideFlow({
                 type="button"
                 onClick={() => setPayment(p)}
                 className={`rounded-full border px-2 py-1 text-[9px] ${
-                  payment === p ? "border-racing-500/50 bg-racing-500/10 text-racing-300" : "border-white/12 text-ink-400"
+                  payment === p ? "border-racing-500/50 bg-racing-500/10 text-racing-400" : "border-white/12 text-ink-400"
                 }`}
               >
                 {p}
@@ -538,7 +557,7 @@ function PackageFlow({
   const [pickup] = useState("Chacao");
   const [dropoff, setDropoff] = useState("Sabana Grande");
   const [size, setSize] = useState("Caja mediana");
-  const price = size === "Sobre" ? 2.4 : size === "Caja mediana" ? 3.2 : 4.1;
+  const price = PACKAGE_PRICES[size] ?? 1;
 
   return (
     <div className="animate-fade-in">
@@ -582,7 +601,7 @@ function PackageFlow({
                 }`}
               >
                 {s}
-                <span className="mono text-[9.5px]">{formatUSD(s === "Sobre" ? 2.4 : s === "Caja mediana" ? 3.2 : 4.1)}</span>
+                <span className="mono text-[9.5px]">{formatUSD(PACKAGE_PRICES[s])}</span>
               </button>
             ))}
           </div>
@@ -607,7 +626,7 @@ function PackageFlow({
               <p className="text-[8px] text-ink-500">Delivery Express</p>
               <p className="mono text-[16px] font-semibold text-white">{formatUSD(price)}</p>
             </div>
-            <span className="rounded-full border border-racing-500/30 bg-racing-500/10 px-2 py-0.5 text-[8px] text-racing-300">
+            <span className="rounded-full border border-racing-500/30 bg-racing-500/10 px-2 py-0.5 text-[8px] text-racing-400">
               Código al recibir
             </span>
           </div>
@@ -648,6 +667,7 @@ function DriverFlow({
   onNext,
   onBack,
   onReset,
+  onContinue,
 }: {
   step: number;
   online: boolean;
@@ -655,12 +675,76 @@ function DriverFlow({
   onNext: () => void;
   onBack: () => void;
   onReset: () => void;
+  onContinue: () => void;
 }) {
+  const { available, hold, holdCommission, captureCommission, releaseHold, pendingRecharge } = usePilotWallet();
+  const [tripId, setTripId] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<PilotTripReceipt | null>(null);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+
+  const fare = 6.2;
+  const commission = commissionFor(fare);
+  const net = fare - commission;
+  const required = requiredBalanceFor(fare);
+  const canWork = available >= PILOT_RULES.minBalanceUSD;
+  const canAccept = available >= required;
+
+  useEffect(() => {
+    return () => {
+      if (tripId) releaseHold(tripId);
+    };
+  }, [tripId, releaseHold]);
+
+  function acceptTrip() {
+    const result = holdCommission({ fareUSD: fare, origin: "Chacao", destination: "Altamira" });
+    if (!result.ok) {
+      setAcceptError(
+        result.reason === "insufficient"
+          ? `Te faltan ${formatUSD(result.neededUSD)} de saldo disponible. Recarga arriba y espera la aprobación.`
+          : "Ya tienes una comisión reservada en otro viaje."
+      );
+      return;
+    }
+    setTripId(result.hold.tripId);
+    setReceipt(null);
+    setAcceptError(null);
+    onNext();
+  }
+
+  function completeTrip() {
+    if (!tripId) return;
+    const result = captureCommission(tripId);
+    if (!result) {
+      setAcceptError("No encontramos la reserva de este viaje. Reinicia la demo.");
+      return;
+    }
+    setReceipt(result);
+    setAcceptError(null);
+    onNext();
+  }
+
+  function resetDemo() {
+    if (tripId) releaseHold(tripId);
+    setTripId(null);
+    setReceipt(null);
+    setAcceptError(null);
+    onReset();
+  }
+
+  function continueDriving() {
+    setTripId(null);
+    setReceipt(null);
+    setAcceptError(null);
+    onContinue();
+  }
+
   return (
     <div className="animate-fade-in">
+      <PilotWalletMini />
+
       {step === 0 && (
         <>
-          <p className="text-[8.5px] font-bold uppercase tracking-[0.14em] text-brand-400">Paso 1 de 3</p>
+          <p className="mt-2 text-[8.5px] font-bold uppercase tracking-[0.14em] text-brand-400">Paso 1 de 3</p>
           <p className="heading mt-0.5 text-[16px] font-bold text-white">Conéctate cuando quieras</p>
           <p className="mt-0.5 text-[9px] text-ink-400">Zona: Caracas · Este</p>
           <div className="mt-2 flex items-center justify-between rounded-lg border border-white/10 bg-ink-950/60 px-2.5 py-2">
@@ -678,39 +762,67 @@ function DriverFlow({
               <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${online ? "left-[18px]" : "left-0.5"}`} />
             </button>
           </div>
-          <DemoButton onClick={() => { setOnline(true); onNext(); }} disabled={!online && false}>
-            {online ? "Ver solicitud" : "Conectarme y ver solicitud"}
+          {!canWork && (
+            <p className="mt-2 rounded-lg border border-racing-500/25 bg-racing-500/[0.07] px-2 py-1.5 text-[8.5px] leading-relaxed text-racing-400">
+              Necesitas {formatUSD(PILOT_RULES.minBalanceUSD)} disponible para recibir viajes. Recarga con los botones
+              de arriba (aprobación simulada).
+            </p>
+          )}
+          <DemoButton onClick={() => { setOnline(true); onNext(); }} disabled={!canWork}>
+            {canWork ? (online ? "Ver solicitud" : "Conectarme y ver solicitud") : "Recarga para conectarte"}
           </DemoButton>
         </>
       )}
 
       {step === 1 && (
         <>
-          <p className="text-[8.5px] font-bold uppercase tracking-[0.14em] text-brand-400">Solicitud</p>
+          <p className="mt-2 text-[8.5px] font-bold uppercase tracking-[0.14em] text-brand-400">Solicitud</p>
           <p className="heading mt-0.5 text-[16px] font-bold text-white">Taxi Pana · 2,5 km</p>
           <div className="mt-2 rounded-lg border border-white/10 bg-ink-950/60 p-2 text-[9px]">
             <p className="flex items-center gap-1"><MapPin className="h-3 w-3 text-racing-500" /> Chacao</p>
             <p className="mt-1 flex items-center gap-1"><Navigation className="h-3 w-3 text-brand-400" /> Altamira</p>
-            <div className="mt-2 flex items-end justify-between border-t border-white/8 pt-1.5">
-              <span className="text-ink-400">Ganas</span>
-              <span className="mono text-[15px] font-semibold text-white">$6,20</span>
+            <div className="mt-2 grid gap-1 border-t border-white/8 pt-1.5">
+              <div className="flex justify-between"><span className="text-ink-400">Tarifa</span><span className="mono text-white">{formatUSD(fare)}</span></div>
+              <div className="flex justify-between"><span className="text-ink-400">Comisión 10% (se reserva)</span><span className="mono text-racing-400">-{formatUSD(commission)}</span></div>
+              <div className="flex justify-between border-t border-white/8 pt-1"><span className="text-ink-300">Te queda</span><span className="mono font-semibold text-white">{formatUSD(net)}</span></div>
             </div>
           </div>
+          {acceptError && (
+            <p role="alert" className="mt-2 rounded-lg border border-flag-500/30 bg-flag-500/10 px-2 py-1.5 text-[8.5px] leading-relaxed text-flag-400">
+              {acceptError}
+            </p>
+          )}
+          {!acceptError && (
+            <p className="mt-2 text-[8px] leading-relaxed text-ink-500">
+              Se reservan {formatUSD(commission)} al aceptar. Solo se descuentan al completar; si cancelas, vuelven a tu saldo.
+            </p>
+          )}
           <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <button type="button" onClick={onBack} className="rounded-lg border border-white/10 py-2 text-[9.5px] text-ink-400">Rechazar</button>
-            <button type="button" onClick={onNext} className="rounded-lg bg-brand-500 py-2 text-[9.5px] font-semibold text-white">Aceptar viaje</button>
+            <button type="button" onClick={() => { setAcceptError(null); onBack(); }} className="rounded-lg border border-white/10 py-2 text-[9.5px] text-ink-400">Rechazar</button>
+            <button
+              type="button"
+              onClick={acceptTrip}
+              disabled={!canAccept}
+              className="rounded-lg bg-brand-500 py-2 text-[9.5px] font-semibold text-white disabled:opacity-40"
+            >
+              {canAccept ? "Aceptar viaje" : "Saldo insuficiente"}
+            </button>
           </div>
         </>
       )}
 
       {step === 2 && (
         <>
-          <div className="flex items-center gap-1.5">
+          <div className="mt-2 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-dot" />
             <p className="text-[9px] font-semibold text-emerald-300">Viaje aceptado</p>
           </div>
           <p className="heading mt-0.5 text-[16px] font-bold text-white">Ve al punto de recogida</p>
           <p className="mt-0.5 text-[9px] text-ink-400">Chacao · 4 min</p>
+          <div className="mt-2 rounded-lg border border-racing-500/20 bg-racing-500/[0.06] px-2 py-1.5 text-[8.5px] leading-relaxed text-ink-300">
+            <Clock className="mr-1 inline h-3 w-3 text-racing-500" />
+            Comisión reservada {formatUSD(hold?.amountUSD ?? commission)}. Aún no se cobra: se descuenta al completar.
+          </div>
           <div className="mt-2 grid gap-1.5">
             <button type="button" className="flex items-center justify-center gap-1 rounded-lg bg-brand-500 py-2 text-[9.5px] font-semibold text-white">
               <Navigation className="h-3 w-3" /> Abrir navegación
@@ -719,7 +831,7 @@ function DriverFlow({
               <Phone className="h-3 w-3" /> Llamar al pasajero
             </button>
           </div>
-          <button type="button" onClick={onNext} className="mt-2 w-full rounded-lg border border-white/12 py-1.5 text-[9px] text-ink-300">
+          <button type="button" onClick={completeTrip} className="mt-2 w-full rounded-lg border border-white/12 py-1.5 text-[9px] text-ink-300">
             Simular llegada y completar
           </button>
         </>
@@ -727,27 +839,40 @@ function DriverFlow({
 
       {step === 3 && (
         <>
-          <div className="flex items-center gap-1.5">
+          <div className="mt-2 flex items-center gap-1.5">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/15">
               <Check className="h-3.5 w-3.5 text-emerald-400" />
             </span>
             <p className="text-[9px] font-semibold text-emerald-300">Viaje completado</p>
           </div>
-          <p className="heading mt-0.5 text-[16px] font-bold text-white">Resumen del viaje</p>
+          <p className="heading mt-0.5 text-[16px] font-bold text-white">Recibo del viaje</p>
           <div className="mt-2 rounded-lg border border-white/10 bg-ink-950/60 p-2 text-[9px]">
-            <div className="flex justify-between"><span className="text-ink-400">Cobrado al pasajero</span><span className="mono text-white">$6,20</span></div>
-            <div className="mt-1 flex justify-between"><span className="text-ink-400">Comisión del plan</span><span className="mono text-emerald-400">$0,00</span></div>
-            <div className="mt-1 flex justify-between border-t border-white/8 pt-1"><span className="text-ink-300">Te quedas con</span><span className="mono font-semibold text-white">$6,20</span></div>
+            <div className="flex justify-between"><span className="text-ink-400">Cobrado al pasajero</span><span className="mono text-white">{formatUSD(receipt?.fareUSD ?? fare)}</span></div>
+            <div className="mt-1 flex justify-between"><span className="text-ink-400">Comisión descontada</span><span className="mono text-flag-400">-{formatUSD(receipt?.commissionUSD ?? commission)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-white/8 pt-1"><span className="text-ink-300">Te quedas con</span><span className="mono font-semibold text-white">{formatUSD(receipt?.netUSD ?? net)}</span></div>
+            <div className="mt-1 flex justify-between"><span className="text-ink-500">Saldo después</span><span className="mono text-ink-300">{formatUSD(receipt?.balanceAfter ?? available)}</span></div>
           </div>
+          <p className="mt-1.5 text-[8px] leading-relaxed text-ink-500">
+            El recibo queda en tu billetera.{" "}
+            <Link to="/conductores/planes#billetera" className="font-semibold text-brand-400">
+              Ver movimientos
+            </Link>
+          </p>
           <div className="mt-2 flex gap-1.5">
-            <button type="button" onClick={onReset} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-white/12 py-1.5 text-[9px] text-ink-300">
+            <button type="button" onClick={resetDemo} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-white/12 py-1.5 text-[9px] text-ink-300">
               <RotateCcw className="h-3 w-3" /> Reiniciar
             </button>
-            <button type="button" onClick={() => onNext()} className="flex-1 rounded-lg bg-brand-500 py-1.5 text-[9px] font-semibold text-white">
+            <button type="button" onClick={continueDriving} className="flex-1 rounded-lg bg-brand-500 py-1.5 text-[9px] font-semibold text-white">
               Seguir conectado
             </button>
           </div>
         </>
+      )}
+
+      {pendingRecharge && step < 3 && (
+        <p className="mt-1.5 text-center text-[8px] text-racing-400">
+          Aprobando recarga de {formatUSD(pendingRecharge.amount)}…
+        </p>
       )}
     </div>
   );

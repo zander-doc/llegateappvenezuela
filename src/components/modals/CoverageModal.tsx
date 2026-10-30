@@ -2,31 +2,49 @@ import { useState } from "react";
 import { ArrowRight, MapPin } from "lucide-react";
 import { Modal } from "../Modal";
 import { Button } from "../ui";
-import { FormSuccess, TextField, saveDemoLead } from "./shared";
+import { FormSuccess, TextField } from "./shared";
+import { saveDemoLead } from "../../lib/demoStorage";
+import { isContact } from "../../lib/validation";
 import { useUI } from "../../lib/ui";
 import { COVERAGE_LABEL, HUBS } from "../../data/site";
+
+type FieldErrors = {
+  town?: string;
+  contact?: string;
+};
 
 export function CoverageModal({ city = "", onClose }: { city?: string; onClose: () => void }) {
   const { notify } = useUI();
   const [town, setTown] = useState(city);
   const [contact, setContact] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [done, setDone] = useState(false);
 
   const hub = HUBS.find((h) => h.city.toLowerCase() === town.trim().toLowerCase());
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    const next: FieldErrors = {};
     if (!town.trim()) {
-      setError("Indica tu ciudad o municipio.");
+      next.town = "Indica tu ciudad o municipio.";
+    }
+    if (!contact.trim()) {
+      next.contact = "Escribe un correo o teléfono para avisarte.";
+    } else if (!isContact(contact)) {
+      next.contact = "Escribe un correo válido o un teléfono de al menos 7 dígitos.";
+    }
+
+    setErrors(next);
+    if (next.town) {
+      document.getElementById("coverage-town")?.focus();
       return;
     }
-    if (contact.trim().length < 7) {
-      setError("Escribe un correo o teléfono para avisarte.");
+    if (next.contact) {
+      document.getElementById("coverage-contact")?.focus();
       return;
     }
-    saveDemoLead("llegate_sim_coverage", { city: town, contact });
-    setError("");
+
+    saveDemoLead("llegate_sim_coverage", { city: town.trim(), contact });
     setDone(true);
     notify("Solicitud de cobertura guardada (demo).");
   }
@@ -38,8 +56,9 @@ export function CoverageModal({ city = "", onClose }: { city?: string; onClose: 
           title={`Anotamos ${town}`}
           text={
             <>
-              Cuando abramos operaciones en tu zona, te avisamos por el contacto que dejaste. También puedes revisar
-              las ciudades de lanzamiento y piloto en la página de cobertura.
+              En producción te avisaríamos por el correo o teléfono que dejaste cuando abramos operaciones en tu zona.
+              Aquí solo queda anotado en este navegador; puedes revisar las ciudades de lanzamiento y piloto en la
+              página de cobertura.
             </>
           }
           actions={
@@ -80,13 +99,19 @@ export function CoverageModal({ city = "", onClose }: { city?: string; onClose: 
         </div>
       </div>
 
-      <form onSubmit={submit} className="grid gap-3">
+      <form onSubmit={submit} noValidate className="grid gap-3">
         <TextField
+          id="coverage-town"
           label="Ciudad o municipio"
           placeholder="Ej. Barquisimeto, Lara"
           value={town}
-          onChange={(e) => setTown(e.target.value)}
+          onChange={(e) => {
+            setTown(e.target.value);
+            if (errors.town) setErrors((current) => ({ ...current, town: undefined }));
+          }}
+          error={errors.town}
           list="coverage-city-options"
+          autoComplete="address-level2"
           required
         />
         <datalist id="coverage-city-options">
@@ -101,17 +126,19 @@ export function CoverageModal({ city = "", onClose }: { city?: string; onClose: 
           </p>
         )}
         <TextField
+          id="coverage-contact"
           label="Correo o teléfono"
           placeholder="tucorreo@ejemplo.com"
           value={contact}
-          onChange={(e) => setContact(e.target.value)}
+          onChange={(e) => {
+            setContact(e.target.value);
+            if (errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
+          }}
+          error={errors.contact}
+          hint="Solo para avisarte. En esta demo no se envía fuera del navegador."
+          autoComplete="email"
           required
         />
-        {error && (
-          <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
-            {error}
-          </p>
-        )}
         <Button type="submit" full>
           Avísame cuando lleguen
         </Button>

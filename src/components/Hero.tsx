@@ -4,7 +4,7 @@ import {
   Apple,
   ArrowRight,
   Check,
-  LayoutGrid,
+  IdCard,
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
@@ -408,10 +408,11 @@ export function Hero() {
             <p className="mt-4 max-w-xl text-[15.5px] leading-relaxed text-ink-300 sm:text-[16.5px]">
               La primera app multimodal de movilidad en Venezuela.{" "}
               <strong className="font-semibold text-white">
-                Mototaxi, taxis, delivery, minivan o autobús... ¡Tú eliges!
+                Mototaxi, taxi y delivery... ¡Tú eliges!
               </strong>{" "}
-              Viaja sin esperas ni regateos: con tarifa clara. Sin sorpresas ni esperas: precios
-              transparentes y conductores 100% verificados con llegada en minutos.
+              Arrancamos con estos tres servicios piloto; minivan, autobús y carga se suman en próximas
+              fases. Viaja sin esperas ni regateos: tarifa clara, precios transparentes y conductores
+              100% verificados con llegada en minutos.
             </p>
           </StaggerItem>
 
@@ -512,18 +513,18 @@ export function Hero() {
               </span>
             </Link>
             <Link
-              to="/servicios"
+              to="/conductores/registro"
               className="group flex min-h-[64px] items-center justify-center gap-2.5 rounded-2xl border border-asphalt-700 bg-asphalt-900/80 px-3 py-2.5 transition hover:border-brand-500/60 hover:bg-asphalt-850 sm:justify-start"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-brand-400">
-                <LayoutGrid className="h-4.5 w-4.5" />
+                <IdCard className="h-4.5 w-4.5" />
               </span>
               <span className="min-w-0 text-center sm:text-left">
                 <span className="block text-[8.5px] font-bold uppercase tracking-[0.14em] text-ink-400">
-                  Servicios
+                  Piloto
                 </span>
                 <span className="heading mt-0.5 block text-[15.5px] font-bold leading-tight text-white">
-                  Ver servicios
+                  Regístrate
                 </span>
               </span>
             </Link>
@@ -534,7 +535,7 @@ export function Hero() {
               <Check className="h-3.5 w-3.5 text-brand-400" strokeWidth={3} /> Registro 100% gratuito
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-brand-400" /> Verificación en minutos
+              <ShieldCheck className="h-3.5 w-3.5 text-brand-400" /> Sube tus documentos en línea
             </span>
           </div>
         </Reveal>

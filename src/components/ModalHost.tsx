@@ -23,7 +23,7 @@ export function ModalHost() {
     case "coverage":
       return <CoverageModal city={modal.city} onClose={closeModal} />;
     case "driver":
-      return <DriverWizard planId={modal.planId} onClose={closeModal} />;
+      return <DriverWizard onClose={closeModal} />;
     case "plan":
       return <PlanModal planId={modal.planId} onClose={closeModal} />;
     case "vendor":

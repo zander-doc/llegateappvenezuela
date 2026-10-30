@@ -270,17 +270,32 @@ try {
     recordError("modal-fare-desktop", String(err));
   }
 
-  // Driver plan modal
+  // Pilot wallet: recarga simulada y saldo actualizado
   try {
-    await desktop.goto(BASE + "/conductores/planes", { waitUntil: "networkidle2" });
-    await clickText(desktop, "main button", "Pro Mensual");
+    await desktop.goto(BASE + "/conductores/planes#billetera", { waitUntil: "networkidle2" });
     await sleep(500);
-    const info = await modalInfo(desktop);
-    results.interactions.push({ name: "modal-plan-desktop", info });
-    await shot(desktop, "desktop-modal-plan");
-    await desktop.keyboard.press("Escape");
+    const readBalance = () =>
+      desktop.evaluate(() => {
+        const el = document.querySelector('#billetera p[aria-live="polite"]');
+        return el ? el.textContent.trim() : null;
+      });
+    const before = await readBalance();
+    await clickText(desktop, "#billetera button", "Ritmo");
+    await sleep(400);
+    const pending = await desktop.evaluate(
+      () => !!document.querySelector('#billetera [role="status"]') ||
+        (document.querySelector("#billetera")?.textContent ?? "").includes("en revisión")
+    );
+    await shot(desktop, "desktop-wallet-pending");
+    await sleep(3400);
+    const after = await readBalance();
+    const recarga = await desktop.evaluate(
+      () => (document.querySelector("#billetera")?.textContent ?? "").includes("Recarga")
+    );
+    await shot(desktop, "desktop-wallet-recarga");
+    results.interactions.push({ name: "wallet-recharge", before, after, pending, recarga });
   } catch (err) {
-    recordError("modal-plan-desktop", String(err));
+    recordError("wallet-recharge", String(err));
   }
 
   // Market filter
@@ -328,6 +343,75 @@ try {
     results.interactions.push({ name: "app-mode-switch", modeButtons });
   } catch (err) {
     recordError("app-mode-switch", String(err));
+  }
+
+  // App demo: flujo del piloto con prepago, reserva y recibo
+  try {
+    await desktop.goto(BASE + "/app", { waitUntil: "networkidle2" });
+    await clickText(desktop, "main button", "Conductor");
+    await sleep(450);
+    await clickText(desktop, "main button", "Conectarme y ver solicitud");
+    await sleep(450);
+    await clickText(desktop, "main button", "Aceptar viaje");
+    await sleep(450);
+    await clickText(desktop, "main button", "Simular llegada y completar");
+    await sleep(500);
+    const receipt = await desktop.evaluate(() => {
+      const main = document.querySelector("main");
+      const text = (main?.textContent ?? "").replace(/\s+/g, " ");
+      return {
+        hasReceipt: text.includes("Recibo del viaje"),
+        showsCommission: text.includes("Comisión descontada"),
+        showsBalance: text.includes("Saldo después"),
+        showsNet: text.includes("Te quedas con"),
+      };
+    });
+    await shot(desktop, "desktop-app-driver-receipt");
+    results.interactions.push({ name: "app-driver-prepago", ...receipt });
+  } catch (err) {
+    recordError("app-driver-prepago", String(err));
+  }
+
+  // Tarifas: mínimos por carrera e ida y vuelta
+  try {
+    await desktop.goto(BASE + "/tarifas", { waitUntil: "networkidle2" });
+    const fares = await desktop.evaluate(() => {
+      const text = (document.querySelector("main")?.textContent ?? "").replace(/\s+/g, " ");
+      const rows = [...document.querySelectorAll("main table tbody tr")]
+        .slice(0, 3)
+        .map((row) => [...row.querySelectorAll("td")].slice(0, 6).map((c) => c.textContent.trim()));
+      return {
+        hasMinimums: text.includes("El piso de cada viaje"),
+        hasRoundTripColumn: text.includes("5 km ida/vuelta"),
+        rows,
+      };
+    });
+    await clickText(desktop, "main button", "Ida y vuelta");
+    const roundTrip = await desktop.evaluate(() => {
+      const text = (document.querySelector("main")?.textContent ?? "").replace(/\s+/g, " ");
+      const idx = text.indexOf("Estimado ida y vuelta");
+      return idx >= 0 ? text.slice(idx, idx + 70) : null;
+    });
+    results.interactions.push({ name: "tarifas-minimos", ...fares, roundTrip });
+  } catch (err) {
+    recordError("tarifas-minimos", String(err));
+  }
+
+  // Calculadora de prepago en montos bajos
+  try {
+    await desktop.goto(BASE + "/conductores/planes", { waitUntil: "networkidle2" });
+    const prepaid = await desktop.evaluate(() => {
+      const text = (document.querySelector("main")?.textContent ?? "").replace(/\s+/g, " ");
+      const idx = text.indexOf("Te queda a la semana");
+      return {
+        weekly: idx >= 0,
+        defaults: text.includes("25") && text.includes("$2,00") && text.includes("$0,20 por viaje"),
+        sample: idx >= 0 ? text.slice(idx, idx + 150) : null,
+      };
+    });
+    results.interactions.push({ name: "prepago-montos-bajos", ...prepaid });
+  } catch (err) {
+    recordError("prepago-montos-bajos", String(err));
   }
 
   // Login demo (no real auth, password never persisted)

@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { Badge, Button, ServiceIcon } from "./ui";
-import { SERVICES } from "../data/services";
+import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
 import { useUI } from "../lib/ui";
 import { DEMO_BCV_RATE, formatRate } from "../lib/format";
 
@@ -305,7 +305,7 @@ export function Header() {
                     onToggle={() => setMobileSection(mobileSection === "servicios" ? null : "servicios")}
                   >
                     <div className="grid gap-1">
-                      {SERVICES.map((s) => (
+                      {LAUNCH_SERVICES.map((s) => (
                         <Link
                           key={s.slug}
                           to={`/servicios/${s.slug}`}
@@ -322,12 +322,34 @@ export function Header() {
                           <ArrowRight className="h-4 w-4 shrink-0 text-ink-500" />
                         </Link>
                       ))}
+                      <p className="mt-2 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-ink-500">
+                        Próximas fases
+                      </p>
+                      {UPCOMING_SERVICES.map((s) => (
+                        <Link
+                          key={s.slug}
+                          to={`/servicios/${s.slug}`}
+                          onClick={() => setDrawer(false)}
+                          className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition hover:bg-white/[0.04]"
+                        >
+                          <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-ink-400">
+                            <ServiceIcon icon={s.icon} className="h-4.5 w-4.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[14px] font-semibold text-ink-200">{s.name}</span>
+                            <span className="block truncate text-[12px] text-ink-500">
+                              Próximamente · {s.phase}
+                            </span>
+                          </span>
+                          <ArrowRight className="h-4 w-4 shrink-0 text-ink-600" />
+                        </Link>
+                      ))}
                       <Link
                         to="/servicios"
                         onClick={() => setDrawer(false)}
                         className="mt-1 px-2 py-2 text-[13px] font-semibold text-brand-400"
                       >
-                        Ver todos los servicios
+                        Ver servicios
                       </Link>
                     </div>
                   </DrawerSection>
@@ -354,7 +376,7 @@ export function Header() {
                   >
                     <div className="grid gap-1 pb-2">
                       <DrawerLink to="/conductores" onNavigate={() => setDrawer(false)}>Trabaja con Llégate</DrawerLink>
-                      <DrawerLink to="/conductores/planes" onNavigate={() => setDrawer(false)}>Planes y comisiones</DrawerLink>
+                      <DrawerLink to="/conductores/planes" onNavigate={() => setDrawer(false)}>Prepago y comisiones</DrawerLink>
                       <DrawerLink to="/conductores/registro" onNavigate={() => setDrawer(false)}>Requisitos y registro</DrawerLink>
                       <DrawerLink to="/pasajeros/club-vip" onNavigate={() => setDrawer(false)}>Club VIP para pasajeros</DrawerLink>
                     </div>
@@ -464,7 +486,7 @@ function ServicesMenu({ onNavigate }: { onNavigate: () => void }) {
       <div>
         <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-ink-400">Elige cómo moverte</p>
         <div className="grid gap-1.5 sm:grid-cols-2">
-          {SERVICES.map((s) => (
+          {LAUNCH_SERVICES.map((s) => (
             <Link
               key={s.slug}
               to={`/servicios/${s.slug}`}
@@ -477,9 +499,37 @@ function ServicesMenu({ onNavigate }: { onNavigate: () => void }) {
               <span className="min-w-0">
                 <span className="flex items-center gap-2 text-[14.5px] font-semibold text-white">
                   {s.name}
-                  <span className="mono text-[11px] font-normal text-racing-400">desde ${s.fromUSD.toFixed(2)}</span>
+                  <span className="mono text-[11px] font-normal text-racing-400">desde ${s.minFareUSD.toFixed(2)}</span>
                 </span>
                 <span className="mt-0.5 block text-[12.5px] leading-snug text-ink-400">{s.short}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <p className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-ink-500">Próximas fases</p>
+          <span className="h-px flex-1 bg-white/8" aria-hidden="true" />
+        </div>
+        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+          {UPCOMING_SERVICES.map((s) => (
+            <Link
+              key={s.slug}
+              to={`/servicios/${s.slug}`}
+              onClick={onNavigate}
+              className="group flex items-start gap-3 rounded-xl p-3 transition hover:bg-white/[0.045]"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-ink-400 transition group-hover:border-brand-500/40 group-hover:text-brand-400">
+                <ServiceIcon icon={s.icon} className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="flex items-center gap-2 text-[14.5px] font-semibold text-ink-200">
+                  {s.name}
+                  <span className="rounded-full border border-white/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-ink-400">
+                    {s.phase}
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-[12.5px] leading-snug text-ink-500">Próximamente</span>
               </span>
             </Link>
           ))}
@@ -515,20 +565,20 @@ function DriversMenu({ onNavigate }: { onNavigate: () => void }) {
         <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-ink-400">Para conductores</p>
         <div className="grid gap-1.5 sm:grid-cols-2">
           <MenuLink to="/conductores" label="Trabaja con Llégate" desc="Cómo funciona y cuánto puedes ganar" onNavigate={onNavigate} />
-          <MenuLink to="/conductores/planes" label="Planes y comisiones" desc="Semanal, mensual y Conductoras Rosa" onNavigate={onNavigate} />
+          <MenuLink to="/conductores/planes" label="Prepago y comisiones" desc="Saldo, recargas y 10% por viaje" onNavigate={onNavigate} />
           <MenuLink to="/conductores/registro" label="Requisitos y registro" desc="Documentos y verificación en 3 pasos" onNavigate={onNavigate} />
           <MenuLink to="/seguridad" label="Seguridad del conductor" desc="Protocolos y soporte en ruta" onNavigate={onNavigate} />
         </div>
       </div>
       <div className="rounded-2xl border border-racing-500/25 bg-racing-500/[0.06] p-5">
-        <Badge tone="yellow">Plan Pro Mensual</Badge>
-        <p className="heading mt-3 text-[20px] font-bold text-white">0% de comisión por viaje</p>
+        <Badge tone="yellow">Prepago piloto</Badge>
+        <p className="heading mt-3 text-[20px] font-bold text-white">Recarga desde $5</p>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-300">
-          Paga $12 al mes y quédate con el 100% de lo que cobras. El semanal cuesta $3,50.
+          Sin mensualidad: la comisión del 10% sale de tu saldo al completar cada viaje. Empiezas con $2.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="yellow" to="/conductores/planes" onClick={onNavigate}>
-            Comparar planes
+          <Button size="sm" variant="yellow" to="/conductores/planes#billetera" onClick={onNavigate}>
+            Ver billetera
           </Button>
           <Button size="sm" variant="secondary" onClick={() => onNavigate()} to="/conductores/registro">
             Registrarme

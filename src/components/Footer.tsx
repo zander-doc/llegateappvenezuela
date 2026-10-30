@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Download, Mail, MapPin, MessageCircle, Smartphone, Wallet } from "lucide-react";
 import { Logo } from "./Logo";
-import { SERVICES } from "../data/services";
+import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
 import { useUI } from "../lib/ui";
 import { DEMO_BCV_RATE, formatRate } from "../lib/format";
 import { HUBS } from "../data/site";
 
-const serviceLinks = SERVICES.map((s) => ({ label: s.name, to: `/servicios/${s.slug}` }));
+const serviceLinks = [
+  ...LAUNCH_SERVICES.map((s) => ({ label: s.name, to: `/servicios/${s.slug}` })),
+  ...UPCOMING_SERVICES.map((s) => ({ label: `${s.name} · próximamente`, to: `/servicios/${s.slug}` })),
+];
 
 const columns = [
   {
@@ -29,7 +32,7 @@ const columns = [
     title: "Para conductores",
     links: [
       { label: "Trabaja con Llégate", to: "/conductores" },
-      { label: "Planes y comisiones", to: "/conductores/planes" },
+      { label: "Prepago y comisiones", to: "/conductores/planes" },
       { label: "Registro", to: "/conductores/registro" },
       { label: "Conductoras Rosa", to: "/conductores/planes#rosa" },
       { label: "Mercado Motor", to: "/mercado" },
@@ -59,8 +62,8 @@ export function Footer() {
           <div>
             <Logo className="h-10" />
             <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-ink-300">
-              Movilidad venezolana en una sola app: moto, carro, minivan, autobús, delivery y carga.
-              Precio claro antes de subir y pago en bolívares o dólares.
+              Movilidad venezolana en una sola app. Arrancamos con mototaxi, taxi y delivery; minivan, autobús y
+              carga llegan en próximas fases. Precio claro antes de subir y pago en bolívares o dólares.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -149,7 +152,7 @@ export function Footer() {
         </div>
 
         <p className="mt-6 max-w-4xl text-[11.5px] leading-relaxed text-ink-500">
-          Prototipo de rediseño con fines de demostración. Las tarifas, fichas de negocios, planes y datos de
+          Prototipo de rediseño con fines de demostración. Las tarifas, fichas de negocios, saldos y datos de
           cobertura son ejemplos y no representan una oferta comercial vigente. Este sitio no procesa viajes,
           pagos ni registros reales. Ningún dato que escribas aquí se envía a un servidor.
         </p>

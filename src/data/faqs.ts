@@ -10,6 +10,10 @@ export const FAQ_GROUPS: FaqGroup[] = [
     title: "Viajes",
     items: [
       {
+        q: "¿Qué servicios están disponibles al lanzamiento?",
+        a: "Arrancamos con mototaxi, taxi y delivery. Cuando estos servicios piloto estén ajustados, sumamos minivan, autobús y carga por fases. Puedes dejar tu contacto para avisarte cuando se abran.",
+      },
+      {
         q: "¿Cómo pido un viaje?",
         a: "Abre la app, elige el servicio, confirma el punto de recogida y el destino. Antes de pedir verás el precio estimado, el tiempo de llegada y el tipo de unidad.",
       },
@@ -44,8 +48,16 @@ export const FAQ_GROUPS: FaqGroup[] = [
         a: "Al terminar el viaje verás el detalle en la app: recorrido, tiempo, monto y tasa aplicada. Puedes descargarlo o enviarlo por correo.",
       },
       {
+        q: "¿Cuál es la tarifa mínima?",
+        a: "Mototaxi y delivery arrancan en $1 por carrera; taxi pana en $3. A ese mínimo se suma el costo por kilómetro. Cada ciudad puede ajustar el mínimo según sus costos y la app muestra el de tu zona antes de confirmar.",
+      },
+      {
+        q: "¿Cómo se cobra una ida y vuelta?",
+        a: "Se suman los kilómetros de ida y de regreso a la misma tarifa por km, y la tarifa mínima se cobra una sola vez. En la calculadora puedes activar «Ida y vuelta» para ver el total.",
+      },
+      {
         q: "¿Los precios incluyen recargos?",
-        a: "El estimado incluye la tarifa base y la distancia. Si hay recargo nocturno o por paradas, aparece desglosado antes de confirmar.",
+        a: "El estimado incluye la tarifa mínima de tu ciudad y la distancia. Si hay recargo nocturno o por paradas, aparece desglosado antes de confirmar.",
       },
     ],
   },
@@ -59,7 +71,15 @@ export const FAQ_GROUPS: FaqGroup[] = [
       },
       {
         q: "¿Cuánto cuesta trabajar con Llégate?",
-        a: "Puedes pagar por viaje (10% de comisión) o elegir un plan Pro con 0% de comisión. El plan semanal es de $3,50 y el mensual de $12. Con el plan empiezas a ahorrar cuando la comisión por viaje supera el costo del plan.",
+        a: "Arrancas con $2 de saldo de bienvenida. Cada viaje completado descuenta una comisión del 10% de la tarifa (mínimo $0,10) desde tu saldo prepago. No hay mensualidad ni cuota de inscripción.",
+      },
+      {
+        q: "¿Cómo recargo mi saldo?",
+        a: "Con Pago Móvil o Binance desde la app. Las recargas empiezan en $5 y se aprueban manualmente; el piloto se compromete a revisarlas en 15 minutos o menos. El saldo no vence.",
+      },
+      {
+        q: "¿Qué pasa si me quedo sin saldo?",
+        a: "Con menos de $1 disponible no puedes aceptar viajes nuevos. Si ya tienes un viaje activo, puedes terminarlo: la comisión se descuenta al finalizar y queda el recibo. Después recargas para volver a conectarte.",
       },
       {
         q: "¿Cuándo recibo mis ganancias?",
@@ -67,7 +87,15 @@ export const FAQ_GROUPS: FaqGroup[] = [
       },
       {
         q: "¿Puedo manejar en varias ciudades?",
-        a: "Sí. La verificación es por ciudad, pero el plan Pro Mensual te permite recibir solicitudes en todas las ciudades con cobertura.",
+        a: "Sí, según tu verificación y la cobertura disponible. El prepago no limita las ciudades: no hay un plan mensual que tenga que pagar para operar en otra zona.",
+      },
+      {
+        q: "¿Puedo pedir un reembolso de mi saldo?",
+        a: "Antes de cobrar dinero real definiremos y publicaremos la política de reembolsos, la vigencia del saldo y el tratamiento del IGTF con asesoría legal. En esta simulación no se mueve dinero.",
+      },
+      {
+        q: "¿Conductoras Rosa tiene un costo aparte?",
+        a: "No. La verificación Rosa es gratuita y no cambia la comisión del 10% por viaje. Es una preferencia de asignación, no un plan mensual.",
       },
     ],
   },

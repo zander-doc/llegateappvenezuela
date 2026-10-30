@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import { Layout } from "./components/Layout";
 import { UIProvider } from "./lib/ui";
+import { PilotWalletProvider } from "./lib/pilotWallet";
 import { HomePage } from "./pages/Home";
 
 const ServiciosPage = lazy(() => import("./pages/Services").then((m) => ({ default: m.ServiciosPage })));
@@ -31,31 +32,33 @@ export default function App() {
     <BrowserRouter>
       <MotionConfig reducedMotion="user">
         <UIProvider>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/servicios" element={<ServiciosPage />} />
-              <Route path="/servicios/:slug" element={<ServiceDetailPage />} />
-              <Route path="/tarifas" element={<TarifasPage />} />
-              <Route path="/cobertura" element={<CoberturaPage />} />
-              <Route path="/conductores" element={<ConductoresPage />} />
-              <Route path="/conductores/planes" element={<PlanesPage />} />
-              <Route path="/conductores/registro" element={<RegistroPage />} />
-              <Route path="/pasajeros/club-vip" element={<ClubVipPage />} />
-              <Route path="/seguridad" element={<SeguridadPage />} />
-              <Route path="/mercado" element={<MercadoPage />} />
-              <Route path="/mercado/negocio/:slug" element={<VendorDetailPage />} />
-              <Route path="/mercado/publicar" element={<PublicarPage />} />
-              <Route path="/app" element={<AppDemoPage />} />
-              <Route path="/ingresar" element={<IngresarPage />} />
-              <Route path="/registro" element={<CuentaRegistroPage />} />
-              <Route path="/empresas" element={<EmpresasPage />} />
-              <Route path="/ayuda" element={<AyudaPage />} />
-              <Route path="/nosotros/aliados" element={<AliadosPage />} />
-              <Route path="/legal/:doc" element={<LegalPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Route>
-          </Routes>
+          <PilotWalletProvider>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/servicios" element={<ServiciosPage />} />
+                <Route path="/servicios/:slug" element={<ServiceDetailPage />} />
+                <Route path="/tarifas" element={<TarifasPage />} />
+                <Route path="/cobertura" element={<CoberturaPage />} />
+                <Route path="/conductores" element={<ConductoresPage />} />
+                <Route path="/conductores/planes" element={<PlanesPage />} />
+                <Route path="/conductores/registro" element={<RegistroPage />} />
+                <Route path="/pasajeros/club-vip" element={<ClubVipPage />} />
+                <Route path="/seguridad" element={<SeguridadPage />} />
+                <Route path="/mercado" element={<MercadoPage />} />
+                <Route path="/mercado/negocio/:slug" element={<VendorDetailPage />} />
+                <Route path="/mercado/publicar" element={<PublicarPage />} />
+                <Route path="/app" element={<AppDemoPage />} />
+                <Route path="/ingresar" element={<IngresarPage />} />
+                <Route path="/registro" element={<CuentaRegistroPage />} />
+                <Route path="/empresas" element={<EmpresasPage />} />
+                <Route path="/ayuda" element={<AyudaPage />} />
+                <Route path="/nosotros/aliados" element={<AliadosPage />} />
+                <Route path="/legal/:doc" element={<LegalPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Routes>
+          </PilotWalletProvider>
         </UIProvider>
       </MotionConfig>
     </BrowserRouter>

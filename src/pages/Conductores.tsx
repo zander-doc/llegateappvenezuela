@@ -4,14 +4,19 @@ import {
   BadgeCheck,
   CalendarDays,
   Check,
-  CircleDollarSign,
   Clock,
+  CreditCard,
   FileText,
+  Gift,
+  LockKeyhole,
+  Percent,
+  ReceiptText,
+  RotateCcw,
+  Scale,
   ShieldCheck,
   Smartphone,
   UserRound,
   Wallet,
-  X,
 } from "lucide-react";
 import {
   Accordion,
@@ -21,14 +26,14 @@ import {
   Eyebrow,
   PageHero,
   SectionHead,
-  TableHint,
 } from "../components/ui";
-import { PlanCard } from "../components/PlanCard";
+import { PilotWalletPanel } from "../components/PilotWallet";
 import { EarningsCalculator } from "../components/EarningsCalculator";
 import { useUI } from "../lib/ui";
-import { DRIVER_PLANS } from "../data/plans";
+import { PILOT_RULES } from "../data/prepaid";
+import { formatUSD } from "../lib/format";
 import { FAQ_GROUPS } from "../data/faqs";
-import { SERVICES } from "../data/services";
+import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
 
 const driverFaqs = FAQ_GROUPS.find((g) => g.id === "conductores")!.items;
 
@@ -46,40 +51,44 @@ export function ConductoresPage() {
             Cobra sin sorpresas.
           </>
         }
-        description="Moto, carro, minivan o carga. Elige cómo pagar: 10% por viaje o un plan mensual con 0% de comisión. Tú decides cuándo conectarte."
+        description="Moto, carro o delivery. Trabajas con prepago: 10% por viaje completado, recargas desde $5 y $2 de saldo de bienvenida. Sin mensualidad."
         crumbs={[{ label: "Conductores", to: "/conductores" }]}
         actions={
           <>
             <Button size="lg" onClick={() => openModal({ type: "driver" })}>
               <UserRound className="h-4 w-4" /> Registrarme
             </Button>
-            <Button size="lg" variant="secondary" to="/conductores/planes">
-              Comparar planes
+            <Button size="lg" variant="secondary" to="/conductores/planes#billetera">
+              Ver prepago
             </Button>
           </>
         }
         aside={
           <div className="card p-5">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-400">Modelo simple</p>
-              <Badge tone="yellow">Sin letras pequeñas</Badge>
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-400">Modelo piloto</p>
+              <Badge tone="yellow">Sin mensualidad</Badge>
             </div>
             <div className="mt-3 grid gap-2">
+              <div className="flex items-center justify-between rounded-lg border border-racing-500/30 bg-racing-500/[0.07] px-3 py-2.5">
+                <span className="text-[12.5px] text-ink-200">Saldo de bienvenida</span>
+                <span className="mono text-[13px] font-semibold text-white">{formatUSD(PILOT_RULES.welcomeUSD)}</span>
+              </div>
               <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2.5">
-                <span className="text-[12.5px] text-ink-300">Por viaje</span>
+                <span className="text-[12.5px] text-ink-300">Comisión por viaje</span>
                 <span className="mono text-[13px] font-semibold text-white">10%</span>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-brand-500/30 bg-brand-500/[0.07] px-3 py-2.5">
-                <span className="text-[12.5px] text-ink-200">Pro Mensual</span>
-                <span className="mono text-[13px] font-semibold text-white">$12 · 0%</span>
+              <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2.5">
+                <span className="text-[12.5px] text-ink-300">Recarga mínima</span>
+                <span className="mono text-[13px] font-semibold text-white">{formatUSD(PILOT_RULES.minRechargeUSD)}</span>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2.5">
-                <span className="text-[12.5px] text-ink-300">Pro Semanal</span>
-                <span className="mono text-[13px] font-semibold text-white">$3,50 · 0%</span>
+                <span className="text-[12.5px] text-ink-300">Aprobación manual</span>
+                <span className="mono text-[13px] font-semibold text-white">SLA {PILOT_RULES.approvalSlaMinutes} min</span>
               </div>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-ink-500">
-              Sin cuota de inscripción. El plan se cambia desde la app.
+              La comisión se descuenta solo al completar. Sin cuota mensual ni saldo negativo.
             </p>
           </div>
         }
@@ -88,9 +97,9 @@ export function ConductoresPage() {
       <section className="wrap py-12 sm:py-16">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: CircleDollarSign, title: "0% de comisión", text: "Con plan Pro te quedas con el 100% de cada viaje." },
+            { icon: Percent, title: "10% por viaje", text: "Se descuenta del saldo al completar. Sin cuota mensual." },
             { icon: CalendarDays, title: "Tú eliges las horas", text: "Conéctate cuando te convenga, sin turnos obligatorios." },
-            { icon: Wallet, title: "Cobro directo", text: "Efectivo en Bs o USD, o saldo digital en la app." },
+            { icon: Wallet, title: "Cobro directo", text: "El pasajero paga el viaje como acuerden; la comisión sale de tu saldo." },
             { icon: ShieldCheck, title: "Respaldo en ruta", text: "Verificación, soporte y protocolo de seguridad." },
           ].map((item) => {
             const Icon = item.icon;
@@ -115,22 +124,22 @@ export function ConductoresPage() {
               ¿Cuánto te quedaría?
             </h2>
             <p className="mt-3 text-[14.5px] leading-relaxed text-ink-300">
-              Ajusta tus viajes y tu ticket promedio. La calculadora compara el pago por viaje con el plan mensual y te
-              dice cuál conviene a tu ritmo.
+              Ajusta tus viajes y tu ticket promedio. Verás cuánto pagas de comisión a la semana y qué recarga te conviene
+              para mantener el saldo activo.
             </p>
             <CheckList
               className="mt-5"
               items={[
-                "Proyección mensual, no promesa de ingresos",
-                "Sin comisión por viaje en planes Pro",
-                "Puedes cambiar de plan cuando quieras",
+                "Comisión del 10% por viaje completado",
+                "Recargas desde $5, sin vencimiento",
+                "Sin mensualidad ni saldo negativo",
               ]}
             />
             <div className="mt-5 flex flex-wrap gap-2">
               <Badge tone="success">
-                <Check className="h-3 w-3" /> Sin costo de inscripción
+                <Check className="h-3 w-3" /> {formatUSD(PILOT_RULES.welcomeUSD)} de bienvenida
               </Badge>
-              <Badge tone="neutral">Pago semanal</Badge>
+              <Badge tone="neutral">SLA de {PILOT_RULES.approvalSlaMinutes} min</Badge>
             </div>
           </div>
           <EarningsCalculator />
@@ -172,7 +181,7 @@ export function ConductoresPage() {
                 {
                   icon: Smartphone,
                   title: "1. Elige tu servicio",
-                  text: "Moto, carro, minivan, autobús, delivery o carga. Puedes sumar más luego.",
+                  text: "Moto, carro o delivery. Minivan, autobús y carga se suman en próximas fases.",
                 },
                 {
                   icon: FileText,
@@ -182,7 +191,7 @@ export function ConductoresPage() {
                 {
                   icon: BadgeCheck,
                   title: "3. Activa tu cuenta",
-                  text: "Eliges plan, recibes la inducción y empiezas a recibir solicitudes.",
+                  text: "Recibes el saldo de bienvenida, la inducción y empiezas a recibir solicitudes.",
                 },
               ].map((step) => {
                 const Icon = step.icon;
@@ -209,19 +218,44 @@ export function ConductoresPage() {
       <section className="border-y border-white/8 bg-ink-900">
         <div className="wrap py-12 sm:py-16">
           <SectionHead
-            kicker="Planes"
-            title="Elige cómo pagar"
-            text="El plan mensual tiene 0% de comisión. El semanal sirve para probar sin compromiso."
+            kicker="Prepago piloto"
+            title="Recarga y maneja"
+            text="La comisión sale de tu saldo al completar cada viaje. Si cancelas, la reserva vuelve a tu billetera."
             action={
-              <Button variant="secondary" to="/conductores/planes">
-                Ver comparación <ArrowRight className="h-4 w-4" />
+              <Button variant="secondary" to="/conductores/planes#billetera">
+                Ver mi billetera <ArrowRight className="h-4 w-4" />
               </Button>
             }
           />
           <div className="mt-6 grid gap-3 md:grid-cols-3">
-            {DRIVER_PLANS.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} compact />
-            ))}
+            {[
+              {
+                icon: Gift,
+                title: `${formatUSD(PILOT_RULES.welcomeUSD)} de bienvenida`,
+                text: "Empiezas con saldo a favor al activar tu cuenta piloto. Sin vencimiento.",
+              },
+              {
+                icon: Wallet,
+                title: `Recargas desde ${formatUSD(PILOT_RULES.minRechargeUSD)}`,
+                text: `Pago Móvil o Binance. Aprobación manual con SLA de ${PILOT_RULES.approvalSlaMinutes} minutos.`,
+              },
+              {
+                icon: ReceiptText,
+                title: "10% por viaje completado",
+                text: "No se cobra al aceptar: se reserva la comisión y se descuenta al finalizar, con recibo.",
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="card p-5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-500/25 bg-brand-500/10 text-brand-400">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="heading mt-3.5 text-[16px] font-bold text-white">{item.title}</h3>
+                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-300">{item.text}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -263,114 +297,181 @@ export function PlanesPage() {
   return (
     <>
       <PageHero
-        kicker="Planes y comisiones"
+        kicker="Prepago piloto"
         title={
           <>
-            Planes claros.
+            Saldo claro.
             <br />
-            Cero comisión.
+            Sin mensualidad.
           </>
         }
-        description="Puedes pagar 10% por viaje o elegir un plan con 0% de comisión. Sin cuota de inscripción, sin permanencia y con cambio de plan desde la app."
+        description="Mototaxi, taxi pana y delivery funcionan con saldo prepago. Recargas desde $5 y la comisión del 10% se descuenta solo al completar cada viaje. Sin saldo negativo."
         crumbs={[
           { label: "Conductores", to: "/conductores" },
-          { label: "Planes", to: "/conductores/planes" },
+          { label: "Prepago", to: "/conductores/planes" },
         ]}
         actions={
           <>
             <Button size="lg" onClick={() => openModal({ type: "driver" })}>
               Registrarme
             </Button>
-            <Button size="lg" variant="secondary" to="/conductores#calculadora">
-              Calcular mis ganancias
+            <Button size="lg" variant="secondary" href="#billetera">
+              Probar la billetera
             </Button>
           </>
         }
         aside={
           <div className="card p-5">
-            <Badge tone="yellow">Recomendado</Badge>
-            <p className="heading mt-3 text-[20px] font-bold text-white">Pro Mensual</p>
-            <p className="mono mt-1 text-[28px] font-semibold text-white">$12 <span className="text-[12px] font-normal text-ink-400">/ mes</span></p>
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-400">
-              0% de comisión, prioridad en horas pico y reporte de ganancias.
+            <div className="flex items-center justify-between">
+              <Badge tone="yellow">Saldo de bienvenida</Badge>
+              <span className="text-[10.5px] text-ink-500">Piloto</span>
+            </div>
+            <p className="mono mt-3 text-[32px] font-semibold leading-none text-white">
+              {formatUSD(PILOT_RULES.welcomeUSD)}
             </p>
-            <Button className="mt-4 w-full" onClick={() => openModal({ type: "plan", planId: "pro-mensual" })}>
-              Elegir Pro Mensual
+            <p className="mt-1 text-[12px] text-ink-400">al activar tu cuenta piloto, sin vencimiento</p>
+            <div className="mt-3 grid gap-2">
+              <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
+                <span className="text-[12px] text-ink-300">Comisión por viaje</span>
+                <span className="mono text-[12.5px] font-semibold text-white">10%</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
+                <span className="text-[12px] text-ink-300">Recarga mínima</span>
+                <span className="mono text-[12.5px] font-semibold text-white">{formatUSD(PILOT_RULES.minRechargeUSD)}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
+                <span className="text-[12px] text-ink-300">Aprobación manual</span>
+                <span className="mono text-[12.5px] font-semibold text-white">SLA {PILOT_RULES.approvalSlaMinutes} min</span>
+              </div>
+            </div>
+            <Button className="mt-4 w-full" variant="secondary" href="#billetera">
+              Ver mi saldo
             </Button>
           </div>
         }
       />
 
       <section className="wrap py-12 sm:py-16">
-        <div className="grid gap-3 md:grid-cols-3">
-          {DRIVER_PLANS.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} />
-          ))}
+        <SectionHead
+          kicker="Billetera piloto"
+          title="Tu saldo, siempre a la vista"
+          text="Prueba la recarga y el descuento por viaje en esta simulación. No se procesa ningún pago real."
+        />
+        <div className="mt-6">
+          <PilotWalletPanel />
         </div>
-        <p className="mt-3 text-[11.5px] text-ink-500">
-          Precios de demostración. El cobro y la activación se harían desde la app, no desde esta web.
-        </p>
       </section>
 
       <section className="border-y border-white/8 bg-ink-900">
         <div className="wrap py-12 sm:py-16">
           <SectionHead
-            kicker="Comparación"
-            title="Pago por viaje vs. plan Pro"
-            text="Mira qué incluye cada modelo antes de decidir."
+            kicker="Cómo funciona"
+            title="La comisión se mueve con el viaje"
+            text="No pagas por adelantado: la app aparta la comisión al aceptar y la cobra al terminar. Si el viaje se cancela, la aparta se libera."
           />
-          <TableHint />
-          <div className="mt-2 overflow-x-auto rounded-2xl border border-white/10 sm:mt-6">
-            <table className="w-full min-w-[620px] text-left text-[13px]">
-              <thead className="bg-white/[0.04] text-[10.5px] uppercase tracking-wider text-ink-400">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Incluye</th>
-                  <th className="px-4 py-3 font-semibold">Por viaje</th>
-                  <th className="px-4 py-3 font-semibold text-brand-300">Pro Semanal</th>
-                  <th className="px-4 py-3 font-semibold text-brand-300">Pro Mensual</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/8">
-                {[
-                  { label: "Comisión por viaje", pay: "10%", week: "0%", month: "0%" },
-                  { label: "Costo fijo", pay: "Ninguno", week: "$3,50 / semana", month: "$12 / mes" },
-                  { label: "Solicitudes en tu ciudad", pay: true, week: true, month: true },
-                  { label: "Todas las ciudades con cobertura", pay: false, week: false, month: true },
-                  { label: "Prioridad en horas pico", pay: false, week: false, month: true },
-                  { label: "Reporte de ganancias", pay: false, week: false, month: true },
-                  { label: "Soporte preferente", pay: false, week: false, month: true },
-                ].map((row) => (
-                  <tr key={row.label} className="transition hover:bg-white/[0.03]">
-                    <td className="px-4 py-3 text-ink-200">{row.label}</td>
-                    {[row.pay, row.week, row.month].map((value, i) => (
-                      <td key={i} className="px-4 py-3 text-ink-300">
-                        {typeof value === "boolean" ? (
-                          value ? <Check className="h-4 w-4 text-emerald-400" /> : <X className="h-4 w-4 text-ink-600" />
-                        ) : (
-                          <span className="mono text-[12.5px]">{value}</span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: CreditCard,
+                step: "01",
+                title: "Recargas",
+                text: `Pago Móvil o Binance desde ${formatUSD(PILOT_RULES.minRechargeUSD)}. La aprobación manual tiene un SLA de ${PILOT_RULES.approvalSlaMinutes} minutos.`,
+              },
+              {
+                icon: LockKeyhole,
+                step: "02",
+                title: "Aceptas",
+                text: "Se reserva la comisión de ese viaje en tu billetera. Todavía no se descuenta.",
+              },
+              {
+                icon: ReceiptText,
+                step: "03",
+                title: "Completas",
+                text: "Se descuenta la comisión y queda el recibo con tarifa, comisión y neto.",
+              },
+              {
+                icon: RotateCcw,
+                step: "04",
+                title: "Cancelas",
+                text: "La reserva se libera y el saldo vuelve completo. También puedes terminar el viaje activo.",
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.step} className="card p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-500/25 bg-brand-500/10 text-brand-400">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="mono text-[11px] text-ink-600">{item.step}</span>
+                  </div>
+                  <h3 className="heading mt-3.5 text-[16px] font-bold text-white">{item.title}</h3>
+                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-300">{item.text}</p>
+                </div>
+              );
+            })}
           </div>
-          <p className="mt-2 text-[11.5px] text-ink-500">
-            Condiciones de demostración. En producción, los términos completos estarían en la app y en la sección
-            legal.
-          </p>
         </div>
       </section>
 
       <section className="wrap py-12 sm:py-16">
-        <div className="grid items-start gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+        <SectionHead
+          kicker="Reglas del piloto"
+          title="Sin letras pequeñas"
+          text="Estas reglas aplican al lanzamiento de mototaxi, taxi pana y delivery. Minivan, autobús y carga se analizan por separado."
+        />
+        <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              title: "Sin mensualidad",
+              text: "No hay plan mensual ni cuota de inscripción. Solo pagas la comisión de los viajes que completas.",
+            },
+            {
+              title: "Sin saldo negativo",
+              text: `Si el saldo disponible baja de ${formatUSD(PILOT_RULES.minBalanceUSD)}, la app pausa nuevas solicitudes hasta que recargues.`,
+            },
+            {
+              title: "Sin vencimiento",
+              text: "El saldo no caduca. Al lanzamiento no hay bonos, vencimientos ni promociones que compliquen las cuentas.",
+            },
+            {
+              title: "Termina tu viaje activo",
+              text: "Si el saldo queda bajo durante un viaje, puedes completarlo. La comisión se cobra al finalizar, nunca antes.",
+            },
+            {
+              title: "Recibo por cada viaje",
+              text: "Cada descuento muestra la tarifa, la comisión y el neto que te corresponde. Queda guardado en tu billetera.",
+            },
+            {
+              title: "Aprobación con SLA",
+              text: `Las recargas se revisan manualmente. El piloto se compromete a aprobarlas en ${PILOT_RULES.approvalSlaMinutes} minutos o menos.`,
+            },
+          ].map((item) => (
+            <div key={item.title} className="card p-5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
+                <Check className="h-4 w-4" strokeWidth={3} />
+              </span>
+              <h3 className="heading mt-3 text-[15.5px] font-bold text-white">{item.title}</h3>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-300">{item.text}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3 text-[11.5px] leading-relaxed text-ink-400">
+          <Scale className="mt-0.5 h-4 w-4 shrink-0 text-racing-400" />
+          Antes de cobrar dinero real se revisarán con asesoría legal y fiscal el tratamiento del saldo prepago, la
+          política de reembolsos, la vigencia y el IGTF. Esta sección describe el piloto propuesto; todavía no es un
+          servicio de dinero electrónico autorizado.
+        </p>
+      </section>
+
+      <section className="border-y border-white/8 bg-ink-900">
+        <div className="wrap grid items-start gap-10 py-12 sm:py-16 lg:grid-cols-[0.85fr_1.15fr]">
           <div>
             <Eyebrow>Calculadora</Eyebrow>
             <h2 className="heading mt-3 text-[28px] font-bold text-white sm:text-[34px]">Haz números con tu ritmo</h2>
             <p className="mt-2 text-[13.5px] leading-relaxed text-ink-400">
-              Ajusta los viajes por semana y el ticket promedio. Te mostramos cuánto cambia entre el 10% por viaje y el
-              plan mensual.
+              Ajusta tus viajes por semana y el ticket promedio. Te mostramos la comisión semanal, tu neto y la recarga
+              que te conviene.
             </p>
             <Button variant="secondary" className="mt-4" onClick={() => openModal({ type: "driver" })}>
               Registrarme <ArrowRight className="h-4 w-4" />
@@ -380,7 +481,7 @@ export function PlanesPage() {
         </div>
       </section>
 
-      <section id="rosa" className="scroll-mt-28 border-y border-white/8 bg-ink-900">
+      <section id="rosa" className="scroll-mt-28 border-b border-white/8 bg-ink-900">
         <div className="wrap grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-[1fr_0.8fr]">
           <div>
             <Badge tone="danger">Conductoras Rosa</Badge>
@@ -389,35 +490,39 @@ export function PlanesPage() {
             </h2>
             <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-ink-300">
               Las conductoras con verificación especial pueden recibir solicitudes de pasajeras que eligen el modo
-              Rosa. Es una preferencia de asignación, sujeta a disponibilidad en la zona.
+              Rosa. La verificación es gratuita y la comisión sigue siendo la misma del 10% por viaje.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge tone="success">
-                <ShieldCheck className="h-3 w-3" /> Verificación especial
+                <ShieldCheck className="h-3 w-3" /> Verificación gratuita
               </Badge>
-              <Badge tone="neutral">0% de comisión</Badge>
+              <Badge tone="neutral">Misma comisión 10%</Badge>
               <Badge tone="neutral">Acompañamiento del equipo</Badge>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Button onClick={() => openModal({ type: "plan", planId: "conductoras-rosa" })}>
-                Quiero el plan Rosa
-              </Button>
-              <Button variant="secondary" onClick={() => openModal({ type: "driver", planId: "conductoras-rosa" })}>
-                Registrarme
+              <Button onClick={() => openModal({ type: "driver" })}>Registrarme</Button>
+              <Button variant="secondary" href="#billetera">
+                Cómo funciona el prepago
               </Button>
             </div>
           </div>
           <div className="card p-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-400">Incluye</p>
             <ul className="mt-3 grid gap-2.5">
-              {DRIVER_PLANS.find((p) => p.id === "conductoras-rosa")!.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-[13px] text-ink-200">
-                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-400" strokeWidth={3} /> {f}
+              {[
+                "Verificación especial Rosa, sin costo",
+                "Preferencia de solicitudes de pasajeras del modo Rosa",
+                "Misma billetera prepago y comisión del 10%",
+                "Acompañamiento del equipo Rosa",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2 text-[13px] text-ink-200">
+                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-400" strokeWidth={3} /> {item}
                 </li>
               ))}
             </ul>
             <p className="mt-4 border-t border-white/8 pt-3 text-[11px] leading-relaxed text-ink-500">
-              El modo Rosa es una opción de preferencia, no un servicio separado ni una garantía de solicitudes.
+              El modo Rosa es una opción de preferencia, no un servicio separado ni una garantía de solicitudes. No hay
+              plan mensual Rosa.
             </p>
           </div>
         </div>
@@ -459,7 +564,7 @@ export function RegistroPage() {
             en tres pasos.
           </>
         }
-        description="Elige tu servicio, deja tus datos y selecciona cómo quieres pagar. La verificación se hace después, con tus documentos."
+        description="Elige tu servicio y deja tus datos. No hay plan mensual: al activarte recibes saldo de bienvenida y recargas cuando lo necesites."
         crumbs={[
           { label: "Conductores", to: "/conductores" },
           { label: "Registro", to: "/conductores/registro" },
@@ -469,8 +574,8 @@ export function RegistroPage() {
             <Button size="lg" onClick={() => openModal({ type: "driver" })}>
               Empezar registro <ArrowRight className="h-4 w-4" />
             </Button>
-            <Button size="lg" variant="secondary" to="/conductores/planes">
-              Ver planes
+            <Button size="lg" variant="secondary" to="/conductores/planes#billetera">
+              Cómo funciona el prepago
             </Button>
           </>
         }
@@ -481,7 +586,7 @@ export function RegistroPage() {
               {[
                 { n: "01", label: "Servicio y ciudad" },
                 { n: "02", label: "Tus datos de contacto" },
-                { n: "03", label: "Plan y confirmación" },
+                { n: "03", label: "Billetera y confirmación" },
               ].map((s) => (
                 <div key={s.n} className="flex items-center gap-3">
                   <span className="mono flex h-8 w-8 items-center justify-center rounded-full border border-white/12 text-[11px] text-ink-300">
@@ -528,7 +633,7 @@ export function RegistroPage() {
               { title: "Identidad", text: "Que la persona y la cédula coincidan." },
               { title: "Licencia y vehículo", text: "Que la categoría y los documentos estén vigentes." },
               { title: "Antecedentes", text: "Revisión estándar antes de activar la cuenta." },
-              { title: "Entrevista corta", text: "Explicamos reglas, seguridad y uso de la app." },
+              { title: "Entrevista corta", text: "Explicamos reglas, seguridad y uso de la billetera prepago." },
             ].map((item, i) => (
               <div key={item.title} className="card flex items-start gap-3 p-4">
                 <span className="mono flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500/12 text-[10px] font-semibold text-brand-400">
@@ -550,15 +655,18 @@ export function RegistroPage() {
       <section className="border-t border-white/8 bg-ink-900">
         <div className="wrap py-12 sm:py-16">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {SERVICES.map((s) => (
+            {[...LAUNCH_SERVICES, ...UPCOMING_SERVICES].map((s) => (
               <div key={s.slug} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3">
                 <span className="text-[13px] font-medium text-white">{s.name}</span>
-                <span className="mono text-[11.5px] text-racing-400">desde ${s.fromUSD.toFixed(2)}</span>
+                <span className={`text-[11.5px] ${s.status === "launch" ? "mono text-racing-400" : "text-ink-500"}`}>
+                  {s.status === "launch" ? `desde $${s.minFareUSD.toFixed(2)}` : `Próximamente · ${s.phase}`}
+                </span>
               </div>
             ))}
           </div>
           <p className="mt-4 text-[11.5px] text-ink-500">
-            Puedes registrarte para un servicio y sumar otros después de la verificación.
+            Puedes registrarte para mototaxi, taxi o delivery. Minivan, autobús y carga se abren por fases; después de
+            la verificación puedes sumarte a los nuevos servicios.
           </p>
         </div>
       </section>

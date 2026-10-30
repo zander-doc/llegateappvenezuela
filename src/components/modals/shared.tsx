@@ -1,48 +1,127 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button, DemoNote } from "../ui";
+
+function useFieldIds(id: string | undefined, hint: string | undefined, error: string | undefined) {
+  const autoId = useId();
+  const fieldId = id ?? autoId;
+  const describedBy =
+    [error ? `${fieldId}-error` : null, hint ? `${fieldId}-hint` : null].filter(Boolean).join(" ") || undefined;
+  return { fieldId, describedBy };
+}
+
+function FieldMessage({
+  fieldId,
+  hint,
+  error,
+}: {
+  fieldId: string;
+  hint?: string;
+  error?: string;
+}) {
+  if (error) {
+    return (
+      <span id={`${fieldId}-error`} className="mt-1.5 block text-[11.5px] leading-snug text-red-300">
+        {error}
+      </span>
+    );
+  }
+  if (hint) {
+    return (
+      <span id={`${fieldId}-hint`} className="mt-1.5 block text-[11.5px] leading-snug text-ink-500">
+        {hint}
+      </span>
+    );
+  }
+  return null;
+}
 
 export function TextField({
   label,
   hint,
+  error,
+  id,
   className = "",
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
+}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string }) {
+  const { fieldId, describedBy } = useFieldIds(id, hint, error);
   return (
-    <label className="block">
-      <span className="label">{label}</span>
-      <input className={`field ${className}`} {...props} />
-      {hint && <span className="mt-1.5 block text-[11.5px] text-ink-500">{hint}</span>}
-    </label>
+    <div>
+      <label htmlFor={fieldId} className="label">
+        {label}
+      </label>
+      <input
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={`field ${error ? "border-red-500/60 focus:border-red-400" : ""} ${className}`}
+        {...props}
+      />
+      <FieldMessage fieldId={fieldId} hint={hint} error={error} />
+    </div>
   );
 }
 
 export function SelectField({
   label,
+  hint,
+  error,
+  id,
   children,
   className = "",
   ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; hint?: string; error?: string }) {
+  const { fieldId, describedBy } = useFieldIds(id, hint, error);
   return (
-    <label className="block">
-      <span className="label">{label}</span>
-      <select className={`field appearance-none ${className}`} {...props}>
+    <div>
+      <label htmlFor={fieldId} className="label">
+        {label}
+      </label>
+      <select
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={`field appearance-none ${error ? "border-red-500/60 focus:border-red-400" : ""} ${className}`}
+        {...props}
+      >
         {children}
       </select>
-    </label>
+      <FieldMessage fieldId={fieldId} hint={hint} error={error} />
+    </div>
   );
 }
 
 export function TextAreaField({
   label,
+  hint,
+  error,
+  id,
   className = "",
   ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; hint?: string; error?: string }) {
+  const { fieldId, describedBy } = useFieldIds(id, hint, error);
   return (
-    <label className="block">
-      <span className="label">{label}</span>
-      <textarea className={`field min-h-[92px] resize-y ${className}`} {...props} />
-    </label>
+    <div>
+      <label htmlFor={fieldId} className="label">
+        {label}
+      </label>
+      <textarea
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={`field min-h-[92px] resize-y ${error ? "border-red-500/60 focus:border-red-400" : ""} ${className}`}
+        {...props}
+      />
+      <FieldMessage fieldId={fieldId} hint={hint} error={error} />
+    </div>
+  );
+}
+
+export function FieldError({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <p id={id} className="mt-1.5 text-[11.5px] leading-snug text-red-300">
+      {children}
+    </p>
   );
 }
 
@@ -130,17 +209,6 @@ export function FormSuccess({
       </div>
     </div>
   );
-}
-
-export function saveDemoLead(key: string, payload: Record<string, unknown>) {
-  try {
-    const raw = localStorage.getItem(key);
-    const list = raw ? (JSON.parse(raw) as unknown[]) : [];
-    list.push({ ...payload, savedAt: new Date().toISOString() });
-    localStorage.setItem(key, JSON.stringify(list.slice(-25)));
-  } catch {
-    /* almacenamiento no disponible: la simulación sigue funcionando */
-  }
 }
 
 export function FormActions({
