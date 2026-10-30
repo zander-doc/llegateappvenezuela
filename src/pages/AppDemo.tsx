@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   Check,
@@ -10,17 +9,15 @@ import {
   Package,
   Phone,
   RotateCcw,
-  Send,
   Share2,
   ShieldCheck,
   Smartphone,
   UserRound,
   Wallet,
-  Zap,
 } from "lucide-react";
-import { Badge, Button, Eyebrow, Money, PageHero, SectionHead, ServiceIcon } from "../components/ui";
+import { Badge, Button, Eyebrow, PageHero, SectionHead, ServiceIcon } from "../components/ui";
 import { useUI } from "../lib/ui";
-import { getService, SERVICES } from "../data/services";
+import { getService } from "../data/services";
 import { estimateFare, formatUSD } from "../lib/format";
 
 type Mode = "ride" | "package" | "driver";

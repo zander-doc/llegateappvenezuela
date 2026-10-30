@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, FileText, Mail, ShieldCheck, TriangleAlert } from "lucide-react";
-import { Badge, Button, Eyebrow, PageHero } from "../components/ui";
+import { Badge, Button, PageHero } from "../components/ui";
 import { useUI } from "../lib/ui";
 import { SITE } from "../data/site";
 

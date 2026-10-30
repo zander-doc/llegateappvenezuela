@@ -19,7 +19,7 @@ export function VendorModal({ vendorSlug, onClose }: { vendorSlug: string; onClo
 
   if (!vendor) return null;
 
-  function submit(e: React.FormEvent) {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim().length < 2) {
       setError("Escribe tu nombre.");
@@ -32,7 +32,7 @@ export function VendorModal({ vendorSlug, onClose }: { vendorSlug: string; onClo
     saveDemoLead("llegate_sim_vendor_messages", { vendor: vendor.slug, name, contact, message });
     notify("Mensaje guardado en este navegador (demo).");
     setDone(true);
-  }
+  };
 
   if (done) {
     return (

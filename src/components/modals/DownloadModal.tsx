@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { ArrowRight, Check, Download, Globe, Play, ShieldCheck, Smartphone } from "lucide-react";
 import { Modal } from "../Modal";
 import { Button, DemoNote } from "../ui";

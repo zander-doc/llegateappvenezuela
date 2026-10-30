@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
 import {
   ArrowRight,
   Bike,
@@ -52,7 +52,13 @@ interface ButtonProps {
   full?: boolean;
   className?: string;
   children: ReactNode;
-  [key: string]: any;
+  type?: "button" | "submit" | "reset";
+  disabled?: boolean;
+  onClick?: MouseEventHandler<HTMLElement>;
+  target?: string;
+  rel?: string;
+  "aria-busy"?: boolean;
+  "aria-label"?: string;
 }
 
 export function Button({
@@ -63,25 +69,54 @@ export function Button({
   full = false,
   className = "",
   children,
-  ...rest
+  type = "button",
+  disabled,
+  onClick,
+  target,
+  rel,
+  "aria-busy": ariaBusy,
+  "aria-label": ariaLabel,
 }: ButtonProps) {
   const cls = buttonClass(variant, size, `${full ? "w-full" : ""} ${className}`);
   if (to) {
     return (
-      <Link to={to} className={cls} {...rest}>
+      <Link
+        to={to}
+        className={cls}
+        onClick={onClick}
+        target={target}
+        rel={rel}
+        aria-busy={ariaBusy}
+        aria-label={ariaLabel}
+      >
         {children}
       </Link>
     );
   }
   if (href) {
     return (
-      <a href={href} className={cls} {...rest}>
+      <a
+        href={href}
+        className={cls}
+        onClick={onClick}
+        target={target}
+        rel={rel}
+        aria-busy={ariaBusy}
+        aria-label={ariaLabel}
+      >
         {children}
       </a>
     );
   }
   return (
-    <button className={cls} {...rest}>
+    <button
+      type={type}
+      className={cls}
+      disabled={disabled}
+      onClick={onClick}
+      aria-busy={ariaBusy}
+      aria-label={ariaLabel}
+    >
       {children}
     </button>
   );

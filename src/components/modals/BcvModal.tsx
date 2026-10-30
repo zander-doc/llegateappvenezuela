@@ -10,7 +10,6 @@ export function BcvModal({ onClose }: { onClose: () => void }) {
 
   const numeric = Number.parseFloat(raw.replace(/\./g, "").replace(",", ".")) || 0;
   const usd = direction === "usd" ? numeric : numeric / DEMO_BCV_RATE;
-  const bs = usd * DEMO_BCV_RATE;
 
   return (
     <Modal

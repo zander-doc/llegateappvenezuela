@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "vite --port=5174 --host=0.0.0.0",
     "build": "vite build && node scripts/copy-landing.mjs",
-    "preview": "vite preview --port=4174 --host=0.0.0.0"
+    "preview": "vite preview --port=4174 --host=0.0.0.0",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -16,13 +21,25 @@
     "react-router-dom": "^7.1.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "jsdom": "^30.1.3",
+    "prettier": "^3.9.10",
     "puppeteer-core": "^25.16.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "typescript-eslint": "^8.72.1",
+    "vite": "^6.0.7",
+    "vitest": "^3.2.7"
   }
 }

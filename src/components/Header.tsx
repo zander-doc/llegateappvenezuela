@@ -37,6 +37,8 @@ export function Header() {
   const [mobileSection, setMobileSection] = useState<string | null>("servicios");
 
   useEffect(() => {
+    // Cerrar mega menú y drawer al navegar (incluye atrás/adelante del navegador).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenu(null);
     setDrawer(false);
   }, [location.pathname]);
@@ -235,7 +237,12 @@ export function Header() {
       {drawer &&
         createPortal(
           <div className="fixed inset-0 z-[70] lg:hidden" role="dialog" aria-modal="true" aria-label="Menú">
-            <div className="absolute inset-0 bg-black/65 backdrop-blur-sm animate-fade-in" onClick={() => setDrawer(false)} />
+            <button
+              type="button"
+              aria-label="Cerrar menú"
+              className="animate-fade-in absolute inset-0 bg-black/65 backdrop-blur-sm"
+              onClick={() => setDrawer(false)}
+            />
             <div className="animate-drawer-in absolute inset-y-0 right-0 flex w-full max-w-[430px] flex-col border-l border-white/10 bg-ink-950">
               <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/8 px-5">
                 <p className="heading text-[14px] font-bold uppercase tracking-[0.16em] text-white">Menú</p>

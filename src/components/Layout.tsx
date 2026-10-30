@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
@@ -17,7 +18,15 @@ export function Layout() {
       <Header />
       <div className="h-16 shrink-0 lg:h-[100px]" aria-hidden="true" />
       <main id="contenido" className="flex-1">
-        <Outlet />
+        <Suspense
+          fallback={
+            <div className="grid min-h-[60dvh] place-items-center" role="status" aria-label="Cargando página">
+              <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-brand-500" />
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
       <Footer />
       <InstallBar />

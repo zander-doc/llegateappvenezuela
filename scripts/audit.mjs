@@ -42,7 +42,7 @@ function recordError(scope, message) {
   results.errors.push({ scope, message });
 }
 
-async function analyze(page, label) {
+async function analyze(page) {
   return page.evaluate(() => {
     const vw = window.innerWidth;
     const de = document.documentElement;
