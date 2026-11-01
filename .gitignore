@@ -9,3 +9,4 @@ shots/
 !.env.example
 .pg-data*
 .storage*
+backups/

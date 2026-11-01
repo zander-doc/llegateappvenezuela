@@ -303,6 +303,21 @@ update public.configuracion_comisiones
 - Las recargas exigen referencias verificables: Pago Móvil de 6 a 12 dígitos;
   Binance Pay de 6 a 64 caracteres alfanuméricos (se admite guion).
 
+## Respaldos
+
+El esquema se reconstruye con estas migraciones; el respaldo guarda solo los
+datos. Se toma y se restaura desde `server/`:
+
+```bash
+cd server
+npm run db:backup
+npm run db:restore -- backups/<archivo>.jsonl.gz --destino "<base destino>" --forzar
+```
+
+El detalle (variables, R2, tarea diaria de Windows y cron) está en
+`server/README.md`, sección «Respaldos y restauración». Restaurar exige una base
+destino con las migraciones ya aplicadas.
+
 ## Validación local
 
 La suite de `db/tests/` se aplica sobre un PostgreSQL real embebido (sin Docker,

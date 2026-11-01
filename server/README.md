@@ -635,6 +635,98 @@ embebido; desde la raíz del repo:
 npm run test:db
 ```
 
+`backups.test.mjs` prueba el respaldo y la restauración de punta a punta:
+crea datos, respalda, restaura en otra base, compara tipos, claves foráneas,
+secuencias y que restaurar dos veces deje el mismo estado.
+
+## Respaldos y restauración
+
+El respaldo guarda **datos**, no esquema: las tablas, funciones, políticas y
+roles se reconstruyen siempre desde `db/migrations`, que vive en el repositorio.
+Así no hace falta `pg_dump` ni instalar herramientas de PostgreSQL, y el archivo
+se puede restaurar en cualquier máquina con Node.
+
+Cada respaldo es un `.jsonl.gz` con una primera línea de manifiesto (base,
+versión de PostgreSQL, migraciones aplicadas, tablas, columnas y conteos) y
+lotes de filas en orden de dependencias. Al lado queda un `.sha256`.
+
+```bash
+cd server
+npm run db:backup
+```
+
+Salida típica:
+
+```
+Respaldo: …/server/backups/llegate-20261101T160957Z.jsonl.gz
+Verificado: checksum 0c04a7a532329e85…, 3 filas en 15 tablas.
+R2 desactivado: el respaldo quedó solo en disco.
+Sin respaldos que borrar (retención: 14 días).
+```
+
+Variables (ver `.env.example`):
+
+| Variable | Por defecto | Qué hace |
+| --- | --- | --- |
+| `RESPALDOS_DIR` | `backups` | Carpeta local, relativa a `server/` |
+| `RESPALDOS_DIAS` | `14` | Días que se conservan; el más reciente nunca se borra |
+| `RESPALDOS_R2` | `0` | `1` sube el respaldo y su checksum a R2 con las credenciales `R2_*` |
+| `RESPALDOS_PREFIJO` | `respaldos` | Prefijo dentro del bucket |
+| `RESPALDOS_BUCKET` | `STORAGE_BUCKET` | Bucket de R2 para respaldos |
+
+Si R2 está activo, conviene una regla de ciclo de vida en el bucket que borre
+los objetos bajo `respaldos/` a los 30 días: la rotación local la hace el
+script, la de R2 la hace Cloudflare.
+
+### Restaurar
+
+El destino debe ser una base **vacía con las migraciones aplicadas**. El script
+vacía las tablas antes de cargar, así que contra un host remoto exige `--forzar`
+para que no se dispare por accidente.
+
+```bash
+# 1. Nuevo proyecto/base en Neon (o Postgres local)
+# 2. Apunta DATABASE_URL a ese destino y aplica el esquema
+cd server
+npm run db:migrate
+
+# 3. Restaura indicando el destino explícito
+npm run db:restore -- backups/llegate-20261101T160957Z.jsonl.gz \
+  --destino "postgresql://usuario:clave@host/base?sslmode=require" --forzar
+```
+
+El script verifica el checksum y los conteos antes de tocar la base, y deja todo
+en una sola transacción: si algo falla, no queda a medias. Contra `localhost`
+no hace falta `--forzar`; `--sin-verificar` omite la comprobación (no se
+recomienda).
+
+Los documentos de conductores no van dentro del respaldo: viven en R2 o en
+`STORAGE_LOCAL_DIR`. Si usas disco local, copia también esa carpeta.
+
+### Automatizarlo
+
+**Windows** (esta máquina): una vez, desde `server/scripts/`:
+
+```bat
+programar-respaldo.cmd 03:00
+```
+
+Crea la tarea diaria «Llegate respaldo» que ejecuta `respaldo-diario.cmd` y
+escribe `backups/respaldo.log`. La tarea corre con tu usuario cuando la sesión
+está iniciada; si el equipo estaba apagado, se ejecuta al siguiente día a la
+misma hora. Para quitarla: `schtasks /Delete /TN "Llegate respaldo" /F`.
+
+**Linux/VPS** (cron):
+
+```cron
+0 3 * * * cd /srv/llegate/server && /usr/bin/node scripts/backup.mjs >> backups/respaldo.log 2>&1
+```
+
+**Neon** guarda una ventana corta de historial propia en el plan gratis; estos
+respaldos cubren más allá de esa ventana y sobreviven a que se borre el
+proyecto. Conviene restaurar uno en una base de prueba cada tanto: un respaldo
+que nunca se restauró no cuenta como respaldo.
+
 ## Errores
 
 Formato uniforme:
