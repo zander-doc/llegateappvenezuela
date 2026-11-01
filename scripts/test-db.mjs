@@ -111,6 +111,7 @@ for (const testFile of [
   "20_prepago.sql",
   "30_identidad.sql",
   "40_pagos.sql",
+  "50_verificacion.sql",
 ]) {
   const output = psql(readFileSync(join(root, "supabase", "tests", testFile), "utf8"), {
     quiet: false,

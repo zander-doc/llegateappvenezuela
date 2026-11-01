@@ -379,6 +379,7 @@ export function Header() {
                       <DrawerLink to="/conductores" onNavigate={() => setDrawer(false)}>Trabaja con Llégate</DrawerLink>
                       <DrawerLink to="/conductores/planes" onNavigate={() => setDrawer(false)}>Prepago y comisiones</DrawerLink>
                       <DrawerLink to="/conductores/registro" onNavigate={() => setDrawer(false)}>Requisitos y registro</DrawerLink>
+                      <DrawerLink to="/conductores/verificacion" onNavigate={() => setDrawer(false)}>Verificar mis documentos</DrawerLink>
                       <DrawerLink to="/pasajeros/club-vip" onNavigate={() => setDrawer(false)}>Club VIP para pasajeros</DrawerLink>
                     </div>
                   </DrawerSection>
@@ -570,6 +571,7 @@ function DriversMenu({ onNavigate }: { onNavigate: () => void }) {
           <MenuLink to="/conductores" label="Trabaja con Llégate" desc="Cómo funciona y cuánto puedes ganar" onNavigate={onNavigate} />
           <MenuLink to="/conductores/planes" label="Prepago y comisiones" desc="Saldo, recargas y 10% por viaje" onNavigate={onNavigate} />
           <MenuLink to="/conductores/registro" label="Requisitos y registro" desc="Documentos y verificación en 3 pasos" onNavigate={onNavigate} />
+          <MenuLink to="/conductores/verificacion" label="Subir mis documentos" desc="Cédula, licencia y certificado médico" onNavigate={onNavigate} />
           <MenuLink to="/seguridad" label="Seguridad del conductor" desc="Protocolos y soporte en ruta" onNavigate={onNavigate} />
         </div>
       </div>

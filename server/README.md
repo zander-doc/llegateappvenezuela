@@ -8,7 +8,8 @@ solo valida entradas, propaga el JWT del usuario y traduce errores.
 
 - Node.js 20 o superior.
 - Un proyecto Supabase con las migraciones de `../supabase/migrations` aplicadas.
-- Proveedor SMS configurado en Supabase Auth (Twilio, MessageBird, Vonage o Textlocal).
+- Proveedor SMS configurado en Supabase Auth. Opcionalmente, el Send SMS Hook
+  puede entregar el código por WhatsApp (ver [OTP por WhatsApp](#otp-por-whatsapp)).
 
 ## Puesta en marcha
 
@@ -21,6 +22,11 @@ npm run dev
 
 Solo se usa la **anon key**. La `service_role` nunca debe viajar al móvil, a la web
 ni a este servidor: los roles y permisos se resuelven con el JWT del usuario y RLS.
+
+Las recargas con pasarelas usan variables opcionales (`PAGOS_CLAVE_SERVIDOR`,
+`PAGO_MOVIL_*`, `BINANCE_PAY_*`). Si faltan, la API sigue arrancando y ese método
+responde `503`; nunca se simula un pago. La configuración completa está en
+[Recargas con pasarelas](#recargas-con-pasarelas).
 
 ## Flujo de autenticación
 
@@ -70,6 +76,38 @@ El saldo, el rol y el estado del piloto son los mismos en ambos clientes.
 
 Para un pasajero, `conductor` es `null` y `puede_pedir_viajes` es `true`.
 
+### Conectar la web
+
+La web cambia entre modo real y demostración solo con `VITE_API_URL`:
+
+```bash
+cd ..                 # raíz de lllegate-sim
+cp .env.example .env  # deja VITE_API_URL vacío para la demo
+# .env
+VITE_API_URL=http://localhost:3000
+```
+
+- **Sin `VITE_API_URL`**: `/ingresar` y `/registro` mantienen los formularios
+  simulados de siempre. No se envía nada a ningún servidor.
+- **Con `VITE_API_URL`**: esas páginas usan `POST /auth/otp` y
+  `POST /auth/verify`. No se piden ni guardan contraseña ni cédula; el teléfono
+  viaja a la API solo para enviar el código SMS.
+- La sesión se guarda en `localStorage` (`llegate_sesion_v1`) únicamente con
+  `access_token`, `refresh_token` y `expires_at`. El cliente renueva el token
+  antes de vencer y `cerrar sesión` solo afecta a ese navegador.
+- La cuenta creada en la web es la misma que abre la app móvil con ese teléfono.
+
+La API debe aceptar el origen de la web en `CORS_ORIGIN`. El servidor de
+desarrollo corre en `http://localhost:5174`:
+
+```bash
+# server/.env
+CORS_ORIGIN=http://localhost:5174,http://localhost:5173
+```
+
+Vite inyecta `VITE_API_URL` al compilar: si cambias la URL o publicas la web,
+vuelve a ejecutar `npm run build`.
+
 ## Endpoints
 
 | Método | Ruta | Quién | Descripción |
@@ -79,14 +117,23 @@ Para un pasajero, `conductor` es `null` y `puede_pedir_viajes` es `true`.
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
 | POST | `/auth/logout` | autenticado | Cierra la sesión de este dispositivo |
 | GET | `/auth/me` | autenticado | Perfil unificado, estado del piloto, saldo y capacidades |
-| POST | `/drivers/me` | conductor | Registra o reenvía documentos del conductor |
-| GET | `/drivers/me` | conductor | Estado de verificación y saldo bloqueado |
+| POST | `/drivers/me` | conductor | Registra o reenvía datos del conductor |
+| GET | `/drivers/me` | conductor | Estado de verificación, riesgo y documentos |
+| POST | `/drivers/me/documentos` | conductor | Sube un documento (base64), calcula hash y OCR |
+| POST | `/drivers/me/enviar` | conductor | Envía los 4 documentos a revisión y calcula riesgo |
 | GET | `/wallet/saldo` | autenticado | Saldo, reservas y límites de la billetera |
 | GET | `/wallet/billetera` | autenticado | Igual que `/saldo`, con nombre de billetera (`piloto`/`pasajero`) |
 | GET | `/wallet/movimientos` | autenticado | Últimos 50 movimientos propios (con `billetera`) |
 | GET | `/wallet/recargas` | autenticado | Últimas 50 recargas propias |
 | POST | `/wallet/recargas/pago-movil` | autenticado | Reporta un Pago Móvil |
 | POST | `/wallet/recargas/binance` | autenticado | Reporta un Binance Pay |
+| GET | `/payments/metodos` | autenticado | Pasarelas configuradas en este despliegue |
+| GET | `/payments` | autenticado | Últimas 20 intenciones de recarga propias |
+| POST | `/payments/intents` | autenticado | Crea la intención (`metodo`, `monto_usd`) y una orden de Binance si aplica |
+| POST | `/payments/:id/report` | autenticado | Reporta la referencia bancaria de un Pago Móvil |
+| POST | `/payments/:id/cancel` | autenticado | Cancela una intención pendiente |
+| POST | `/webhooks/binance-pay` | Binance | Confirma el pago con la firma RSA del webhook |
+| POST | `/webhooks/supabase-otp` | Supabase | Send SMS Hook: entrega el OTP por WhatsApp |
 | POST | `/trips` | cliente | Crea una solicitud de viaje |
 | GET | `/trips/:id` | participante | Detalle del viaje |
 | POST | `/trips/:id/aceptar` | conductor | Acepta y reserva la comisión (valida saldo disponible) |
@@ -97,7 +144,11 @@ Para un pasajero, `conductor` es `null` y `puede_pedir_viajes` es `true`.
 | GET | `/admin/recargas?estado=pendiente` | admin | Recargas por revisar |
 | POST | `/admin/recargas/:id/aprobar` | admin | Acredita el saldo |
 | POST | `/admin/recargas/:id/rechazar` | admin | Rechaza con motivo |
-| GET | `/admin/conductores?verificacion=pendiente` | admin | Conductores por verificar |
+| GET | `/admin/pagos?estado=en_revision` | admin | Intenciones de Pago Móvil por confirmar |
+| POST | `/admin/pagos/:id/confirmar` | admin | Confirma el pago y acredita el saldo |
+| POST | `/admin/pagos/:id/rechazar` | admin | Rechaza la intención con motivo |
+| GET | `/admin/conductores?verificacion=pendiente` | admin | Conductores por verificar, ordenados por riesgo |
+| GET | `/admin/conductores/:usuarioId` | admin | Detalle: perfil, documentos firmados, OCR y auditoría |
 | POST | `/admin/conductores/:usuarioId/verificar` | admin | Aprueba o rechaza documentos |
 
 ## Ejemplos
@@ -192,11 +243,75 @@ Respuesta:
 Si el conductor estaba `inactivo_sin_saldo` y ya está verificado, la aprobación lo
 reactiva automáticamente cuando el saldo alcanza el mínimo.
 
-### 4. Registro de conductor
+### 4. Verificación de documentos del piloto
 
-Las imágenes se suben directo a Supabase Storage desde la app con el JWT del
-usuario, al bucket privado `documentos-conductores` y con la ruta
-`<usuario_id>/<archivo>`. Después se registran las rutas:
+El piloto sube cuatro documentos: cédula por ambos lados, licencia y certificado
+médico. La API valida los bytes reales del archivo (JPG, PNG, WebP o PDF), calcula
+su SHA-256, guarda una copia en el bucket privado `documentos-conductores` y, si
+hay OCR configurado, registra el texto leído:
+
+```bash
+curl -X POST http://localhost:3000/drivers/me/documentos \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tipo": "cedula_frente",
+    "mime": "image/jpeg",
+    "contenido_base64": "/9j/4AAQSkZJRgABAQ..."
+  }'
+```
+
+Respuesta `201`:
+
+```json
+{
+  "ok": true,
+  "documento": {
+    "tipo": "cedula_frente",
+    "mime": "image/jpeg",
+    "bytes": 184320,
+    "ocr_estado": "listo",
+    "ocr_confianza": 0.91
+  }
+}
+```
+
+Los tipos admitidos son `cedula_frente`, `cedula_reverso`, `licencia` y
+`certificado_medico`. Reemplazar un documento todavía está permitido mientras el
+piloto no esté aprobado. Un mismo archivo **no puede estar vinculado a dos
+cuentas**: el hash es único en `conductores_documentos` y responde `409`. Si la
+RPC rechaza la fila, la API borra el archivo recién subido para no dejar huérfanos.
+
+Con los cuatro documentos cargados se envía a revisión:
+
+```bash
+curl -X POST http://localhost:3000/drivers/me/enviar -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "ok": true,
+  "verificacion": "pendiente",
+  "riesgo_puntaje": 25,
+  "riesgo_nivel": "medio",
+  "motivos": [
+    { "codigo": "nombre_no_coincide", "peso": 25, "detalle": "Falta «PEREZ» en la lectura del documento" }
+  ],
+  "documentos": 4,
+  "enviado_en": "2026-10-31T15:20:00.000Z"
+}
+```
+
+El puntaje es una **señal explicable**, no un veredicto: 40 por cédula que no
+aparece en el OCR, 25 por nombre que no coincide, 15 por OCR de baja confianza y
+10 por reenvíos acumulados (`intentos_verificacion >= 2`). Sin OCR configurado el
+envío no se bloquea: queda `ocr_no_disponible` con peso 0 y el operador revisa a
+mano. El admin ve la cola ordenada por riesgo en `GET /admin/conductores` y el
+detalle con URLs firmadas de 15 minutos en `GET /admin/conductores/:id`.
+
+`POST /drivers/me` se conserva para registrar los datos del vehículo y las rutas
+heredadas; el flujo nuevo sube el archivo desde la web y no necesita URLs
+públicas:
 
 ```bash
 curl -X POST http://localhost:3000/drivers/me \
@@ -215,9 +330,38 @@ curl -X POST http://localhost:3000/drivers/me \
   }'
 ```
 
-El registro queda en `pendiente` hasta que un admin lo apruebe.
+### 5. OTP por WhatsApp
 
-### 5. Ciclo del viaje y comisión
+Supabase Auth puede entregar el código SMS mediante su **Send SMS Hook**. La API
+recibe el evento en `/webhooks/supabase-otp`, verifica la firma HMAC del estándar
+Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature` sobre
+`<id>.<timestamp>.<cuerpo>`, ventana de 5 minutos) y envía una plantilla de
+WhatsApp Cloud API:
+
+```bash
+SUPABASE_SEND_SMS_HOOK_SECRET=whsec_...
+WHATSAPP_TOKEN=EAAG...
+WHATSAPP_PHONE_ID=1234567890
+WHATSAPP_OTP_TEMPLATE=llegate_otp
+WHATSAPP_OTP_LANGUAGE=es
+WHATSAPP_API_VERSION=v21.0
+```
+
+1. En Supabase → Authentication → Hooks → Send SMS, activa el hook HTTP hacia
+   `https://api.tudominio.com/webhooks/supabase-otp`.
+2. Copia el secreto que muestra Supabase en `SUPABASE_SEND_SMS_HOOK_SECRET`.
+3. La API responde `503` si falta el secreto o las credenciales de Meta; en ese
+   caso Supabase debe seguir usando su proveedor SMS normal. Nunca se finge un
+   envío.
+
+Los límites de la API son una ventana deslizante en memoria por teléfono, por IP
+y por intento de verificación (`OTP_MAX_POR_TELEFONO`, `OTP_MAX_POR_IP`,
+`OTP_MAX_VERIFICACIONES`, `OTP_VENTANA_MINUTOS`). Al superarlos responde `429`
+con `Retry-After`. Supabase también aplica su propio límite de envío; estos son
+una segunda barrera. El almacén es en memoria: si la API escala a varias
+instancias, debe moverse a Redis.
+
+### 6. Ciclo del viaje y comisión
 
 ```bash
 # Cliente solicita
@@ -264,7 +408,7 @@ después de recargar:
 La operación es idempotente: repetirla sobre un viaje ya finalizado devuelve
 `ya_procesado: true` sin volver a debitar.
 
-### 6. Pagar un viaje con saldo
+### 7. Pagar un viaje con saldo
 
 Se usa cuando el viaje se creó con `"metodo_pago": "saldo"`. Solo el cliente dueño
 puede cobrarlo, y el viaje debe estar `en_curso`. El conductor no puede cerrarlo
@@ -297,7 +441,7 @@ la comisión como un débito aparte, todo en una sola transacción. Si el client
 tiene saldo responde `409` con `motivo: "saldo_insuficiente"` y no cambia nada.
 Reintentarla es idempotente.
 
-### 7. Prepago del piloto
+### 8. Prepago del piloto
 
 Mototaxi, taxi pana y delivery no pagan mensualidad: recargan saldo y la
 comisión se descuenta por viaje completado. La billetera del piloto es distinta
@@ -361,6 +505,89 @@ Reglas del lanzamiento:
 - `procesar_comision_viaje` y `pagar_viaje_con_saldo` devuelven un `recibo` con
   tarifa, comisión descontada, neto y saldo resultante para mostrarlo al piloto.
 
+## Recargas con pasarelas
+
+Las recargas reales viven en `public.pagos` y no tocan el saldo hasta que el pago
+se confirma. La intención nace `pendiente` con un código público `LLG-XXXXXXXXXX`;
+la web muestra métodos según `GET /payments/metodos`.
+
+### Pago Móvil (semiautomático)
+
+1. La API toma banco, teléfono, cédula, titular y tasa de `PAGO_MOVIL_*`.
+2. `POST /payments/intents` calcula el monto exacto en bolívares y devuelve las
+   instrucciones. El cliente paga desde su banco.
+3. `POST /payments/:id/report` guarda la referencia bancaria (6 a 12 dígitos) y
+   deja el pago `en_revision`.
+4. Un admin confirma:
+
+```bash
+curl -X POST http://localhost:3000/admin/pagos/$PAGO_ID/confirmar -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+No hay scraping ni verificación bancaria automática: mientras el banco no ofrezca
+API, la revisión es humana y el SLA objetivo sigue siendo de 15 minutos.
+
+### Binance Pay (automático)
+
+1. `POST /payments/intents` crea la intención y luego la orden v3 de Binance con
+   `merchantTradeNo = codigo`.
+2. La API firma el cuerpo con RSA-SHA256 y guarda `checkout_url` y `prepayId`.
+3. La web abre el checkout; el usuario paga en Binance.
+4. Binance llama a `POST /webhooks/binance-pay`. La API verifica la firma con la
+   clave pública, el `timestamp` (ventana de ±5 minutos) y solo acepta
+   `PAY_SUCCESS`/`PAID`. Después confirma el pago y acredita el saldo.
+
+Variables:
+
+```bash
+BINANCE_PAY_CERT_SN=serial-del-certificado
+BINANCE_PAY_SECRET_KEY=-----BEGIN PRIVATE KEY-----\n...   # PEM o base64 del PEM
+BINANCE_PAY_WEBHOOK_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\n...  # clave pública de Binance
+BINANCE_PAY_BASE_URL=https://bpay.binanceapi.com
+```
+
+El webhook debe quedar público en `https://api.tudominio.com/webhooks/binance-pay`
+y se monta **antes** de `express.json()` porque la firma se calcula sobre el cuerpo
+crudo. Sin claves configuradas el endpoint responde `503` y nunca confirma nada.
+
+> **Pendiente de validación:** el flujo de Binance está probado con claves RSA
+> locales y un servidor falso. Antes de producción hay que probarlo contra el
+> sandbox de Binance con credenciales reales (creación de orden, checkout y
+> webhook). La implementación falla cerrada: si algo no cuadra, no acredita saldo.
+
+### Clave de servidor
+
+Los clientes tienen la anon key, así que la confirmación no puede depender solo de
+un JWT: cualquier usuario podría invocar la RPC. Por eso `confirmar_pago` exige una
+clave que solo conocen la API y la base:
+
+```bash
+# 1. Genera la clave y guárdala en server/.env
+openssl rand -hex 32
+# PAGOS_CLAVE_SERVIDOR=<clave>
+
+# 2. Registra solo su SHA-256 en Supabase (SQL Editor, como postgres)
+insert into public.configuracion_pagos (id, clave_servidor_hash)
+values (true, encode(digest('<clave>', 'sha256'), 'hex'))
+on conflict (id) do update
+   set clave_servidor_hash = excluded.clave_servidor_hash,
+       updated_at = now();
+```
+
+`configuracion_pagos` no tiene grants para `anon` ni `authenticated`; el hash se
+compara dentro de una función `security definer`. Cambiar la clave exige repetir
+ambos pasos. El panel admin no usa la clave: confirma con su JWT mediante
+`confirmar_pago_admin`.
+
+### Estados e idempotencia
+
+`pendiente → en_revision → confirmado`, con salidas a `cancelado`, `expirado` y
+`rechazado`. Confirmar dos veces el mismo pago no duplica el saldo: la intención
+queda ligada a una única recarga (`transaccion_billetera_id` unique) y una
+referencia externa solo puede usarse una vez. Si el monto de Binance no coincide
+con la intención (±0.01 USD), el pago queda pendiente y el webhook solo registra
+el aviso.
+
 ## Pruebas
 
 ```bash
@@ -372,7 +599,15 @@ Las pruebas levantan un Supabase falso en memoria (GoTrue y PostgREST) y prueban
 el API real sin credenciales ni red externa: pago feliz, saldo insuficiente,
 rechazo `42501`, token ausente o inválido, UUID inválido, validaciones de recarga,
 billetera del piloto, movimientos, cancelación con liberación de reserva, perfil
-unificado, refresco de sesión y cierre de sesión local.
+unificado, refresco de sesión, cierre de sesión local, las rutas de pagos
+(métodos, intención de Pago Móvil, reporte, cancelación y Binance sin configurar),
+la carga de documentos (formato, MIME declarado, hash y borrado si la RPC falla),
+el envío con riesgo, la cola y el detalle del admin, el límite de OTP por teléfono
+y por intento de verificación. `binance.test.mjs` cubre la firma RSA-SHA256, la
+verificación del webhook (cuerpo alterado, firma ajena, timestamp viejo) y el
+parseo de eventos. `ocr.test.mjs` cubre OCR.space, Google Vision y los fallos del
+proveedor; `otpWebhook.test.mjs` cubre la firma del Send SMS Hook y la plantilla
+de WhatsApp.
 
 Las migraciones y RPC se prueban con PostgreSQL:
 
@@ -393,8 +628,13 @@ Formato uniforme:
 | 401 | `token_requerido` / `token_invalido` | Falta el JWT o expiró |
 | 403 | `no_autorizado` / `solo_admin` | RLS o RPC rechazaron la operación |
 | 404 | `P0002` | Registro no encontrado |
-| 409 | `23505` | Referencia de pago duplicada |
+| 409 | `23505` | Referencia de pago o hash de documento duplicado |
+| 413 | `documento_muy_grande` | El archivo supera `VERIFICACION_MAX_BYTES` |
 | 422 | `datos_invalidos` | Falla de validación (Zod) |
+| 422 | `formato_no_soportado` / `mime_no_coincide` | Los bytes no son JPG, PNG, WebP o PDF, o no coinciden con el MIME declarado |
+| 429 | `demasiados_intentos` | Límite de OTP por teléfono, IP o intento de verificación |
+| 503 | `pago_movil_no_configurado` / `binance_no_configurado` | La pasarela no tiene credenciales en este despliegue |
+| 503 | `hook_no_configurado` / `whatsapp_no_configurado` | El Send SMS Hook o Meta no están configurados |
 
 ## Notas de seguridad
 
@@ -406,8 +646,21 @@ Formato uniforme:
   exclusivo y el libro mayor registra `billetera = 'piloto' | 'pasajero'`.
 - La finalización directa de un viaje está bloqueada por trigger.
 - Las recargas quedan pendientes y una referencia solo puede canjearse una vez.
+- La confirmación automática de Binance exige la firma RSA sobre el cuerpo crudo
+  y un `timestamp` de ±5 minutos; el webhook nunca acepta el cuerpo parseado.
+- La clave de servidor solo existe en `PAGOS_CLAVE_SERVIDOR` y como SHA-256 en
+  `configuracion_pagos`. No se envía a la web, al móvil ni dentro del JWT.
 - Los documentos de conductores viven en un bucket privado; RLS limita el acceso
-  al dueño y a los admins.
+  al dueño y a los admins. El admin los ve con URLs firmadas de 15 minutos.
+- El MIME se decide por los bytes reales del archivo, no por lo que declara el
+  navegador, y el hash SHA-256 es único entre cuentas para detectar documentos
+  reutilizados. El OCR y el puntaje de riesgo son señales para el revisor, no una
+  aprobación automática.
+- La firma del Send SMS Hook se verifica sobre el cuerpo crudo con HMAC-SHA256 y
+  una ventana de 5 minutos. Sin secreto o sin credenciales de Meta el hook
+  responde `503`: nunca se finge haber enviado un código.
 - El precio del viaje se recibe en `POST /trips`. Antes de producción debe
   calcularse en el servidor a partir de tarifa y distancia: hoy un cliente podría
   solicitar un viaje con un precio arbitrario.
+- La web real solo guarda tokens de sesión en `localStorage`; nunca contraseña ni
+  cédula. En modo demo no se almacena ni transmite ningún dato personal.

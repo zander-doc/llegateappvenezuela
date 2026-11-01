@@ -49,4 +49,30 @@ export const config = {
       expiraMinutos: number("BINANCE_PAY_EXPIRA_MINUTOS", 30),
     },
   },
+  otp: {
+    // Supabase llama a /webhooks/supabase-otp (Send SMS Hook) con este secreto.
+    hookSecret: text("SUPABASE_SEND_SMS_HOOK_SECRET"),
+    whatsapp: {
+      token: text("WHATSAPP_TOKEN"),
+      phoneId: text("WHATSAPP_PHONE_ID"),
+      template: text("WHATSAPP_OTP_TEMPLATE") || "llegate_otp",
+      language: text("WHATSAPP_OTP_LANGUAGE") || "es",
+      apiVersion: text("WHATSAPP_API_VERSION") || "v21.0",
+    },
+    limits: {
+      porTelefono: number("OTP_MAX_POR_TELEFONO", 3),
+      porIp: number("OTP_MAX_POR_IP", 8),
+      porVerificacion: number("OTP_MAX_VERIFICACIONES", 6),
+      ventanaMinutos: number("OTP_VENTANA_MINUTOS", 10),
+    },
+  },
+  verification: {
+    maxBytes: number("VERIFICACION_MAX_BYTES", 5 * 1024 * 1024),
+    ocr: {
+      provider: (text("OCR_PROVIDER") || "none").toLowerCase(),
+      apiKey: text("OCR_API_KEY"),
+      endpoint: text("OCR_ENDPOINT"),
+      timeoutMs: number("OCR_TIMEOUT_MS", 12000),
+    },
+  },
 };

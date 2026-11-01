@@ -276,6 +276,24 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
           </Button>
         </div>
 
+        <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[12.5px]">
+          {usuario.rol === "admin" ? (
+            <Link
+              to="/admin"
+              className="inline-flex min-h-[36px] items-center font-semibold text-brand-400 transition hover:text-brand-300"
+            >
+              Panel de operaciones
+            </Link>
+          ) : (
+            <Link
+              to="/conductores/verificacion"
+              className="inline-flex min-h-[36px] items-center font-semibold text-brand-400 transition hover:text-brand-300"
+            >
+              Verificación de piloto
+            </Link>
+          )}
+        </div>
+
         <div className="mt-6 text-left">
           <RealNote />
         </div>

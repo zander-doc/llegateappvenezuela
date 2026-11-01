@@ -1,10 +1,66 @@
 import { Router } from "express";
+import { config } from "../config.js";
 import { asyncHandler, HttpError, parse, unwrap } from "../http.js";
 import { requireUser } from "../middleware.js";
 import { otpRequestSchema, otpVerifySchema, refreshTokenSchema } from "../schemas.js";
+import { hitRateLimit, resetRateLimit } from "../security/rateLimit.js";
+import { whatsappDisponible } from "../security/whatsapp.js";
 import { supabaseAnon } from "../supabase.js";
 
 export const authRouter = Router();
+
+function ipDe(req) {
+  return req.ip || req.socket?.remoteAddress || "desconocida";
+}
+
+function bloquearPorLimite(res, retryAfter, mensaje) {
+  res.set("Retry-After", String(retryAfter));
+  throw new HttpError(429, "demasiados_intentos", mensaje, { retry_after: retryAfter });
+}
+
+function limitarEnvioOtp(req, res, telefono) {
+  const { limits } = config.otp;
+  const windowMs = limits.ventanaMinutos * 60_000;
+
+  const porTelefono = hitRateLimit(`otp:telefono:${telefono}`, {
+    limit: limits.porTelefono,
+    windowMs,
+  });
+  if (!porTelefono.ok) {
+    bloquearPorLimite(
+      res,
+      porTelefono.retryAfter,
+      `Ese número pidió demasiados códigos. Espera ${porTelefono.retryAfter} segundos.`,
+    );
+  }
+
+  const porIp = hitRateLimit(`otp:ip:${ipDe(req)}`, {
+    limit: limits.porIp,
+    windowMs,
+  });
+  if (!porIp.ok) {
+    bloquearPorLimite(
+      res,
+      porIp.retryAfter,
+      `Se pidieron demasiados códigos desde esta conexión. Espera ${porIp.retryAfter} segundos.`,
+    );
+  }
+}
+
+function limitarVerificacion(req, res, telefono) {
+  const { limits } = config.otp;
+  const limite = hitRateLimit(`otp:verificar:${telefono}`, {
+    limit: limits.porVerificacion,
+    windowMs: limits.ventanaMinutos * 60_000,
+  });
+  if (!limite.ok) {
+    bloquearPorLimite(
+      res,
+      limite.retryAfter,
+      `Demasiados intentos con ese código. Espera ${limite.retryAfter} segundos.`,
+    );
+  }
+}
 
 const PERFIL_COLUMNS = [
   "id",
@@ -30,6 +86,7 @@ authRouter.post(
   "/otp",
   asyncHandler(async (req, res) => {
     const body = parse(otpRequestSchema, req.body);
+    limitarEnvioOtp(req, res, body.telefono);
 
     const { error } = await supabaseAnon.auth.signInWithOtp({
       phone: body.telefono,
@@ -44,7 +101,10 @@ authRouter.post(
 
     if (error) throw new HttpError(400, "otp_error", error.message);
 
-    res.status(202).json({ ok: true, mensaje: "Código enviado por SMS" });
+    res.status(202).json({
+      ok: true,
+      mensaje: whatsappDisponible() ? "Código enviado por WhatsApp o SMS" : "Código enviado por SMS",
+    });
   }),
 );
 
@@ -52,6 +112,7 @@ authRouter.post(
   "/verify",
   asyncHandler(async (req, res) => {
     const body = parse(otpVerifySchema, req.body);
+    limitarVerificacion(req, res, body.telefono);
 
     const { data, error } = await supabaseAnon.auth.verifyOtp({
       phone: body.telefono,
@@ -62,6 +123,8 @@ authRouter.post(
     if (error || !data.session) {
       throw new HttpError(401, "codigo_invalido", error?.message ?? "Código incorrecto o expirado");
     }
+
+    resetRateLimit(`otp:verificar:${body.telefono}`);
 
     res.json({
       ok: true,

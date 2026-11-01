@@ -13,6 +13,10 @@ const CoberturaPage = lazy(() => import("./pages/Cobertura").then((m) => ({ defa
 const ConductoresPage = lazy(() => import("./pages/Conductores").then((m) => ({ default: m.ConductoresPage })));
 const PlanesPage = lazy(() => import("./pages/Conductores").then((m) => ({ default: m.PlanesPage })));
 const RegistroPage = lazy(() => import("./pages/Conductores").then((m) => ({ default: m.RegistroPage })));
+const VerificacionPage = lazy(() =>
+  import("./pages/VerificacionConductor").then((m) => ({ default: m.VerificacionConductorPage })),
+);
+const AdminPage = lazy(() => import("./pages/AdminOperaciones").then((m) => ({ default: m.AdminOperacionesPage })));
 const ClubVipPage = lazy(() => import("./pages/ClubVip").then((m) => ({ default: m.ClubVipPage })));
 const SeguridadPage = lazy(() => import("./pages/Seguridad").then((m) => ({ default: m.SeguridadPage })));
 const MercadoPage = lazy(() => import("./pages/Market").then((m) => ({ default: m.MercadoPage })));
@@ -43,6 +47,8 @@ export default function App() {
                 <Route path="/conductores" element={<ConductoresPage />} />
                 <Route path="/conductores/planes" element={<PlanesPage />} />
                 <Route path="/conductores/registro" element={<RegistroPage />} />
+                <Route path="/conductores/verificacion" element={<VerificacionPage />} />
+                <Route path="/admin" element={<AdminPage />} />
                 <Route path="/pasajeros/club-vip" element={<ClubVipPage />} />
                 <Route path="/seguridad" element={<SeguridadPage />} />
                 <Route path="/mercado" element={<MercadoPage />} />

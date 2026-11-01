@@ -4,7 +4,7 @@ import { config } from "./config.js";
 import { errorHandler } from "./http.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
-import { driversRouter } from "./routes/drivers.js";
+import { driverDocumentsRouter, driversRouter } from "./routes/drivers.js";
 import { paymentsRouter } from "./routes/payments.js";
 import { tripsRouter } from "./routes/trips.js";
 import { walletRouter } from "./routes/wallet.js";
@@ -18,6 +18,8 @@ app.use(cors({ origin: config.corsOrigins }));
 // Los webhooks verifican la firma sobre el cuerpo crudo, antes del parser JSON.
 app.use("/webhooks", webhooksRouter);
 
+// Los documentos llegan en base64 y necesitan más espacio que el resto de la API.
+app.use("/drivers/me/documentos", express.json({ limit: "8mb" }), driverDocumentsRouter);
 app.use(express.json({ limit: "256kb" }));
 
 app.get("/health", (_req, res) => {

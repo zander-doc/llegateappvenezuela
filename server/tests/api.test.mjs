@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import http from "node:http";
 import test from "node:test";
+import { resetRateLimits } from "../src/security/rateLimit.js";
 
 const CLIENT_ID = "22222222-2222-2222-2222-222222222222";
 const ADMIN_ID = "33333333-3333-3333-3333-333333333333";
@@ -906,4 +907,242 @@ test("las rutas de pagos exigen sesión", async () => {
 
   assert.equal(response.status, 401);
   assert.equal(body.error, "token_requerido");
+});
+
+// ---------------------------------------------------------------------------
+// Paso 4: documentos del piloto, riesgo y panel administrativo
+// ---------------------------------------------------------------------------
+
+test("POST /drivers/me/documentos exige sesión", async () => {
+  const response = await post("/drivers/me/documentos", {
+    body: { tipo: "cedula_frente", mime: "image/png", contenido_base64: PNG_BASE64 },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 401);
+  assert.equal(body.error, "token_requerido");
+});
+
+test("POST /drivers/me/documentos rechaza archivos que no son imagen ni PDF", async () => {
+  const response = await post("/drivers/me/documentos", {
+    token: "valid-client",
+    body: {
+      tipo: "cedula_frente",
+      mime: "image/png",
+      contenido_base64: Buffer.from("esto no es un documento real").toString("base64"),
+    },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 422);
+  assert.equal(body.error, "formato_no_soportado");
+});
+
+test("POST /drivers/me/documentos compara los bytes con el MIME declarado", async () => {
+  const response = await post("/drivers/me/documentos", {
+    token: "valid-client",
+    body: { tipo: "cedula_frente", mime: "image/jpeg", contenido_base64: PNG_BASE64 },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 422);
+  assert.equal(body.error, "mime_no_coincide");
+});
+
+test("POST /drivers/me/documentos sube, calcula el hash y registra la fila", async () => {
+  const uploadsAntes = storageUploads;
+  const response = await post("/drivers/me/documentos", {
+    token: "valid-client",
+    body: { tipo: "cedula_frente", mime: "image/png", contenido_base64: PNG_BASE64 },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(body.ok, true);
+  assert.equal(body.documento.tipo, "cedula_frente");
+  assert.equal(storageUploads, uploadsAntes + 1);
+
+  const rpc = lastRpc();
+  assert.equal(rpc.fn, "registrar_documento_conductor");
+  assert.equal(rpc.authorization, "Bearer valid-client");
+  assert.equal(rpc.payload.p_mime, "image/png");
+  assert.equal(rpc.payload.p_bytes, Buffer.from(PNG_BASE64, "base64").length);
+  assert.equal(rpc.payload.p_ocr_estado, "no_configurado");
+  assert.match(rpc.payload.p_hash_sha256, /^[0-9a-f]{64}$/);
+  assert.ok(rpc.payload.p_storage_path.startsWith(`${CLIENT_ID}/cedula_frente-`));
+  assert.ok(rpc.payload.p_storage_path.endsWith(".png"));
+});
+
+test("POST /drivers/me/documentos borra el archivo subido si la RPC lo rechaza", async () => {
+  const bytes = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from("documento-duplicado"),
+  ]);
+  hashDuplicado = createHash("sha256").update(bytes).digest("hex");
+  const borradosAntes = storageDeletes;
+
+  const response = await post("/drivers/me/documentos", {
+    token: "valid-client",
+    body: {
+      tipo: "cedula_reverso",
+      mime: "image/png",
+      contenido_base64: bytes.toString("base64"),
+    },
+  });
+  hashDuplicado = null;
+  const body = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(body.error, "23505");
+  assert.equal(storageDeletes, borradosAntes + 1);
+});
+
+test("GET /drivers/me devuelve el estado de verificación y los documentos sin OCR", async () => {
+  const response = await fetch(`${baseUrl}/drivers/me`, {
+    headers: { authorization: "Bearer valid-client" },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.conductor.riesgo_puntaje, 65);
+  assert.equal(body.conductor.intentos_verificacion, 1);
+  assert.equal(body.documentos.length, 4);
+  assert.equal(body.documentos[0].ocr_estado, "no_configurado");
+  assert.equal("ocr_texto" in body.documentos[0], false);
+});
+
+test("POST /drivers/me/enviar devuelve el riesgo explicable", async () => {
+  const response = await post("/drivers/me/enviar", { token: "valid-client" });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.verificacion, "pendiente");
+  assert.equal(body.riesgo_puntaje, 65);
+  assert.equal(body.riesgo_nivel, "alto");
+  assert.equal(body.documentos, 4);
+
+  const rpc = lastRpc();
+  assert.equal(rpc.fn, "enviar_verificacion_conductor");
+  assert.deepEqual(rpc.payload, {});
+});
+
+test("GET /admin/conductores exige rol administrador", async () => {
+  const response = await fetch(`${baseUrl}/admin/conductores`, {
+    headers: { authorization: "Bearer valid-client" },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(body.error, "solo_admin");
+});
+
+test("GET /admin/conductores mezcla perfil, riesgo y documentos", async () => {
+  const response = await fetch(`${baseUrl}/admin/conductores?verificacion=pendiente`, {
+    headers: { authorization: "Bearer valid-admin" },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.conductores.length, 1);
+  assert.equal(body.conductores[0].riesgo_puntaje, 65);
+  assert.equal(body.conductores[0].usuario.nombre, "Ana Cliente");
+  assert.equal(body.conductores[0].documentos.length, 4);
+});
+
+test("GET /admin/conductores/:id firma los documentos y lista la auditoría", async () => {
+  const firmasAntes = signedUrls;
+  const response = await fetch(`${baseUrl}/admin/conductores/${CLIENT_ID}`, {
+    headers: { authorization: "Bearer valid-admin" },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.conductor.riesgo_motivos[0].codigo, "cedula_no_coincide");
+  assert.equal(body.usuario.email, "ana@example.com");
+  assert.equal(body.documentos.length, 4);
+  assert.match(body.documentos[0].url, /token=prueba/);
+  assert.equal(body.eventos[0].tipo, "verificacion_enviada");
+  assert.equal(signedUrls, firmasAntes + 4);
+});
+
+test("GET /admin/conductores/:id responde 403 a quien no es admin", async () => {
+  const response = await fetch(`${baseUrl}/admin/conductores/${CLIENT_ID}`, {
+    headers: { authorization: "Bearer valid-client" },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(body.error, "solo_admin");
+});
+
+test("POST /admin/conductores/:id/verificar aprueba y delega en la RPC", async () => {
+  const response = await post(`/admin/conductores/${CLIENT_ID}/verificar`, {
+    token: "valid-admin",
+    body: { aprobado: true },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.verificacion, "aprobado");
+
+  const rpc = lastRpc();
+  assert.equal(rpc.fn, "verificar_conductor");
+  assert.deepEqual(rpc.payload, {
+    p_usuario_id: CLIENT_ID,
+    p_aprobado: true,
+    p_motivo: null,
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OTP: límites por teléfono y por intento de verificación
+// ---------------------------------------------------------------------------
+
+test("POST /auth/otp limita los códigos pedidos por teléfono", async () => {
+  resetRateLimits();
+  const telefono = "+584141239999";
+
+  for (let intento = 0; intento < 3; intento += 1) {
+    const response = await post("/auth/otp", { body: { telefono, rol: "conductor" } });
+    const body = await response.json();
+    assert.equal(response.status, 202);
+    assert.equal(body.mensaje, "Código enviado por SMS");
+  }
+
+  const enviosAntes = otpRequests.length;
+  const bloqueado = await post("/auth/otp", { body: { telefono } });
+  const body = await bloqueado.json();
+
+  assert.equal(bloqueado.status, 429);
+  assert.equal(body.error, "demasiados_intentos");
+  assert.ok(Number(bloqueado.headers.get("retry-after")) > 0);
+  assert.ok(body.detalles.retry_after > 0);
+  assert.equal(otpRequests.length, enviosAntes);
+});
+
+test("POST /auth/verify limita los intentos con el mismo teléfono", async () => {
+  resetRateLimits();
+  const telefono = "+584141238888";
+
+  for (let intento = 0; intento < 6; intento += 1) {
+    const response = await post("/auth/verify", { body: { telefono, token: "000000" } });
+    const body = await response.json();
+    assert.equal(response.status, 401);
+    assert.equal(body.error, "codigo_invalido");
+  }
+
+  const bloqueado = await post("/auth/verify", { body: { telefono, token: "123456" } });
+  const body = await bloqueado.json();
+
+  assert.equal(bloqueado.status, 429);
+  assert.equal(body.error, "demasiados_intentos");
+});
+
+test("el API mantiene el health check", async () => {
+  const response = await fetch(`${baseUrl}/health`);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(authCalls > 0, true);
 });

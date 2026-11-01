@@ -541,3 +541,393 @@ export function paymentErrorMessage(error: unknown): string {
   const copy = PAYMENT_ERROR_COPY.find(([pattern]) => pattern.test(error.message));
   return copy ? copy[1] : error.message;
 }
+
+// ---------------------------------------------------------------------------
+// Verificación de conductores y antifraude
+// ---------------------------------------------------------------------------
+
+export type TipoDocumentoConductor = "cedula_frente" | "cedula_reverso" | "licencia" | "certificado_medico";
+export type EstadoOcr = "no_configurado" | "listo" | "fallido";
+export type NivelRiesgo = "bajo" | "medio" | "alto";
+export type EstadoVerificacion = "pendiente" | "aprobado" | "rechazado";
+
+export interface MotivoRiesgo {
+  codigo: string;
+  peso: number;
+  detalle?: string | null;
+}
+
+export interface DocumentoConductor {
+  tipo: TipoDocumentoConductor;
+  mime: string;
+  bytes: number;
+  ocrEstado: EstadoOcr;
+  ocrConfianza: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface VerificacionConductor {
+  cedula: string;
+  tipoVehiculo: "moto" | "carro";
+  placa: string;
+  marca: string | null;
+  modelo: string | null;
+  anio: number | null;
+  verificacion: EstadoVerificacion;
+  estado: string;
+  motivoRechazo: string | null;
+  riesgoPuntaje: number;
+  riesgoMotivos: MotivoRiesgo[];
+  enviadoEn: string | null;
+  intentosVerificacion: number;
+}
+
+export interface MiVerificacion {
+  conductor: VerificacionConductor;
+  documentos: DocumentoConductor[];
+}
+
+export interface ResultadoEnvioVerificacion {
+  ok: boolean;
+  verificacion: EstadoVerificacion;
+  riesgoPuntaje: number;
+  riesgoNivel: NivelRiesgo;
+  motivos: MotivoRiesgo[];
+  documentos: number;
+  enviadoEn: string | null;
+}
+
+export interface DocumentoRevision extends DocumentoConductor {
+  url: string | null;
+  hashSha256: string;
+  ocrTexto: string | null;
+  ocrDatos: unknown;
+}
+
+export interface ConductorRevision extends VerificacionConductor {
+  usuarioId: string;
+  verificadoPor: string | null;
+  verificadoEn: string | null;
+  createdAt: string | null;
+}
+
+export interface EventoSeguridad {
+  id: number;
+  tipo: string;
+  severidad: "info" | "alerta" | "critico";
+  detalle: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface PerfilConductor {
+  id: string;
+  nombre: string;
+  telefono: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  telefonoVerificado: boolean;
+  createdAt: string | null;
+}
+
+export interface ConductorEnCola extends ConductorRevision {
+  usuario: PerfilConductor | null;
+  documentos: DocumentoConductor[];
+}
+
+export interface RevisionConductor {
+  conductor: ConductorRevision;
+  usuario: PerfilConductor | null;
+  documentos: DocumentoRevision[];
+  eventos: EventoSeguridad[];
+}
+
+interface DriverRow {
+  usuario_id?: string;
+  cedula: string;
+  tipo_vehiculo: "moto" | "carro";
+  placa: string;
+  marca: string | null;
+  modelo: string | null;
+  anio: number | null;
+  verificacion: EstadoVerificacion;
+  estado: string;
+  motivo_rechazo: string | null;
+  riesgo_puntaje: number | string | null;
+  riesgo_motivos: MotivoRiesgo[] | null;
+  enviado_en: string | null;
+  intentos_verificacion: number | string | null;
+  verificado_por?: string | null;
+  verificado_en?: string | null;
+  created_at?: string | null;
+}
+
+interface DriverDocumentRow {
+  usuario_id?: string;
+  tipo: TipoDocumentoConductor;
+  mime: string;
+  bytes: number | string;
+  hash_sha256?: string;
+  ocr_estado: EstadoOcr;
+  ocr_texto?: string | null;
+  ocr_confianza: number | string | null;
+  ocr_datos?: unknown;
+  created_at?: string | null;
+  updated_at?: string | null;
+  url?: string | null;
+}
+
+interface PerfilConductorRow {
+  id: string;
+  nombre: string;
+  telefono: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  telefono_verificado: boolean;
+  created_at?: string | null;
+}
+
+function mapConductor(row: DriverRow): VerificacionConductor {
+  return {
+    cedula: row.cedula,
+    tipoVehiculo: row.tipo_vehiculo,
+    placa: row.placa,
+    marca: row.marca ?? null,
+    modelo: row.modelo ?? null,
+    anio: row.anio === null || row.anio === undefined ? null : Number(row.anio),
+    verificacion: row.verificacion,
+    estado: row.estado,
+    motivoRechazo: row.motivo_rechazo ?? null,
+    riesgoPuntaje: num(row.riesgo_puntaje),
+    riesgoMotivos: Array.isArray(row.riesgo_motivos) ? row.riesgo_motivos : [],
+    enviadoEn: row.enviado_en ?? null,
+    intentosVerificacion: num(row.intentos_verificacion),
+  };
+}
+
+function mapDocumento(row: DriverDocumentRow): DocumentoConductor {
+  return {
+    tipo: row.tipo,
+    mime: row.mime,
+    bytes: num(row.bytes),
+    ocrEstado: row.ocr_estado,
+    ocrConfianza: row.ocr_confianza === null || row.ocr_confianza === undefined ? null : num(row.ocr_confianza),
+    createdAt: row.created_at ?? null,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+function mapPerfil(row: PerfilConductorRow | null | undefined): PerfilConductor | null {
+  if (!row) return null;
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    telefono: row.telefono ?? null,
+    whatsapp: row.whatsapp ?? null,
+    email: row.email ?? null,
+    telefonoVerificado: Boolean(row.telefono_verificado),
+    createdAt: row.created_at ?? null,
+  };
+}
+
+function mapConductorRevision(row: DriverRow): ConductorRevision {
+  return {
+    ...mapConductor(row),
+    usuarioId: row.usuario_id ?? "",
+    verificadoPor: row.verificado_por ?? null,
+    verificadoEn: row.verificado_en ?? null,
+    createdAt: row.created_at ?? null,
+  };
+}
+
+export async function getDriverVerification(): Promise<MiVerificacion> {
+  const token = await accessToken();
+  const data = await request<{ ok: boolean; conductor: DriverRow; documentos: DriverDocumentRow[] | null }>(
+    "/drivers/me",
+    { token },
+  );
+  return {
+    conductor: mapConductor(data.conductor),
+    documentos: (data.documentos ?? []).map(mapDocumento),
+  };
+}
+
+export async function saveDriverDetails(input: {
+  cedula: string;
+  tipoVehiculo: "moto" | "carro";
+  placa: string;
+  marca?: string;
+  modelo?: string;
+  anio?: number;
+}): Promise<VerificacionConductor> {
+  const token = await accessToken();
+  const data = await request<{ ok: boolean; conductor: DriverRow }>("/drivers/me", {
+    method: "POST",
+    token,
+    body: {
+      cedula: input.cedula.trim().toUpperCase(),
+      tipo_vehiculo: input.tipoVehiculo,
+      placa: input.placa.trim().toUpperCase(),
+      marca: input.marca?.trim() || undefined,
+      modelo: input.modelo?.trim() || undefined,
+      anio: input.anio,
+    },
+  });
+  return mapConductor(data.conductor);
+}
+
+const MAX_DOCUMENTO_BYTES = 5 * 1024 * 1024;
+const MIMES_DOCUMENTO = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+
+function leerArchivoBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () =>
+      reject(new ApiError("lectura_fallida", 0, "No pudimos leer el archivo. Intenta de nuevo."));
+    reader.onload = () => {
+      const resultado = String(reader.result ?? "");
+      const coma = resultado.indexOf(",");
+      resolve(coma >= 0 ? resultado.slice(coma + 1) : resultado);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function uploadDriverDocument(input: { tipo: TipoDocumentoConductor; file: File }): Promise<DocumentoConductor> {
+  if (input.file.size === 0) {
+    throw new ApiError("documento_vacio", 0, "El archivo está vacío.");
+  }
+  if (input.file.size > MAX_DOCUMENTO_BYTES) {
+    throw new ApiError("documento_muy_grande", 0, "El archivo supera los 5 MB.");
+  }
+  if (!MIMES_DOCUMENTO.has(input.file.type)) {
+    throw new ApiError("formato_no_soportado", 0, "Sube una foto JPG, PNG, WebP o un PDF.");
+  }
+
+  const token = await accessToken();
+  const contenido = await leerArchivoBase64(input.file);
+  const data = await request<{ ok: boolean; documento: DriverDocumentRow }>("/drivers/me/documentos", {
+    method: "POST",
+    token,
+    body: { tipo: input.tipo, mime: input.file.type, contenido_base64: contenido },
+  });
+  return mapDocumento(data.documento);
+}
+
+export async function submitDriverVerification(): Promise<ResultadoEnvioVerificacion> {
+  const token = await accessToken();
+  const data = await request<{
+    ok: boolean;
+    verificacion: EstadoVerificacion;
+    riesgo_puntaje: number | string;
+    riesgo_nivel: NivelRiesgo;
+    motivos: MotivoRiesgo[] | null;
+    documentos: number | string;
+    enviado_en: string | null;
+  }>("/drivers/me/enviar", { method: "POST", token });
+
+  return {
+    ok: Boolean(data.ok),
+    verificacion: data.verificacion,
+    riesgoPuntaje: num(data.riesgo_puntaje),
+    riesgoNivel: data.riesgo_nivel,
+    motivos: data.motivos ?? [],
+    documentos: num(data.documentos),
+    enviadoEn: data.enviado_en,
+  };
+}
+
+export async function listDriversForReview(verificacion: EstadoVerificacion): Promise<ConductorEnCola[]> {
+  const token = await accessToken();
+  const data = await request<{
+    ok: boolean;
+    conductores: Array<
+      DriverRow & { usuario: PerfilConductorRow | null; documentos: DriverDocumentRow[] | null }
+    > | null;
+  }>(`/admin/conductores?verificacion=${encodeURIComponent(verificacion)}`, { token });
+
+  return (data.conductores ?? []).map((row) => ({
+    ...mapConductorRevision(row),
+    usuario: mapPerfil(row.usuario),
+    documentos: (row.documentos ?? []).map(mapDocumento),
+  }));
+}
+
+export async function getDriverReview(usuarioId: string): Promise<RevisionConductor> {
+  const token = await accessToken();
+  const data = await request<{
+    ok: boolean;
+    conductor: DriverRow;
+    usuario: PerfilConductorRow | null;
+    documentos: DriverDocumentRow[] | null;
+    eventos: Array<{
+      id: number;
+      tipo: string;
+      severidad: "info" | "alerta" | "critico";
+      detalle: Record<string, unknown>;
+      created_at: string;
+    }> | null;
+  }>(`/admin/conductores/${encodeURIComponent(usuarioId)}`, { token });
+
+  return {
+    conductor: mapConductorRevision(data.conductor),
+    usuario: mapPerfil(data.usuario),
+    documentos: (data.documentos ?? []).map((row) => ({
+      ...mapDocumento(row),
+      url: row.url ?? null,
+      hashSha256: row.hash_sha256 ?? "",
+      ocrTexto: row.ocr_texto ?? null,
+      ocrDatos: row.ocr_datos ?? null,
+    })),
+    eventos: (data.eventos ?? []).map((evento) => ({
+      id: evento.id,
+      tipo: evento.tipo,
+      severidad: evento.severidad,
+      detalle: evento.detalle ?? {},
+      createdAt: evento.created_at,
+    })),
+  };
+}
+
+export async function verifyDriver(
+  usuarioId: string,
+  input: { aprobado: boolean; motivo?: string },
+): Promise<{ ok: boolean; verificacion: EstadoVerificacion; motivoRechazo: string | null }> {
+  const token = await accessToken();
+  const data = await request<{
+    ok: boolean;
+    verificacion: EstadoVerificacion;
+    motivo_rechazo?: string | null;
+  }>(`/admin/conductores/${encodeURIComponent(usuarioId)}/verificar`, {
+    method: "POST",
+    token,
+    body: { aprobado: input.aprobado, motivo: input.motivo?.trim() || undefined },
+  });
+
+  return {
+    ok: Boolean(data.ok),
+    verificacion: data.verificacion,
+    motivoRechazo: data.motivo_rechazo ?? null,
+  };
+}
+
+const VERIFICATION_ERROR_COPY: Array<[RegExp, string]> = [
+  [/DOCUMENTO_DUPLICADO|23505/, "Ese documento ya está vinculado a otra cuenta. Revisa que sea tuyo y vuelve a intentarlo."],
+  [/CONDUCTOR_YA_APROBADO/, "Tu cuenta ya está aprobada; los documentos no se pueden reemplazar."],
+  [/CONDUCTOR_BLOQUEADO/, "Tu cuenta está bloqueada para verificación. Escríbenos por soporte."],
+  [/DOCUMENTOS_INCOMPLETOS/, "Faltan documentos: sube la cédula por ambos lados, la licencia y el certificado médico."],
+  [/conductor_no_registrado/, "Primero completa los datos de tu vehículo."],
+  [/documento_muy_grande/, "El archivo supera los 5 MB. Comprime la imagen o usa un PDF más liviano."],
+  [/formato_no_soportado/, "Sube una foto JPG, PNG, WebP o un PDF del documento."],
+  [/mime_no_coincide/, "El archivo no coincide con su formato. Vuelve a exportarlo o toma otra foto."],
+  [/documento_invalido|documento_vacio/, "No pudimos leer el archivo. Intenta con otra foto o PDF."],
+  [/solo_admin/, "Esta sección es solo para el equipo de operaciones."],
+  [/NO_AUTORIZADO|TOKEN|sesion_invalida/, "Tu sesión no permite esta operación. Vuelve a ingresar."],
+];
+
+export function verificationErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return "No pudimos completar la verificación. Intenta de nuevo.";
+  if (error.status === 0 && error.code === "sin_conexion") return error.message;
+  const copy = VERIFICATION_ERROR_COPY.find(([pattern]) => pattern.test(`${error.code} ${error.message}`));
+  return copy ? copy[1] : error.message;
+}

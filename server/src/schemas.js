@@ -13,6 +13,13 @@ const montoUsd = z.coerce
 
 const documento = z.string().trim().min(1, "Falta la ruta del documento").max(300);
 
+const contenidoBase64 = z
+  .string()
+  .trim()
+  .min(16, "El archivo está vacío")
+  // 5 MB en bytes son ~6.7 MB en base64; el límite real se valida al decodificar.
+  .max(7_000_000, "El archivo es demasiado grande");
+
 export const uuidSchema = z.string().uuid("Identificador inválido");
 
 export const otpRequestSchema = z.object({
@@ -57,9 +64,11 @@ export const driverDetailsSchema = z.object({
     .min(1950)
     .max(new Date().getFullYear() + 1)
     .optional(),
-  cedula_url: documento,
-  licencia_url: documento,
-  certificado_medico_url: documento,
+  // Rutas legadas del primer registro. El flujo nuevo sube los archivos por
+  // POST /drivers/me/documentos, así que ya no son obligatorias.
+  cedula_url: documento.optional(),
+  licencia_url: documento.optional(),
+  certificado_medico_url: documento.optional(),
 });
 
 export const pagoMovilSchema = z.object({
@@ -113,4 +122,14 @@ export const cancelTripSchema = z.object({
 export const verifyDriverSchema = z.object({
   aprobado: z.boolean(),
   motivo: z.string().trim().max(300).optional(),
+});
+
+export const estadoVerificacionSchema = z.enum(["pendiente", "aprobado", "rechazado"], {
+  errorMap: () => ({ message: "Usa pendiente, aprobado o rechazado" }),
+});
+
+export const driverDocumentSchema = z.object({
+  tipo: z.enum(["cedula_frente", "cedula_reverso", "licencia", "certificado_medico"]),
+  mime: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
+  contenido_base64: contenidoBase64,
 });
