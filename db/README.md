@@ -1,9 +1,17 @@
-# Base de datos Llégate (Supabase)
+# Base de datos Llégate (PostgreSQL)
+
+El esquema corre sobre PostgreSQL 15 o superior: Neon, un VPS o el PostgreSQL
+embebido que usan las pruebas. Conserva los nombres heredados de Supabase
+(`auth.users`, `auth.uid()`, roles `anon`/`authenticated`/`service_role` y el
+catálogo `storage`) para no reescribir políticas ni RPC, pero **no depende de
+Supabase**: la identidad, el OTP, las sesiones y los archivos los administra
+esta aplicación.
 
 ## Migraciones
 
 | Archivo | Contenido |
 | --- | --- |
+| `20261029000000_llegate_base_postgres.sql` | Roles, esquema `auth`, identidad, OTP, sesiones y catálogo de almacenamiento |
 | `20261030120000_llegate_core.sql` | Enums, tablas, constraints, triggers, RLS, grants y bucket de documentos |
 | `20261030120100_llegate_rpc.sql` | RPC transaccionales: recargas, verificación y comisión del viaje |
 | `20261030130000_llegate_billetera_tipos.sql` | Tipos `pago` y `abono` del libro mayor |
@@ -14,32 +22,61 @@
 | `20261031120000_llegate_pagos.sql` | Intenciones de recarga (`pagos`), confirmación con clave de servidor y acreditación idempotente |
 | `20261031160000_llegate_verificacion_antifraude.sql` | Documentos con hash único, OCR, puntaje de riesgo explicable, eventos de seguridad y RPC de envío de verificación |
 
-Se aplican en orden. Con la CLI de Supabase:
+Se aplican **en orden**. Con `psql` y la cadena de conexión en `DATABASE_URL`:
 
 ```bash
-supabase link --project-ref <ref>
-supabase db push
+for archivo in db/migrations/*.sql; do
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$archivo" || break
+done
 ```
+
+También puedes pegar cada archivo en el SQL Editor de Neon, en orden por nombre.
+La primera migración crea los roles del clúster; es idempotente, así que puede
+correrse en un proyecto donde ya existan.
 
 Las migraciones que crean tipos (`...130000` y `...140000`) están separadas de
 las que los usan (`...130100` y `...140100`) a propósito: PostgreSQL no permite
 usar un valor de enum nuevo en la misma transacción que lo crea. No las fusiones.
 
-También puedes pegarlas en el SQL Editor del dashboard, en orden por nombre.
-
 ## Requisitos del proyecto
 
-1. **Auth por teléfono**: activa el proveedor SMS en Authentication → Providers → Phone
-   y configura Twilio, MessageBird, Vonage o Textlocal. Define la plantilla del código
-   y límites de envío.
-2. **Bucket privado**: la migración crea `documentos-conductores` (10 MB, jpeg/png/webp/pdf)
-   con políticas de acceso por carpeta `<usuario_id>/`.
-3. **Confirmación de teléfono**: el perfil se marca `telefono_verificado = true` cuando
-   `auth.users.phone_confirmed_at` existe. Sin esa confirmación un conductor no puede
-   registrarse.
-4. **OTP por WhatsApp (opcional)**: el Send SMS Hook puede apuntar al webhook de la
-   API (`/webhooks/supabase-otp`) para entregar el código por WhatsApp Cloud API.
-   La configuración está en `server/README.md`.
+1. **PostgreSQL 15+** con la extensión `pgcrypto` (la crean las migraciones). En
+   Neon sirve la cadena de conexión directa del proyecto; el API la toma de
+   `DATABASE_URL` y activa TLS con `DATABASE_SSL=1` si el proveedor lo exige.
+2. **Autenticación propia**: no hay proveedor externo. El API genera el código
+   OTP, lo guarda como HMAC en `auth.otp_codigos` y entrega un JWT firmado con
+   `AUTH_JWT_SECRET`. El pepper del OTP se configura en `OTP_SECRET`.
+3. **Almacenamiento de documentos**: en desarrollo, disco local
+   (`STORAGE_DRIVER=local`); en producción, Cloudflare R2
+   (`STORAGE_DRIVER=r2`). La base solo guarda el catálogo y los metadatos; los
+   archivos nunca viven en Postgres.
+4. **Confirmación de teléfono**: el perfil se marca `telefono_verificado = true`
+   cuando el API confirma el OTP y escribe `auth.users.phone_confirmed_at`. Sin
+   esa confirmación un conductor no puede registrarse.
+
+## Esquema base portable
+
+La migración `20261029000000` reproduce lo mínimo que antes administraba
+Supabase:
+
+- **Roles** `anon`, `authenticated` y `service_role`, que usan las políticas
+  RLS y los `grant`.
+- **`auth.users`**: identidad 1:1 con `public.usuarios`, teléfono y correo
+  únicos, metadata de registro y `phone_confirmed_at`.
+- **`auth.uid()` y `auth.role()`**: leen `request.jwt.claim.sub` y
+  `request.jwt.claim.role`, variables que el API fija por transacción con
+  `set_config(..., true)` a partir del JWT verificado. No hay JWT de Supabase.
+- **`auth.otp_codigos`**: un código vigente por teléfono, guardado como
+  HMAC-SHA256 con pepper, TTL de 10 minutos y máximo de intentos.
+- **`auth.sesiones`**: refresh tokens rotativos (solo su SHA-256), fecha de
+  expiración y revocación por dispositivo.
+- **`storage.buckets`, `storage.objects` y `storage.foldername()`**: catálogo
+  para que las políticas de documentos sigan describiendo qué carpeta
+  `<usuario_id>/` puede leer cada piloto.
+
+El API se conecta con la credencial de `DATABASE_URL`; ninguna credencial de
+base de datos viaja al navegador ni al móvil. Además de los `grant`, las RPC
+comprueban `auth.uid()` y el rol antes de tocar saldos, verificación o pagos.
 
 ## Tablas
 
@@ -77,20 +114,22 @@ Una persona tiene una sola cuenta. La web de registro, el panel de administraci�
 y la app móvil comparten la misma base:
 
 - `auth.users` es la identidad; `public.usuarios` es su perfil 1:1, creado por el
-  trigger `handle_new_user`.
+  trigger `handle_new_user` cuando el API inserta la cuenta al pedir el primer
+  OTP.
 - La llave compartida es el teléfono en formato E.164 (`+584141234567`), único en
   `usuarios`. Quien se registra en la web puede iniciar sesión en la app con el
-  mismo número y viceversa.
-- Un registro solo por correo crea el perfil sin teléfono; al confirmar un número
-  desde Auth, `sync_usuario_auth` lo copia al perfil, lo marca verificado y lo usa
+  mismo número y viceversa. El registro del API es solo por teléfono; la columna
+  `email` queda opcional para datos heredados.
+- Al verificar el código, el API marca `phone_confirmed_at`; el trigger
+  `sync_usuario_auth` copia el teléfono al perfil, lo marca verificado y lo usa
   como WhatsApp si aún no había uno.
 - El metadata del cliente solo puede pedir `cliente` o `conductor`; `admin` se
   ignora y se promueve únicamente desde SQL.
 
 La vista `public.perfil_usuario` es el contrato de lectura para ambos clientes.
 Usa `security_invoker`, así que aplica la RLS de `usuarios` y
-`conductores_detalles` con el JWT del visitante: cada cuenta ve su fila y el
-admin ve todas. Expone:
+`conductores_detalles` cuando la consulta corre con un rol sujeto a RLS: cada
+cuenta ve su fila y el admin ve todas. Expone:
 
 | Columna | Uso |
 | --- | --- |
@@ -99,8 +138,6 @@ admin ve todas. Expone:
 | `es_conductor`, `tipo_vehiculo`, `placa`, `verificacion`, `estado_conductor`, `motivo_rechazo`, `verificado_en` | Estado del piloto, sin consultar dos tablas |
 | `puede_pedir_viajes` | `rol = cliente` (lo mismo que exige la RLS de `viajes`) |
 | `puede_conducir` | Verificación aprobada y estado operativo `activo` |
-
-El rol anónimo no tiene `select` sobre la vista.
 
 ### Del plan a las tablas
 
@@ -125,7 +162,7 @@ saldo por sí sola: primero hay que confirmarla.
 | `mis_pagos` | usuario | Expira las vencidas y lista las últimas propias |
 | `reportar_pago` | dueño | Pago Móvil: guarda la referencia (6–12 dígitos) y pasa a `en_revision` |
 | `cancelar_pago` | dueño | Cancela una intención pendiente |
-| `confirmar_pago` | `anon` + clave de servidor | Confirma y acredita; la usa el webhook de Binance |
+| `confirmar_pago` | `service_role` + clave de servidor | Confirma y acredita; la usa el webhook de Binance |
 | `confirmar_pago_admin` | admin | Confirma un Pago Móvil revisado a mano |
 | `rechazar_pago` | admin | Rechaza con motivo |
 | `expirar_pagos` | admin/service | Marca vencidas |
@@ -138,12 +175,13 @@ referencia externa del proveedor tampoco se puede repetir.
 
 ### Configurar la clave de servidor
 
-Los clientes tienen la anon key, por lo que `crear_intencion_pago` no puede
-acreditar saldo. La API y la base comparten una clave que el navegador nunca ve:
+Solo el API se conecta a la base, pero el webhook de Binance es público. Para que
+una petición no pueda confirmar un pago solo con la firma RSA (o con una clave
+filtrada), la RPC exige además una clave que comparten el API y la base:
 
 ```sql
--- Ejecuta como postgres/service_role. La clave real va en
--- server/.env como PAGOS_CLAVE_SERVIDOR.
+-- Ejecuta con la conexión de administración (owner del proyecto). La clave
+-- real va en server/.env como PAGOS_CLAVE_SERVIDOR.
 insert into public.configuracion_pagos (id, clave_servidor_hash)
 values (true, encode(digest('mi-clave-larga-y-aleatoria', 'sha256'), 'hex'))
 on conflict (id) do update
@@ -152,19 +190,19 @@ on conflict (id) do update
 ```
 
 `confirmar_pago` compara el hash dentro de una función `security definer` y está
-concedida solo a `anon` (webhook) y `service_role`; cambiar la clave exige
-actualizar el hash y el `.env` de la API a la vez.
+concedida solo a `anon` y `service_role` (el API entra como este último); cambiar
+la clave exige actualizar el hash y el `.env` de la API a la vez.
 
 ### Relación con el flujo anterior
 
 `/wallet/recargas/*` sigue existiendo para clientes antiguos: reporta directo en
 `transacciones_billetera` y el admin aprueba con `aprobar_recarga`. La web nueva
-no lo usa. `aprobar_recarga` ahora reutiliza la misma acreditación interna, así
-que ambos caminos dejan el mismo rastro en el libro mayor.
+no lo usa. `aprobar_recarga` reutiliza la misma acreditación interna, así que
+ambos caminos dejan el mismo rastro en el libro mayor.
 
 ## Verificación de pilotos y antifraude
 
-El piloto sube cuatro archivos al bucket privado `documentos-conductores`, en su
+El piloto sube cuatro archivos al prefijo privado `documentos-conductores`, en su
 propia carpeta `<usuario_id>/`. La API valida el tipo real del archivo (firma
 binaria, no solo la extensión), calcula el SHA-256 y, si hay OCR configurado, el
 texto y la confianza. El registro del documento y el envío del expediente pasan
@@ -198,16 +236,17 @@ de nuevo exige el expediente completo y está bloqueado si el piloto ya fue
 aprobado o bloqueado (`CONDUCTOR_YA_APROBADO`, `CONDUCTOR_BLOQUEADO`,
 `DOCUMENTOS_INCOMPLETOS`).
 
-El bucket es privado: el piloto solo borra archivos de su carpeta (para limpiar un
-documento reemplazado) y la API genera enlaces firmados de 900 s para que el
-operador los previsualice. `conductores_documentos` se lee propio o admin y
-`eventos_seguridad` solo admin; ambos sin escritura directa para `authenticated`.
-El envío deja un evento `verificacion_enviada` con puntaje, motivos y conteo de
-documentos.
+El almacenamiento es privado: el piloto solo borra archivos de su carpeta (para
+limpiar un documento reemplazado) y la API genera enlaces de descarga firmados
+por ella misma, válidos 900 s (`GET /files/:token`), para que el operador los
+previsualice. Funcionan igual con R2 o con disco. `conductores_documentos` se lee
+propio o admin y `eventos_seguridad` solo admin; ambos sin escritura directa para
+`authenticated`. El envío deja un evento `verificacion_enviada` con puntaje,
+motivos y conteo de documentos.
 
 ## Operación
 
-**Promover un admin** (solo desde SQL como `postgres`/service role):
+**Promover un admin** (solo desde SQL, con la conexión del owner):
 
 ```sql
 update public.usuarios set rol = 'admin' where telefono = '+584141234567';
@@ -254,19 +293,16 @@ update public.configuracion_comisiones
 
 ## Validación local
 
-La suite de `tests/` se aplica sobre PostgreSQL 15 con stubs de `auth` y `storage`
-y no necesita un proyecto Supabase ni credenciales. Desde la raíz del repo:
+La suite de `db/tests/` se aplica sobre un PostgreSQL real embebido (sin Docker,
+sin proyecto externo y sin credenciales). Desde la raíz del repo:
 
 ```bash
 npm run test:db
 ```
 
-Requiere un contenedor local; el script crea y recrea la base `llegate_test`:
-
-```bash
-docker run --name llegate-pg -e POSTGRES_HOST_AUTH_METHOD=trust \
-  -p 55432:5432 -d postgres:15-alpine
-```
+El script crea y recrea la base `llegate_test` en un clúster efímero, aplica
+todas las migraciones —incluida la base portable con `auth` y `storage`— y
+ejecuta las pruebas. El puerto se puede cambiar con `LLEGATE_TEST_PORT`.
 
 Cubre: pago feliz con saldo, libro mayor y conciliación, idempotencia, saldo
 insuficiente, autorización del cliente, viaje en efectivo, comisión mínima topada
@@ -274,16 +310,19 @@ al precio, bloqueo de finalización directa, constraints de signo y unicidad,
 recargas (referencias, duplicados, rechazo y reintento) y RLS para cliente y
 terceros. `20_prepago.sql` cubre bienvenida única, reserva y liberación de la
 comisión, captura, saldo mínimo, recarga del piloto con su SLA, finalización sin
-saldo y RLS de las reservas. `30_identidad.sql` cubre el perfil creado desde
-Auth, el rol admin ignorado, la sincronización del teléfono, el teléfono único
-entre web y app, las capacidades dentro de `perfil_usuario` y la RLS de la vista
-para pasajero, piloto, admin y anónimo. `40_pagos.sql` cubre la creación de
-intenciones, el reporte y la deduplicación de referencias, la confirmación manual
-del admin, la confirmación automática con clave de servidor (y el rechazo con una
-clave incorrecta), la idempotencia, el monto distinto, la expiración, el rechazo
-con motivo, el crédito y reactivación del piloto y la RLS de `pagos`.
-`50_verificacion.sql` cubre el expediente incompleto, las validaciones del
-registro, el documento duplicado entre cuentas, el envío sin riesgo y el reenvío,
-el scoring alto por cédula, nombre, confianza y reintentos, la aprobación y el
-rechazo con su auditoría, el bloqueo de reenvío tras aprobar y la RLS de
-`conductores_documentos` y `eventos_seguridad`.
+saldo y RLS de las reservas. `30_identidad.sql` cubre el perfil creado al
+insertar en la identidad, el rol admin ignorado, la sincronización del teléfono,
+el teléfono único entre web y app, las capacidades dentro de `perfil_usuario` y
+la RLS de la vista para pasajero, piloto, admin y anónimo. `40_pagos.sql` cubre
+la creación de intenciones, el reporte y la deduplicación de referencias, la
+confirmación manual del admin, la confirmación automática con clave de servidor
+(y el rechazo con una clave incorrecta), la idempotencia, el monto distinto, la
+expiración, el rechazo con motivo, el crédito y reactivación del piloto y la RLS
+de `pagos`. `50_verificacion.sql` cubre el expediente incompleto, las
+validaciones del registro, el documento duplicado entre cuentas, el envío sin
+riesgo y el reenvío, el scoring alto por cédula, nombre, confianza y reintentos,
+la aprobación y el rechazo con su auditoría, el bloqueo de reenvío tras aprobar y
+la RLS de `conductores_documentos` y `eventos_seguridad`.
+
+Las pruebas de integración del API (`npm run test:api`) levantan otro PostgreSQL
+embebido, aplican las mismas migraciones y ejercitan los endpoints reales.

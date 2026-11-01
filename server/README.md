@@ -1,27 +1,33 @@
 # Llégate API
 
-API HTTP (Node.js + Express) sobre Supabase para la app móvil y la web. Todas las
-operaciones sensibles se ejecutan en las funciones RPC de PostgreSQL: esta capa
-solo valida entradas, propaga el JWT del usuario y traduce errores.
+API HTTP (Node.js + Express) sobre PostgreSQL para la app móvil y la web. Todas
+las operaciones sensibles se ejecutan en las funciones RPC de PostgreSQL: esta
+capa solo valida entradas, verifica el JWT propio, fija la identidad de la
+transacción y traduce errores.
 
 ## Requisitos
 
 - Node.js 20 o superior.
-- Un proyecto Supabase con las migraciones de `../supabase/migrations` aplicadas.
-- Proveedor SMS configurado en Supabase Auth. Opcionalmente, el Send SMS Hook
-  puede entregar el código por WhatsApp (ver [OTP por WhatsApp](#otp-por-whatsapp)).
+- PostgreSQL 15 o superior (Neon, un VPS o el Postgres embebido de las pruebas)
+  con las migraciones de `../db/migrations` aplicadas; ver `../db/README.md`.
+- Un canal para entregar el OTP: WhatsApp Cloud API, SMS por Twilio o, solo
+  fuera de producción, el log del servidor (ver [OTP por WhatsApp o SMS](#otp-por-whatsapp-o-sms)).
+- Almacenamiento para los documentos: disco local en desarrollo o Cloudflare R2
+  en producción.
 
 ## Puesta en marcha
 
 ```bash
 cd server
 npm install
-cp .env.example .env   # completa SUPABASE_URL y SUPABASE_ANON_KEY
+cp .env.example .env   # completa DATABASE_URL y AUTH_JWT_SECRET
 npm run dev
 ```
 
-Solo se usa la **anon key**. La `service_role` nunca debe viajar al móvil, a la web
-ni a este servidor: los roles y permisos se resuelven con el JWT del usuario y RLS.
+La credencial de `DATABASE_URL` es la del **owner** del proyecto: solo la usa este
+servidor y nunca viaja al móvil ni a la web. Ninguna credencial de base de datos
+llega a los clientes; la autorización se resuelve con el JWT del usuario y las
+RPC. Los archivos de `.env` no se versionan.
 
 Las recargas con pasarelas usan variables opcionales (`PAGOS_CLAVE_SERVIDOR`,
 `PAGO_MOVIL_*`, `BINANCE_PAY_*`). Si faltan, la API sigue arrancando y ese método
@@ -30,15 +36,22 @@ responde `503`; nunca se simula un pago. La configuración completa está en
 
 ## Flujo de autenticación
 
-1. `POST /auth/otp` envía un código SMS al teléfono.
+1. `POST /auth/otp` envía un código al teléfono (WhatsApp o SMS).
 2. `POST /auth/verify` valida el código y devuelve `access_token` y `refresh_token`.
 3. El cliente envía `Authorization: Bearer <access_token>` en cada petición.
 4. Cuando el token expira, `POST /auth/refresh` entrega un par nuevo sin pedir otro SMS.
 5. `POST /auth/logout` cierra solo la sesión de ese dispositivo.
 
-Al primer registro, Supabase Auth crea el perfil en `public.usuarios` mediante un
-trigger. El rol del metadata solo puede ser `cliente` o `conductor`; cualquier
+Al primer registro, el API crea la cuenta en `auth.users`; el trigger
+`handle_new_user` crea el perfil en `public.usuarios`. Al confirmar el código, el
+trigger `sync_usuario_auth` marca el teléfono como verificado y lo copia al
+perfil. El rol del metadata solo puede ser `cliente` o `conductor`; cualquier
 intento de declararse `admin` se ignora.
+
+El OTP se guarda como HMAC-SHA256 (no en claro), vence a los 10 minutos y admite
+5 intentos. La sesión usa un JWT HS256 de 1 hora (`AUTH_JWT_SECRET`) y un refresh
+token rotativo de 30 días guardado como hash en `auth.sesiones`; cada petición
+comprueba que la sesión siga vigente y sin revocar.
 
 ### Una cuenta, dos clientes
 
@@ -112,7 +125,7 @@ vuelve a ejecutar `npm run build`.
 
 | Método | Ruta | Quién | Descripción |
 | --- | --- | --- | --- |
-| POST | `/auth/otp` | público | Envía el código SMS (`telefono`, `rol`, `nombre` opcional) |
+| POST | `/auth/otp` | público | Envía el código OTP (`telefono`, `rol`, `nombre` opcional) |
 | POST | `/auth/verify` | público | Verifica el código y entrega la sesión |
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
 | POST | `/auth/logout` | autenticado | Cierra la sesión de este dispositivo |
@@ -133,7 +146,7 @@ vuelve a ejecutar `npm run build`.
 | POST | `/payments/:id/report` | autenticado | Reporta la referencia bancaria de un Pago Móvil |
 | POST | `/payments/:id/cancel` | autenticado | Cancela una intención pendiente |
 | POST | `/webhooks/binance-pay` | Binance | Confirma el pago con la firma RSA del webhook |
-| POST | `/webhooks/supabase-otp` | Supabase | Send SMS Hook: entrega el OTP por WhatsApp |
+| GET | `/files/:token` | público firmado | Descarga un documento con el enlace temporal que genera la API |
 | POST | `/trips` | cliente | Crea una solicitud de viaje |
 | GET | `/trips/:id` | participante | Detalle del viaje |
 | POST | `/trips/:id/aceptar` | conductor | Acepta y reserva la comisión (valida saldo disponible) |
@@ -247,8 +260,8 @@ reactiva automáticamente cuando el saldo alcanza el mínimo.
 
 El piloto sube cuatro documentos: cédula por ambos lados, licencia y certificado
 médico. La API valida los bytes reales del archivo (JPG, PNG, WebP o PDF), calcula
-su SHA-256, guarda una copia en el bucket privado `documentos-conductores` y, si
-hay OCR configurado, registra el texto leído:
+su SHA-256, guarda una copia en el prefijo privado `documentos-conductores`
+(disco o R2) y, si hay OCR configurado, registra el texto leído:
 
 ```bash
 curl -X POST http://localhost:3000/drivers/me/documentos \
@@ -307,7 +320,8 @@ aparece en el OCR, 25 por nombre que no coincide, 15 por OCR de baja confianza y
 10 por reenvíos acumulados (`intentos_verificacion >= 2`). Sin OCR configurado el
 envío no se bloquea: queda `ocr_no_disponible` con peso 0 y el operador revisa a
 mano. El admin ve la cola ordenada por riesgo en `GET /admin/conductores` y el
-detalle con URLs firmadas de 15 minutos en `GET /admin/conductores/:id`.
+detalle con enlaces firmados por la API, válidos 15 minutos, en
+`GET /admin/conductores/:id`.
 
 `POST /drivers/me` se conserva para registrar los datos del vehículo y las rutas
 heredadas; el flujo nuevo sube el archivo desde la web y no necesita URLs
@@ -330,36 +344,38 @@ curl -X POST http://localhost:3000/drivers/me \
   }'
 ```
 
-### 5. OTP por WhatsApp
+### 5. OTP por WhatsApp o SMS
 
-Supabase Auth puede entregar el código SMS mediante su **Send SMS Hook**. La API
-recibe el evento en `/webhooks/supabase-otp`, verifica la firma HMAC del estándar
-Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature` sobre
-`<id>.<timestamp>.<cuerpo>`, ventana de 5 minutos) y envía una plantilla de
-WhatsApp Cloud API:
+El API genera el código y lo entrega en este orden: **WhatsApp Cloud API**,
+**SMS por Twilio** y, solo fuera de producción, el **log del servidor**. No hay
+proveedor externo de autenticación ni hook: la verificación ocurre en
+`POST /auth/verify` contra el hash guardado en `auth.otp_codigos`.
 
 ```bash
-SUPABASE_SEND_SMS_HOOK_SECRET=whsec_...
 WHATSAPP_TOKEN=EAAG...
 WHATSAPP_PHONE_ID=1234567890
 WHATSAPP_OTP_TEMPLATE=llegate_otp
 WHATSAPP_OTP_LANGUAGE=es
 WHATSAPP_API_VERSION=v21.0
+
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM=+1...
 ```
 
-1. En Supabase → Authentication → Hooks → Send SMS, activa el hook HTTP hacia
-   `https://api.tudominio.com/webhooks/supabase-otp`.
-2. Copia el secreto que muestra Supabase en `SUPABASE_SEND_SMS_HOOK_SECRET`.
-3. La API responde `503` si falta el secreto o las credenciales de Meta; en ese
-   caso Supabase debe seguir usando su proveedor SMS normal. Nunca se finge un
-   envío.
+- WhatsApp se usa cuando están `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_ID`. La
+  plantilla debe estar aprobada en Meta y recibe el código como parámetro.
+- Si falta WhatsApp, se usa Twilio cuando están sus tres variables.
+- Sin ninguno de los dos, `OTP_LOG_EN_DESARROLLO=1` imprime
+  `[otp] +584141234567: 123456` en el log. En producción, sin canal configurado,
+  la ruta responde `503 otp_no_configurado` en vez de fingir un envío.
 
-Los límites de la API son una ventana deslizante en memoria por teléfono, por IP
-y por intento de verificación (`OTP_MAX_POR_TELEFONO`, `OTP_MAX_POR_IP`,
-`OTP_MAX_VERIFICACIONES`, `OTP_VENTANA_MINUTOS`). Al superarlos responde `429`
-con `Retry-After`. Supabase también aplica su propio límite de envío; estos son
-una segunda barrera. El almacén es en memoria: si la API escala a varias
-instancias, debe moverse a Redis.
+El código vence a los 10 minutos, admite 5 intentos y se guarda como HMAC con
+`OTP_SECRET` (o `AUTH_JWT_SECRET` si no se define). Además hay una ventana
+deslizante en memoria por teléfono, por IP y por intento de verificación
+(`OTP_MAX_POR_TELEFONO`, `OTP_MAX_POR_IP`, `OTP_MAX_VERIFICACIONES`,
+`OTP_VENTANA_MINUTOS`). Al superarlos responde `429` con `Retry-After`. El almacén
+es en memoria: si la API escala a varias instancias, debe moverse a Redis.
 
 ### 6. Ciclo del viaje y comisión
 
@@ -557,16 +573,17 @@ crudo. Sin claves configuradas el endpoint responde `503` y nunca confirma nada.
 
 ### Clave de servidor
 
-Los clientes tienen la anon key, así que la confirmación no puede depender solo de
-un JWT: cualquier usuario podría invocar la RPC. Por eso `confirmar_pago` exige una
-clave que solo conocen la API y la base:
+Solo este servidor se conecta a la base, pero el webhook de Binance es público.
+Para que confirmar un pago exija dos secretos independientes (la firma RSA del
+proveedor y una clave que no viaja en el webhook), `confirmar_pago` recibe
+`PAGOS_CLAVE_SERVIDOR` y la compara con el hash guardado en la base:
 
 ```bash
 # 1. Genera la clave y guárdala en server/.env
 openssl rand -hex 32
 # PAGOS_CLAVE_SERVIDOR=<clave>
 
-# 2. Registra solo su SHA-256 en Supabase (SQL Editor, como postgres)
+# 2. Registra solo su SHA-256 en la base (psql o el SQL Editor de Neon)
 insert into public.configuracion_pagos (id, clave_servidor_hash)
 values (true, encode(digest('<clave>', 'sha256'), 'hex'))
 on conflict (id) do update
@@ -595,21 +612,23 @@ cd server
 npm test
 ```
 
-Las pruebas levantan un Supabase falso en memoria (GoTrue y PostgREST) y prueban
-el API real sin credenciales ni red externa: pago feliz, saldo insuficiente,
-rechazo `42501`, token ausente o inválido, UUID inválido, validaciones de recarga,
-billetera del piloto, movimientos, cancelación con liberación de reserva, perfil
-unificado, refresco de sesión, cierre de sesión local, las rutas de pagos
-(métodos, intención de Pago Móvil, reporte, cancelación y Binance sin configurar),
-la carga de documentos (formato, MIME declarado, hash y borrado si la RPC falla),
-el envío con riesgo, la cola y el detalle del admin, el límite de OTP por teléfono
-y por intento de verificación. `binance.test.mjs` cubre la firma RSA-SHA256, la
-verificación del webhook (cuerpo alterado, firma ajena, timestamp viejo) y el
-parseo de eventos. `ocr.test.mjs` cubre OCR.space, Google Vision y los fallos del
-proveedor; `otpWebhook.test.mjs` cubre la firma del Send SMS Hook y la plantilla
-de WhatsApp.
+Las pruebas de integración levantan un PostgreSQL real embebido, aplican todas
+las migraciones y arrancan la app de Express en el mismo proceso, sin
+credenciales ni red externa. `api.test.mjs` cubre el alta por OTP y el contrato de
+sesión, la rotación del refresh token, el cierre de sesión, el límite de OTP por
+teléfono, la autorización del admin, los métodos de pago, la intención de Pago
+Móvil con su reporte y confirmación, la recarga heredada, la carga de documentos
+(formato, MIME declarado, hash y borrado si la RPC falla), el envío con riesgo, la
+cola y el detalle del admin, la aprobación con bienvenida y el ciclo del viaje
+(aceptación con reserva, pago con saldo, idempotencia y cancelación con
+liberación). `binance.test.mjs` cubre la firma RSA-SHA256, la verificación del
+webhook (cuerpo alterado, firma ajena, timestamp viejo) y el parseo de eventos.
+`ocr.test.mjs` cubre OCR.space, Google Vision y los fallos del proveedor;
+`otpDelivery.test.mjs` cubre WhatsApp (plantilla y errores de Meta) y SMS por
+Twilio.
 
-Las migraciones y RPC se prueban con PostgreSQL:
+Las migraciones y las RPC se prueban por separado con el mismo PostgreSQL
+embebido; desde la raíz del repo:
 
 ```bash
 npm run test:db
@@ -634,7 +653,9 @@ Formato uniforme:
 | 422 | `formato_no_soportado` / `mime_no_coincide` | Los bytes no son JPG, PNG, WebP o PDF, o no coinciden con el MIME declarado |
 | 429 | `demasiados_intentos` | Límite de OTP por teléfono, IP o intento de verificación |
 | 503 | `pago_movil_no_configurado` / `binance_no_configurado` | La pasarela no tiene credenciales en este despliegue |
-| 503 | `hook_no_configurado` / `whatsapp_no_configurado` | El Send SMS Hook o Meta no están configurados |
+| 503 | `otp_no_configurado` / `whatsapp_no_configurado` / `sms_no_configurado` | No hay canal para enviar el código o faltan credenciales del proveedor |
+| 503 | `almacenamiento_no_configurado` | `STORAGE_DRIVER=r2` sin credenciales de R2 |
+| 502 | `almacenamiento_error` | R2 rechazó la lectura o la escritura del documento |
 
 ## Notas de seguridad
 
@@ -650,15 +671,16 @@ Formato uniforme:
   y un `timestamp` de ±5 minutos; el webhook nunca acepta el cuerpo parseado.
 - La clave de servidor solo existe en `PAGOS_CLAVE_SERVIDOR` y como SHA-256 en
   `configuracion_pagos`. No se envía a la web, al móvil ni dentro del JWT.
-- Los documentos de conductores viven en un bucket privado; RLS limita el acceso
-  al dueño y a los admins. El admin los ve con URLs firmadas de 15 minutos.
+- Los documentos de conductores viven en almacenamiento privado (disco o R2),
+  fuera de la base; las políticas del catálogo limitan el acceso al dueño y a los
+  admins. El admin los ve con enlaces firmados por la API, válidos 15 minutos.
 - El MIME se decide por los bytes reales del archivo, no por lo que declara el
   navegador, y el hash SHA-256 es único entre cuentas para detectar documentos
   reutilizados. El OCR y el puntaje de riesgo son señales para el revisor, no una
   aprobación automática.
-- La firma del Send SMS Hook se verifica sobre el cuerpo crudo con HMAC-SHA256 y
-  una ventana de 5 minutos. Sin secreto o sin credenciales de Meta el hook
-  responde `503`: nunca se finge haber enviado un código.
+- El OTP se guarda como HMAC-SHA256 con pepper, vence a los 10 minutos y admite 5
+  intentos; sin canal configurado en producción no se finge un envío (`503`). Los
+  refresh tokens se guardan como hash y rotan en cada uso.
 - El precio del viaje se recibe en `POST /trips`. Antes de producción debe
   calcularse en el servidor a partir de tarifa y distancia: hoy un cliente podría
   solicitar un viaje con un precio arbitrario.

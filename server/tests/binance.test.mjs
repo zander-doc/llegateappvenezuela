@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { createVerify, generateKeyPairSync } from "node:crypto";
 import test from "node:test";
-
-// config.js exige estas variables; la firma no toca Supabase.
-process.env.SUPABASE_URL ||= "http://supabase.test";
-process.env.SUPABASE_ANON_KEY ||= "anon-test";
+import "./setup.mjs";
 
 const {
   binanceDisponible,

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { config } from "../config.js";
-import { asyncHandler, HttpError, parse, unwrap } from "../http.js";
+import { rpc } from "../db.js";
+import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
 import { binanceDisponible, crearOrdenBinance } from "../payments/binance.js";
 import { crearIntencionPagoMovil, pagoMovilDisponible } from "../payments/pagoMovil.js";
@@ -41,7 +42,7 @@ paymentsRouter.get(
 paymentsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
-    const pagos = unwrap(await req.supabase.rpc("mis_pagos", { p_limite: 20 }));
+    const pagos = await rpc("mis_pagos", { p_limite: 20 }, { usuarioId: req.user.id });
 
     res.json({ ok: true, pagos });
   }),
@@ -54,8 +55,9 @@ paymentsRouter.post(
 
     if (body.metodo === "pago_movil") {
       const intencion = crearIntencionPagoMovil(body.monto_usd);
-      const resultado = unwrap(
-        await req.supabase.rpc("crear_intencion_pago", {
+      const resultado = await rpc(
+        "crear_intencion_pago",
+        {
           p_metodo: "pago_movil",
           p_proveedor: "manual",
           p_monto_usd: body.monto_usd,
@@ -64,7 +66,8 @@ paymentsRouter.post(
           p_monto_bs: intencion.montoBs,
           p_tasa_bs: intencion.tasaBs,
           p_expira_en: expiraEn(intencion.expiraMinutos),
-        }),
+        },
+        { usuarioId: req.user.id },
       );
 
       res.status(201).json(resultado);
@@ -79,8 +82,9 @@ paymentsRouter.post(
       );
     }
 
-    const resultado = unwrap(
-      await req.supabase.rpc("crear_intencion_pago", {
+    const resultado = await rpc(
+      "crear_intencion_pago",
+      {
         p_metodo: "binance_pay",
         p_proveedor: "binance_pay",
         p_monto_usd: body.monto_usd,
@@ -89,7 +93,8 @@ paymentsRouter.post(
         p_monto_bs: null,
         p_tasa_bs: null,
         p_expira_en: expiraEn(config.payments.binance.expiraMinutos),
-      }),
+      },
+      { usuarioId: req.user.id },
     );
 
     try {
@@ -98,13 +103,15 @@ paymentsRouter.post(
         codigo: resultado.pago.codigo,
       });
 
-      unwrap(
-        await req.supabase.rpc("actualizar_intencion_pago", {
+      await rpc(
+        "actualizar_intencion_pago",
+        {
           p_pago_id: resultado.pago.id,
           p_checkout_url: orden.checkoutUrl,
           p_referencia_externa: orden.prepayId,
           p_metadata: orden.metadata,
-        }),
+        },
+        { usuarioId: req.user.id },
       );
 
       res.status(201).json({
@@ -116,7 +123,7 @@ paymentsRouter.post(
       });
     } catch (error) {
       // Si Binance no responde, la intención no debe quedar viva sin checkout.
-      await req.supabase.rpc("cancelar_pago", { p_pago_id: resultado.pago.id });
+      await rpc("cancelar_pago", { p_pago_id: resultado.pago.id }, { usuarioId: req.user.id });
       throw error;
     }
   }),
@@ -128,12 +135,14 @@ paymentsRouter.post(
     const id = parse(uuidSchema, req.params.id, "id");
     const body = parse(paymentReportSchema, req.body);
 
-    const resultado = unwrap(
-      await req.supabase.rpc("reportar_pago", {
+    const resultado = await rpc(
+      "reportar_pago",
+      {
         p_pago_id: id,
         p_referencia: body.referencia,
         p_comprobante_url: body.comprobante_url ?? null,
-      }),
+      },
+      { usuarioId: req.user.id },
     );
 
     res.json(resultado);
@@ -144,7 +153,7 @@ paymentsRouter.post(
   "/:id/cancel",
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
-    const resultado = unwrap(await req.supabase.rpc("cancelar_pago", { p_pago_id: id }));
+    const resultado = await rpc("cancelar_pago", { p_pago_id: id }, { usuarioId: req.user.id });
 
     res.json(resultado);
   }),

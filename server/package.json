@@ -9,14 +9,15 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test",
-    "check": "node --check src/index.js && node --check src/app.js && node --check src/config.js && node --check src/supabase.js && node --check src/schemas.js && node --check src/http.js && node --check src/middleware.js && node --check src/routes/auth.js && node --check src/routes/drivers.js && node --check src/routes/wallet.js && node --check src/routes/payments.js && node --check src/routes/webhooks.js && node --check src/routes/admin.js && node --check src/routes/trips.js && node --check src/payments/pagoMovil.js && node --check src/payments/binance.js && node --check src/security/rateLimit.js && node --check src/security/whatsapp.js && node --check src/verification/documents.js && node --check src/verification/ocr.js"
+    "test": "node --import ./tests/setup.mjs --test",
+    "check": "node --check src/index.js && node --check src/app.js && node --check src/config.js && node --check src/db.js && node --check src/storage.js && node --check src/schemas.js && node --check src/http.js && node --check src/middleware.js && node --check src/routes/auth.js && node --check src/routes/drivers.js && node --check src/routes/files.js && node --check src/routes/wallet.js && node --check src/routes/payments.js && node --check src/routes/webhooks.js && node --check src/routes/admin.js && node --check src/routes/trips.js && node --check src/auth/tokens.js && node --check src/auth/cuentas.js && node --check src/payments/pagoMovil.js && node --check src/payments/binance.js && node --check src/security/rateLimit.js && node --check src/security/whatsapp.js && node --check src/security/otp-delivery.js && node --check src/verification/documents.js && node --check src/verification/ocr.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.47.10",
+    "aws4fetch": "^1.0.20",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "pg": "^8.23.1",
     "zod": "^3.24.1"
   }
 }

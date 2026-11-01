@@ -1,11 +1,20 @@
 import { Router } from "express";
+import {
+  crearOActualizarCuenta,
+  crearSesion,
+  guardarCodigo,
+  revocarSesion,
+  rotarSesion,
+  validarCodigo,
+} from "../auth/cuentas.js";
+import { generarCodigo, hashCodigo } from "../auth/tokens.js";
 import { config } from "../config.js";
-import { asyncHandler, HttpError, parse, unwrap } from "../http.js";
+import { fila } from "../db.js";
+import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
 import { otpRequestSchema, otpVerifySchema, refreshTokenSchema } from "../schemas.js";
+import { canalOtp, enviarCodigoOtp } from "../security/otp-delivery.js";
 import { hitRateLimit, resetRateLimit } from "../security/rateLimit.js";
-import { whatsappDisponible } from "../security/whatsapp.js";
-import { supabaseAnon } from "../supabase.js";
 
 export const authRouter = Router();
 
@@ -88,22 +97,33 @@ authRouter.post(
     const body = parse(otpRequestSchema, req.body);
     limitarEnvioOtp(req, res, body.telefono);
 
-    const { error } = await supabaseAnon.auth.signInWithOtp({
-      phone: body.telefono,
-      options: {
-        shouldCreateUser: true,
-        data: {
-          rol: body.rol,
-          ...(body.nombre ? { nombre: body.nombre } : {}),
-        },
-      },
-    });
+    const canal = canalOtp();
+    if (!canal) {
+      throw new HttpError(
+        503,
+        "otp_no_configurado",
+        "Todavía no podemos enviarte el código. Escríbenos por WhatsApp para terminar tu registro.",
+      );
+    }
 
-    if (error) throw new HttpError(400, "otp_error", error.message);
+    const cuenta = await crearOActualizarCuenta(body);
+    if (!cuenta) {
+      throw new HttpError(500, "cuenta_error", "No pudimos preparar tu cuenta. Intenta de nuevo.");
+    }
+
+    const codigo = generarCodigo();
+    await guardarCodigo(body.telefono, hashCodigo(body.telefono, codigo));
+
+    try {
+      await enviarCodigoOtp({ telefono: body.telefono, codigo });
+    } catch (error) {
+      console.error("[otp] no se pudo enviar el código:", error.message);
+      throw new HttpError(502, "otp_envio_error", "No pudimos enviarte el código. Intenta de nuevo.");
+    }
 
     res.status(202).json({
       ok: true,
-      mensaje: whatsappDisponible() ? "Código enviado por WhatsApp o SMS" : "Código enviado por SMS",
+      mensaje: canal === "whatsapp" ? "Código enviado por WhatsApp o SMS" : "Código enviado por SMS",
     });
   }),
 );
@@ -114,25 +134,19 @@ authRouter.post(
     const body = parse(otpVerifySchema, req.body);
     limitarVerificacion(req, res, body.telefono);
 
-    const { data, error } = await supabaseAnon.auth.verifyOtp({
-      phone: body.telefono,
-      token: body.token,
-      type: "sms",
-    });
-
-    if (error || !data.session) {
-      throw new HttpError(401, "codigo_invalido", error?.message ?? "Código incorrecto o expirado");
+    const resultado = await validarCodigo(body.telefono, body.token);
+    if (!resultado.ok) {
+      const mensaje =
+        resultado.motivo === "codigo_expirado"
+          ? "El código expiró; pide uno nuevo"
+          : "Código incorrecto o expirado";
+      throw new HttpError(401, "codigo_invalido", mensaje);
     }
 
     resetRateLimit(`otp:verificar:${body.telefono}`);
 
-    res.json({
-      ok: true,
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_at: data.session.expires_at,
-      usuario: { id: data.user.id, telefono: data.user.phone },
-    });
+    const tokens = await crearSesion(resultado.usuario, req.get("user-agent"));
+    res.json({ ok: true, ...tokens });
   }),
 );
 
@@ -140,22 +154,13 @@ authRouter.post(
   "/refresh",
   asyncHandler(async (req, res) => {
     const body = parse(refreshTokenSchema, req.body);
+    const tokens = await rotarSesion(body.refresh_token, req.get("user-agent"));
 
-    const { data, error } = await supabaseAnon.auth.refreshSession({
-      refresh_token: body.refresh_token,
-    });
-
-    if (error || !data.session) {
+    if (!tokens) {
       throw new HttpError(401, "sesion_invalida", "La sesión expiró; vuelve a ingresar con tu código SMS");
     }
 
-    res.json({
-      ok: true,
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_at: data.session.expires_at,
-      usuario: { id: data.user.id, telefono: data.user.phone },
-    });
+    res.json({ ok: true, ...tokens });
   }),
 );
 
@@ -163,13 +168,9 @@ authRouter.post(
   "/logout",
   requireUser,
   asyncHandler(async (req, res) => {
-    // scope "local" cierra solo esta sesión: la web y la app mantienen sesiones
+    // Se revoca solo esta sesión: la web y la app mantienen sesiones
     // independientes sobre la misma cuenta.
-    const { error } = await req.supabase.auth.admin.signOut(req.accessToken, "local");
-    if (error && ![401, 403, 404].includes(error.status)) {
-      throw new HttpError(502, "logout_error", "No se pudo cerrar la sesión en el proveedor");
-    }
-
+    await revocarSesion(req.sesionId, req.user.id);
     res.json({ ok: true });
   }),
 );
@@ -178,12 +179,9 @@ authRouter.get(
   "/me",
   requireUser,
   asyncHandler(async (req, res) => {
-    const perfil = unwrap(
-      await req.supabase
-        .from("perfil_usuario")
-        .select(PERFIL_COLUMNS)
-        .eq("id", req.user.id)
-        .maybeSingle(),
+    const perfil = await fila(
+      `select ${PERFIL_COLUMNS} from public.perfil_usuario where id = $1`,
+      [req.user.id],
     );
 
     if (!perfil) throw new HttpError(404, "perfil_no_encontrado", "El perfil aún no está creado");

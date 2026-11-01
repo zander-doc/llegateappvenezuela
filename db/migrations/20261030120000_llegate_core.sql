@@ -1,5 +1,5 @@
--- Llégate App · núcleo del modelo de datos (Supabase / PostgreSQL)
--- Aplica con: supabase db push   (o pega este archivo en el SQL Editor)
+-- Llégate App · núcleo del modelo de datos (PostgreSQL)
+-- Aplica con psql en orden (ver db/README.md).
 --
 -- Decisiones clave:
 --  * La identidad vive en auth.users; public.usuarios es el perfil 1:1.
@@ -191,7 +191,7 @@ create trigger configuracion_touch before update on public.configuracion_comisio
   for each row execute function public.touch_updated_at();
 
 -- ---------------------------------------------------------------------------
--- Alta de perfil al registrarse en Supabase Auth
+-- Alta de perfil al insertar la cuenta en auth.users
 -- ---------------------------------------------------------------------------
 create function public.handle_new_user()
 returns trigger
@@ -234,7 +234,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Mantener el teléfono verificado en sincronía cuando Supabase confirma el OTP.
+-- Mantener el teléfono verificado en sincronía cuando el API confirma el OTP.
 create function public.sync_usuario_auth()
 returns trigger
 language plpgsql

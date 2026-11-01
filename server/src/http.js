@@ -28,14 +28,9 @@ export function bearerToken(req) {
   const header = req.headers.authorization ?? "";
   const [scheme, token] = header.split(" ");
   if (scheme?.toLowerCase() !== "bearer" || !token) {
-    throw new HttpError(401, "token_requerido", "Envía el access_token de Supabase en el header Authorization");
+    throw new HttpError(401, "token_requerido", "Envía el access_token en el header Authorization");
   }
   return token;
-}
-
-export function unwrap({ data, error }) {
-  if (error) throw error;
-  return data;
 }
 
 const STATUS_BY_CODE = {

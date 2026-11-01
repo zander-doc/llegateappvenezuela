@@ -1,40 +1,37 @@
 import { Router } from "express";
-import { asyncHandler, HttpError, parse, unwrap } from "../http.js";
+import { config } from "../config.js";
+import { fila, filas, rpc } from "../db.js";
+import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
 import { driverDetailsSchema, driverDocumentSchema } from "../schemas.js";
+import { borrar, subir } from "../storage.js";
 import {
   decodificarDocumento,
   hashDocumento,
   rutaDocumento,
 } from "../verification/documents.js";
 import { extraerTexto } from "../verification/ocr.js";
-import { config } from "../config.js";
 
 export const driversRouter = Router();
-
-const BUCKET = "documentos-conductores";
 
 const DRIVER_COLUMNS =
   "usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, anio, cedula_url, licencia_url, certificado_medico_url, verificacion, estado, motivo_rechazo, riesgo_puntaje, riesgo_motivos, enviado_en, intentos_verificacion, created_at";
 
 const DOCUMENT_COLUMNS = "tipo, mime, bytes, ocr_estado, ocr_confianza, created_at, updated_at";
 
-async function guardarEnStorage(cliente, path, buffer, mime) {
-  const { error } = await cliente.storage.from(BUCKET).upload(path, buffer, {
-    contentType: mime,
-    upsert: false,
-    cacheControl: "3600",
-  });
-
-  if (!error) return true;
-
-  const estado = String(error.statusCode ?? error.status ?? "");
-  if (estado === "409" || /already exists|duplicate/i.test(error.message ?? "")) {
-    return false;
-  }
-
-  throw new HttpError(502, "almacenamiento_error", "No pudimos guardar el documento. Intenta de nuevo.");
-}
+// Columnas que el piloto puede escribir; el resto (verificación, riesgo y
+// fechas) solo cambia por RPC.
+const CAMPOS_ESCRIBIBLES = [
+  "cedula",
+  "tipo_vehiculo",
+  "placa",
+  "marca",
+  "modelo",
+  "anio",
+  "cedula_url",
+  "licencia_url",
+  "certificado_medico_url",
+];
 
 driversRouter.use(requireUser);
 
@@ -43,12 +40,9 @@ driversRouter.post(
   asyncHandler(async (req, res) => {
     const body = parse(driverDetailsSchema, req.body);
 
-    const existente = unwrap(
-      await req.supabase
-        .from("conductores_detalles")
-        .select("usuario_id, verificacion")
-        .eq("usuario_id", req.user.id)
-        .maybeSingle(),
+    const existente = await fila(
+      "select usuario_id, verificacion from public.conductores_detalles where usuario_id = $1",
+      [req.user.id],
     );
 
     if (existente && existente.verificacion !== "rechazado") {
@@ -59,16 +53,28 @@ driversRouter.post(
       );
     }
 
-    const query = existente
-      ? req.supabase
-          .from("conductores_detalles")
-          .update({ ...body, verificacion: "pendiente", motivo_rechazo: null })
-          .eq("usuario_id", req.user.id)
-      : req.supabase
-          .from("conductores_detalles")
-          .insert({ usuario_id: req.user.id, ...body });
+    const valores = CAMPOS_ESCRIBIBLES.map((campo) => body[campo] ?? null);
+    let detalle;
 
-    const detalle = unwrap(await query.select(DRIVER_COLUMNS).single());
+    if (existente) {
+      const asignaciones = CAMPOS_ESCRIBIBLES.map((campo, indice) => `${campo} = $${indice + 1}`).join(", ");
+      detalle = await fila(
+        `update public.conductores_detalles
+            set ${asignaciones}, verificacion = 'pendiente', motivo_rechazo = null
+          where usuario_id = $${valores.length + 1}
+          returning ${DRIVER_COLUMNS}`,
+        [...valores, req.user.id],
+      );
+    } else {
+      const columnas = ["usuario_id", ...CAMPOS_ESCRIBIBLES].join(", ");
+      const marcadores = valores.map((_, indice) => `$${indice + 2}`).join(", ");
+      detalle = await fila(
+        `insert into public.conductores_detalles (${columnas})
+         values ($1, ${marcadores})
+         returning ${DRIVER_COLUMNS}`,
+        [req.user.id, ...valores],
+      );
+    }
 
     res.status(existente ? 200 : 201).json({ ok: true, conductor: detalle });
   }),
@@ -77,7 +83,7 @@ driversRouter.post(
 driversRouter.post(
   "/me/enviar",
   asyncHandler(async (req, res) => {
-    const resultado = unwrap(await req.supabase.rpc("enviar_verificacion_conductor"));
+    const resultado = await rpc("enviar_verificacion_conductor", {}, { usuarioId: req.user.id });
     res.json(resultado);
   }),
 );
@@ -85,22 +91,19 @@ driversRouter.post(
 driversRouter.get(
   "/me",
   asyncHandler(async (req, res) => {
-    const detalle = unwrap(
-      await req.supabase
-        .from("conductores_detalles")
-        .select(DRIVER_COLUMNS)
-        .eq("usuario_id", req.user.id)
-        .maybeSingle(),
+    const detalle = await fila(
+      `select ${DRIVER_COLUMNS} from public.conductores_detalles where usuario_id = $1`,
+      [req.user.id],
     );
 
     if (!detalle) throw new HttpError(404, "conductor_no_registrado", "Aún no tienes registro de conductor");
 
-    const documentos = unwrap(
-      await req.supabase
-        .from("conductores_documentos")
-        .select(DOCUMENT_COLUMNS)
-        .eq("usuario_id", req.user.id)
-        .order("tipo", { ascending: true }),
+    const documentos = await filas(
+      `select ${DOCUMENT_COLUMNS}
+         from public.conductores_documentos
+        where usuario_id = $1
+        order by tipo asc`,
+      [req.user.id],
     );
 
     res.json({ ok: true, conductor: detalle, documentos: documentos ?? [] });
@@ -131,12 +134,13 @@ driverDocumentsRouter.post(
       mime: archivo.mime,
     });
 
-    const subido = await guardarEnStorage(req.supabase, path, archivo.buffer, archivo.mime);
+    const subido = await subir(path, archivo.buffer, archivo.mime);
     const ocr = await extraerTexto({ buffer: archivo.buffer, mime: archivo.mime });
 
     try {
-      const resultado = unwrap(
-        await req.supabase.rpc("registrar_documento_conductor", {
+      const resultado = await rpc(
+        "registrar_documento_conductor",
+        {
           p_tipo: body.tipo,
           p_storage_path: path,
           p_mime: archivo.mime,
@@ -146,16 +150,17 @@ driverDocumentsRouter.post(
           p_ocr_texto: ocr.texto,
           p_ocr_confianza: ocr.confianza,
           p_ocr_datos: ocr.datos,
-        }),
+        },
+        { usuarioId: req.user.id },
       );
 
       res.status(201).json(resultado);
     } catch (error) {
       // Si la fila no se registró, el archivo recién subido no debe quedar
-      // huérfano. Si ya existía (409 de Storage), no se borra: puede ser el
+      // huérfano. Si ya existía (mismo hash), no se borra: puede ser el
       // documento vigente del piloto.
       if (subido) {
-        await req.supabase.storage.from(BUCKET).remove([path]).catch(() => {});
+        await borrar(path).catch(() => {});
       }
       throw error;
     }

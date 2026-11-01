@@ -10,7 +10,7 @@ import { HttpError } from "../http.js";
 //   BINANCE_PAY_CERT_SN              serial del certificado del comercio
 //   BINANCE_PAY_SECRET_KEY           clave privada RSA en PEM (o base64 del PEM)
 //   BINANCE_PAY_WEBHOOK_PUBLIC_KEY   clave pública de Binance en PEM (o base64)
-//   PAGOS_CLAVE_SERVIDOR             clave con la que la API confirma en Supabase
+//   PAGOS_CLAVE_SERVIDOR             clave con la que la API confirma en la base
 
 function pem(value) {
   if (!value) return "";

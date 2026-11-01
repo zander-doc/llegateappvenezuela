@@ -7,3 +7,5 @@ shots/
 .env
 .env.*
 !.env.example
+.pg-data*
+.storage*

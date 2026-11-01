@@ -1,69 +1,9 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import test from "node:test";
+import "./setup.mjs";
 
-// webhooks.js importa config.js, que exige estas variables al cargar.
-process.env.SUPABASE_URL = "http://127.0.0.1:1";
-process.env.SUPABASE_ANON_KEY = "clave-anon-de-prueba";
-
-const { firmaHookValida } = await import("../src/routes/webhooks.js");
+const { enviarCodigoSms, smsDisponible } = await import("../src/security/otp-delivery.js");
 const { enviarCodigoWhatsApp, whatsappDisponible } = await import("../src/security/whatsapp.js");
-
-const SECRETO = Buffer.from("secreto-del-hook-de-prueba");
-const ID = "msg_01J0000000000000000000000";
-const CUERPO = JSON.stringify({
-  user: { phone: "+584141234567" },
-  sms: { otp: "123456" },
-});
-
-function firmar(cuerpo, timestamp, secreto = SECRETO) {
-  return createHmac("sha256", secreto).update(`${ID}.${timestamp}.${cuerpo}`).digest("base64");
-}
-
-test("la firma del Send SMS Hook acepta el formato v1 del estándar Webhooks", () => {
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const firma = firmar(CUERPO, timestamp);
-
-  assert.equal(firmaHookValida({ rawBody: CUERPO, id: ID, timestamp, firma: `v1,${firma}`, secreto: SECRETO }), true);
-  assert.equal(
-    firmaHookValida({
-      rawBody: CUERPO,
-      id: ID,
-      timestamp,
-      firma: `v1,AAAA v1,${firma}`,
-      secreto: SECRETO,
-    }),
-    true,
-  );
-});
-
-test("la firma rechaza cuerpos alterados, secretos distintos y firmas vacías", () => {
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const firma = firmar(CUERPO, timestamp);
-
-  assert.equal(
-    firmaHookValida({ rawBody: `${CUERPO} `, id: ID, timestamp, firma: `v1,${firma}`, secreto: SECRETO }),
-    false,
-  );
-  assert.equal(
-    firmaHookValida({
-      rawBody: CUERPO,
-      id: ID,
-      timestamp,
-      firma: `v1,${firma}`,
-      secreto: Buffer.from("otro-secreto"),
-    }),
-    false,
-  );
-  assert.equal(firmaHookValida({ rawBody: CUERPO, id: ID, timestamp, firma: "", secreto: SECRETO }), false);
-});
-
-test("la firma caduca para evitar reenvíos", () => {
-  const viejo = String(Math.floor(Date.now() / 1000) - 900);
-  const firma = firmar(CUERPO, viejo);
-
-  assert.equal(firmaHookValida({ rawBody: CUERPO, id: ID, timestamp: viejo, firma: `v1,${firma}`, secreto: SECRETO }), false);
-});
 
 test("WhatsApp arma la plantilla de OTP con el número normalizado", async () => {
   let solicitud;
@@ -126,5 +66,70 @@ test("un 4xx de Meta se reporta como error del proveedor", async () => {
         whatsapp: { token: "t", phoneId: "1", template: "tpl", language: "es", apiVersion: "v21.0" },
       }),
     /whatsapp_401/,
+  );
+});
+
+test("Twilio recibe el código con autenticación básica", async () => {
+  let solicitud;
+  const fetchImpl = async (url, opciones) => {
+    solicitud = { url, opciones };
+    return new Response("{}", { status: 201 });
+  };
+  const sms = {
+    accountSid: "AC1234567890",
+    authToken: "token-twilio",
+    from: "+15551234567",
+  };
+
+  assert.equal(smsDisponible(sms), true);
+  const resultado = await enviarCodigoSms({
+    telefono: "+584141234567",
+    codigo: "654321",
+    fetchImpl,
+    sms,
+  });
+
+  assert.deepEqual(resultado, { ok: true });
+  assert.equal(
+    solicitud.url,
+    "https://api.twilio.com/2010-04-01/Accounts/AC1234567890/Messages.json",
+  );
+  assert.equal(
+    solicitud.opciones.headers.Authorization,
+    `Basic ${Buffer.from("AC1234567890:token-twilio").toString("base64")}`,
+  );
+  assert.equal(solicitud.opciones.body.get("To"), "+584141234567");
+  assert.equal(solicitud.opciones.body.get("From"), "+15551234567");
+  assert.match(solicitud.opciones.body.get("Body"), /654321/);
+});
+
+test("sin credenciales de Twilio el envío falla antes de salir a la red", async () => {
+  assert.equal(smsDisponible({ accountSid: "", authToken: "t", from: "x" }), false);
+  assert.equal(smsDisponible({ accountSid: "a", authToken: "", from: "x" }), false);
+  assert.equal(smsDisponible({ accountSid: "a", authToken: "t", from: "" }), false);
+
+  await assert.rejects(
+    () =>
+      enviarCodigoSms({
+        telefono: "+584141234567",
+        codigo: "123456",
+        sms: { accountSid: "", authToken: "", from: "" },
+      }),
+    /sms_no_configurado/,
+  );
+});
+
+test("un 4xx de Twilio se reporta como error del proveedor", async () => {
+  const fetchImpl = async () => new Response("número inválido", { status: 400 });
+
+  await assert.rejects(
+    () =>
+      enviarCodigoSms({
+        telefono: "+584141234567",
+        codigo: "123456",
+        fetchImpl,
+        sms: { accountSid: "AC1", authToken: "t", from: "+15551234567" },
+      }),
+    /sms_400/,
   );
 });

@@ -9,17 +9,17 @@
 --   pendiente → en_revision → confirmado
 --          ↘ cancelado / expirado / rechazado
 --
--- Seguridad con anon key:
---   La API solo tiene la anon key (nunca service_role), así que la confirmación
---   automática no puede apoyarse en el rol service_role. En su lugar, la fila
+-- Seguridad de la confirmación automática:
+--   La credencial de la base solo la usa el API, pero el webhook de Binance es
+--   público y la confirmación no debe depender solo de la firma RSA. La fila
 --   única de `configuracion_pagos` guarda el hash SHA-256 de una clave de
 --   servidor. `confirmar_pago` exige esa clave y está pensada para el webhook;
---   un usuario con el anon key público no puede confirmar pagos sin ella.
+--   quien no la conozca no puede confirmar pagos aunque alcance la RPC.
 --   El admin también puede confirmar con su JWT mediante
 --   `confirmar_pago_admin`, sin conocer la clave.
 --
 --   La clave no vive en la base en texto plano: se registra una sola vez con
---   su hash (ver supabase/README.md) y se configura igual en la API.
+--   su hash (ver db/README.md) y se configura igual en la API.
 
 create type public.estado_pago as enum (
   'pendiente',

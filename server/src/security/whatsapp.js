@@ -1,8 +1,8 @@
 import { config } from "../config.js";
 
-// Supabase Auth envía el OTP mediante su Send SMS Hook (ver webhooks.js). Ese
-// hook llama a la API de Meta con la plantilla configurada. Si faltan las
-// credenciales, Supabase debe seguir usando su proveedor SMS normal.
+// Canal preferido para el OTP en Venezuela: la plantilla de Meta no tiene costo
+// por conversación de servicio dentro del plan gratuito. Si faltan las
+// credenciales, el API cae a SMS o, en desarrollo, al log.
 
 export function whatsappDisponible(whatsapp = config.otp.whatsapp) {
   return Boolean(whatsapp.token && whatsapp.phoneId);

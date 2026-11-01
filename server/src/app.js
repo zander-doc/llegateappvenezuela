@@ -5,6 +5,7 @@ import { errorHandler } from "./http.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { driverDocumentsRouter, driversRouter } from "./routes/drivers.js";
+import { filesRouter } from "./routes/files.js";
 import { paymentsRouter } from "./routes/payments.js";
 import { tripsRouter } from "./routes/trips.js";
 import { walletRouter } from "./routes/wallet.js";
@@ -32,6 +33,8 @@ app.use("/wallet", walletRouter);
 app.use("/payments", paymentsRouter);
 app.use("/trips", tripsRouter);
 app.use("/admin", adminRouter);
+// Enlaces firmados de descarga de documentos (sin sesión, con vencimiento).
+app.use("/files", filesRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "ruta_no_encontrada", mensaje: "Ruta no encontrada" });

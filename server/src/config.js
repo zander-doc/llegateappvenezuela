@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { resolve } from "node:path";
 
 function required(name) {
   const value = process.env[name]?.trim();
@@ -17,6 +18,12 @@ function number(name, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function flag(name, fallback = false) {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (!value) return fallback;
+  return ["1", "true", "si", "sí", "yes"].includes(value);
+}
+
 function originList(value) {
   return (value ?? "http://localhost:5173")
     .split(",")
@@ -24,11 +31,69 @@ function originList(value) {
     .filter(Boolean);
 }
 
+const port = Number(process.env.PORT ?? 3000);
+const databaseUrl = required("DATABASE_URL");
+const jwtSecret = required("AUTH_JWT_SECRET");
+
 export const config = {
-  port: Number(process.env.PORT ?? 3000),
-  supabaseUrl: required("SUPABASE_URL"),
-  supabaseAnonKey: required("SUPABASE_ANON_KEY"),
+  port,
+  databaseUrl,
+  // Neon y la mayoría de proveedores administrados exigen TLS.
+  databaseSsl: flag(
+    "DATABASE_SSL",
+    /sslmode=require|neon\.tech|render\.com|railway/.test(databaseUrl),
+  ),
+  databasePoolSize: number("DATABASE_POOL_SIZE", 5),
+  publicBaseUrl: text("PUBLIC_API_URL") || `http://localhost:${port}`,
   corsOrigins: originList(process.env.CORS_ORIGIN),
+  auth: {
+    jwtSecret,
+    accessTtlSegundos: number("AUTH_ACCESS_TTL_SEGUNDOS", 3600),
+    refreshTtlDias: number("AUTH_REFRESH_TTL_DIAS", 30),
+  },
+  otp: {
+    // Pepper propio del código OTP; si no se define usa el secreto de sesión.
+    secret: text("OTP_SECRET") || jwtSecret,
+    ttlMinutos: number("OTP_TTL_MINUTOS", 10),
+    maxIntentos: number("OTP_MAX_INTENTOS", 5),
+    // Sin proveedor configurado el código se escribe en el log solo fuera de
+    // producción; en producción se responde 503 en vez de fingir un envío.
+    registrarEnLog: flag("OTP_LOG_EN_DESARROLLO", process.env.NODE_ENV !== "production"),
+    sms: {
+      accountSid: text("TWILIO_ACCOUNT_SID"),
+      authToken: text("TWILIO_AUTH_TOKEN"),
+      from: text("TWILIO_FROM"),
+    },
+    whatsapp: {
+      token: text("WHATSAPP_TOKEN"),
+      phoneId: text("WHATSAPP_PHONE_ID"),
+      template: text("WHATSAPP_OTP_TEMPLATE") || "llegate_otp",
+      language: text("WHATSAPP_OTP_LANGUAGE") || "es",
+      apiVersion: text("WHATSAPP_API_VERSION") || "v21.0",
+    },
+    limits: {
+      porTelefono: number("OTP_MAX_POR_TELEFONO", 3),
+      porIp: number("OTP_MAX_POR_IP", 8),
+      porVerificacion: number("OTP_MAX_VERIFICACIONES", 6),
+      ventanaMinutos: number("OTP_VENTANA_MINUTOS", 10),
+    },
+  },
+  storage: {
+    // "local" guarda en disco (desarrollo y pruebas); "r2" usa Cloudflare R2.
+    driver: (text("STORAGE_DRIVER") || "local").toLowerCase(),
+    bucket: text("STORAGE_BUCKET") || "documentos-conductores",
+    localDir: resolve(process.cwd(), text("STORAGE_LOCAL_DIR") || ".storage"),
+    // Las URLs de descarga las firma esta API, no el proveedor: así el mismo
+    // enlace funciona con R2 o con disco y caduca igual.
+    urlSegundos: number("ARCHIVOS_URL_SEGUNDOS", 900),
+    secret: text("ARCHIVOS_SECRET") || jwtSecret,
+    r2: {
+      accountId: text("R2_ACCOUNT_ID"),
+      accessKeyId: text("R2_ACCESS_KEY_ID"),
+      secretAccessKey: text("R2_SECRET_ACCESS_KEY"),
+      endpoint: text("R2_ENDPOINT"),
+    },
+  },
   payments: {
     // Clave compartida con `configuracion_pagos.clave_servidor_hash`. Solo la
     // usan los webhooks para confirmar un pago; nunca se envía a la web.
@@ -47,23 +112,6 @@ export const config = {
       webhookPublicKey: text("BINANCE_PAY_WEBHOOK_PUBLIC_KEY"),
       baseUrl: text("BINANCE_PAY_BASE_URL") || "https://bpay.binanceapi.com",
       expiraMinutos: number("BINANCE_PAY_EXPIRA_MINUTOS", 30),
-    },
-  },
-  otp: {
-    // Supabase llama a /webhooks/supabase-otp (Send SMS Hook) con este secreto.
-    hookSecret: text("SUPABASE_SEND_SMS_HOOK_SECRET"),
-    whatsapp: {
-      token: text("WHATSAPP_TOKEN"),
-      phoneId: text("WHATSAPP_PHONE_ID"),
-      template: text("WHATSAPP_OTP_TEMPLATE") || "llegate_otp",
-      language: text("WHATSAPP_OTP_LANGUAGE") || "es",
-      apiVersion: text("WHATSAPP_API_VERSION") || "v21.0",
-    },
-    limits: {
-      porTelefono: number("OTP_MAX_POR_TELEFONO", 3),
-      porIp: number("OTP_MAX_POR_IP", 8),
-      porVerificacion: number("OTP_MAX_VERIFICACIONES", 6),
-      ventanaMinutos: number("OTP_VENTANA_MINUTOS", 10),
     },
   },
   verification: {

@@ -1,1148 +1,709 @@
+// Pruebas de integración del API contra un PostgreSQL real efímero. Sin
+// servicios externos ni red: se aplican las migraciones en el clúster embebido y
+// se ejercita el flujo completo por HTTP.
+import "./setup.mjs";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import http from "node:http";
-import test from "node:test";
-import { resetRateLimits } from "../src/security/rateLimit.js";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
+import test, { after, before } from "node:test";
+import {
+  aplicarMigraciones,
+  iniciarPostgres,
+  listarMigraciones,
+  root,
+} from "../../scripts/embedded-postgres.mjs";
 
-const CLIENT_ID = "22222222-2222-2222-2222-222222222222";
-const ADMIN_ID = "33333333-3333-3333-3333-333333333333";
-const INTENT_ID = "7a000000-0000-0000-0000-000000000001";
-const OK_TRIP = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-const NO_FUNDS_TRIP = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
-const FORBIDDEN_TRIP = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+const PUERTO_PG = 55434;
+const PUERTO_API = 4399;
+const BASE = "llegate_api_test";
+const DIR_DATOS = join(root, ".pg-data-api");
+const DIR_ALMACEN = join(root, ".storage-api-test");
+const URL_API = `http://127.0.0.1:${PUERTO_API}`;
 
-let authCalls = 0;
-const rpcCalls = [];
-const logoutCalls = [];
-const otpRequests = [];
-let storageUploads = 0;
-let storageDeletes = 0;
-let signedUrls = 0;
-// Cuando esta variable coincide con el hash del archivo subido, la RPC
-// simulada rechaza el documento como duplicado entre cuentas.
-let hashDuplicado = null;
-
-const PNG_BASE64 = Buffer.concat([
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-  Buffer.from("documento-de-prueba"),
-]).toString("base64");
-
-const CONDUCTOR = {
-  usuario_id: CLIENT_ID,
-  cedula: "V12345678",
-  tipo_vehiculo: "moto",
-  placa: "AB123CD",
-  marca: "Bera",
-  modelo: "SBR",
-  anio: 2021,
-  cedula_url: "ana/cedula.pdf",
-  licencia_url: "ana/licencia.pdf",
-  certificado_medico_url: "ana/certificado.pdf",
-  verificacion: "pendiente",
-  estado: "inactivo_sin_saldo",
-  motivo_rechazo: null,
-  riesgo_puntaje: 65,
-  riesgo_motivos: [{ codigo: "cedula_no_coincide", peso: 40 }],
-  enviado_en: "2026-10-31T15:00:00.000Z",
-  intentos_verificacion: 1,
-  verificado_por: null,
-  verificado_en: null,
-  created_at: "2026-10-30T10:00:00.000Z",
-};
-
-const DOCUMENTOS_RESUMEN = ["cedula_frente", "cedula_reverso", "licencia", "certificado_medico"].map(
-  (tipo) => ({
-    usuario_id: CLIENT_ID,
-    tipo,
-    mime: "image/png",
-    bytes: 1024,
-    ocr_estado: "no_configurado",
-    ocr_confianza: null,
-    created_at: "2026-10-31T14:00:00.000Z",
-    updated_at: "2026-10-31T14:00:00.000Z",
-  }),
-);
-
-function json(res, status, payload) {
-  res.writeHead(status, { "content-type": "application/json" });
-  res.end(JSON.stringify(payload));
-}
-
-// Supabase falso: GoTrue para validar el JWT y PostgREST para las RPC.
-// Permite probar el API completo sin proyecto ni credenciales reales.
-const fakeSupabase = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  let raw = "";
-  for await (const chunk of req) raw += chunk;
-
-  if (url.pathname === "/auth/v1/user") {
-    authCalls += 1;
-    const token = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
-    if (token === "valid-admin") {
-      return json(res, 200, {
-        id: ADMIN_ID,
-        aud: "authenticated",
-        role: "authenticated",
-        email: "admin@example.com",
-        phone: "",
-      });
-    }
-    if (token === "valid-client") {
-      return json(res, 200, {
-        id: CLIENT_ID,
-        aud: "authenticated",
-        role: "authenticated",
-        email: "ana@example.com",
-        phone: "",
-      });
-    }
-    return json(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
-  }
-
-  if (url.pathname === "/auth/v1/otp") {
-    otpRequests.push(raw ? JSON.parse(raw) : {});
-    return json(res, 200, {});
-  }
-
-  if (url.pathname === "/auth/v1/verify") {
-    const body = raw ? JSON.parse(raw) : {};
-    if (body.token === "123456") {
-      return json(res, 200, {
-        access_token: "new-access",
-        token_type: "bearer",
-        expires_in: 3600,
-        expires_at: 1790000000,
-        refresh_token: "new-refresh",
-        user: {
-          id: CLIENT_ID,
-          aud: "authenticated",
-          role: "authenticated",
-          phone: body.phone,
-        },
-      });
-    }
-    return json(res, 403, { error_code: "otp_expired", msg: "Token has expired or is invalid" });
-  }
-
-  // Storage: la API sube, borra y firma documentos con el JWT del usuario.
-  if (url.pathname.startsWith("/storage/v1/object/sign/documentos-conductores/")) {
-    signedUrls += 1;
-    return json(res, 200, { signedURL: "/object/sign/documento?token=prueba" });
-  }
-
-  if (url.pathname === "/storage/v1/object/documentos-conductores" && req.method === "DELETE") {
-    storageDeletes += 1;
-    return json(res, 200, {});
-  }
-
-  if (url.pathname.startsWith("/storage/v1/object/documentos-conductores/") && req.method === "POST") {
-    storageUploads += 1;
-    return json(res, 200, { Key: url.pathname });
-  }
-
-  // Tablas del flujo de verificación. Las respuestas son arreglos; supabase-js
-  // resuelve maybeSingle en el cliente.
-  if (url.pathname === "/rest/v1/conductores_detalles") {
-    const select = url.searchParams.get("select") ?? "";
-    if (select.includes("verificado_por")) {
-      return json(res, 200, [{ ...CONDUCTOR }]);
-    }
-    if (url.searchParams.get("verificacion")?.startsWith("eq.")) {
-      const listado = { ...CONDUCTOR };
-      delete listado.verificado_por;
-      delete listado.verificado_en;
-      return json(res, 200, [listado]);
-    }
-    return json(res, 200, [{ ...CONDUCTOR }]);
-  }
-
-  if (url.pathname === "/rest/v1/conductores_documentos") {
-    const select = url.searchParams.get("select") ?? "";
-    if (select.includes("storage_path")) {
-      return json(
-        res,
-        200,
-        DOCUMENTOS_RESUMEN.map((documento) => ({
-          ...documento,
-          storage_path: `${CLIENT_ID}/${documento.tipo}.png`,
-          hash_sha256: "a".repeat(64),
-          ocr_texto: "V-12345678 ANA CLIENTE",
-          ocr_datos: { proveedor: "ocrspace" },
-        })),
-      );
-    }
-    return json(res, 200, DOCUMENTOS_RESUMEN);
-  }
-
-  if (url.pathname === "/rest/v1/eventos_seguridad") {
-    return json(res, 200, [
-      {
-        id: 1,
-        tipo: "verificacion_enviada",
-        severidad: "alerta",
-        detalle: { riesgo_puntaje: 65, riesgo_nivel: "alto" },
-        created_at: "2026-10-31T15:00:00.000Z",
-      },
-    ]);
-  }
-
-  if (url.pathname === "/rest/v1/usuarios") {
-    const consulta = url.searchParams.get("id") ?? "";
-    if (consulta.includes(ADMIN_ID)) {
-      return json(res, 200, [
-        {
-          id: ADMIN_ID,
-          rol: "admin",
-          nombre: "Operadora Llégate",
-          telefono: "+584140000000",
-          whatsapp: "+584140000000",
-          email: "admin@example.com",
-          telefono_verificado: true,
-          created_at: "2026-10-01T10:00:00.000Z",
-        },
-      ]);
-    }
-    return json(res, 200, [
-      {
-        id: CLIENT_ID,
-        rol: "conductor",
-        nombre: "Ana Cliente",
-        telefono: "+584142222222",
-        whatsapp: null,
-        email: "ana@example.com",
-        telefono_verificado: true,
-        created_at: "2026-10-20T10:00:00.000Z",
-      },
-    ]);
-  }
-
-  if (url.pathname === "/auth/v1/token") {
-    const body = raw ? JSON.parse(raw) : {};
-    if (url.searchParams.get("grant_type") === "refresh_token" && body.refresh_token === "valid-refresh") {
-      return json(res, 200, {
-        access_token: "new-access",
-        token_type: "bearer",
-        expires_in: 3600,
-        expires_at: 1790000000,
-        refresh_token: "new-refresh",
-        user: {
-          id: CLIENT_ID,
-          aud: "authenticated",
-          role: "authenticated",
-          email: "ana@example.com",
-          phone: "+584142222222",
-        },
-      });
-    }
-    return json(res, 400, {
-      error: "invalid_grant",
-      error_description: "Invalid Refresh Token: Refresh Token Not Found",
-    });
-  }
-
-  if (url.pathname === "/auth/v1/logout") {
-    const token = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
-    logoutCalls.push({ token, scope: url.searchParams.get("scope") });
-    if (token !== "valid-client") {
-      return json(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
-    }
-    res.writeHead(204);
-    return res.end();
-  }
-
-  if (url.pathname === "/rest/v1/perfil_usuario") {
-    return json(res, 200, [
-      {
-        id: CLIENT_ID,
-        rol: "conductor",
-        nombre: "Ana Cliente",
-        telefono: "+584142222222",
-        telefono_verificado: true,
-        email: "ana@example.com",
-        whatsapp: null,
-        saldo_billetera: 20,
-        es_conductor: true,
-        tipo_vehiculo: "moto",
-        placa: "AB123CD",
-        verificacion: "aprobado",
-        estado_conductor: "activo",
-        motivo_rechazo: null,
-        verificado_en: "2026-10-30T12:00:00.000Z",
-        puede_pedir_viajes: false,
-        puede_conducir: true,
-      },
-    ]);
-  }
-
-  if (url.pathname === "/rest/v1/transacciones_billetera") {
-    return json(res, 200, [
-      {
-        id: "9f1c0000-0000-0000-0000-000000000001",
-        tipo: "comision",
-        estado: "aprobada",
-        metodo: "saldo",
-        monto_usd: -1,
-        saldo_resultante: 19,
-        billetera: "piloto",
-        viaje_id: OK_TRIP,
-        banco: null,
-        referencia: null,
-        comprobante_url: null,
-        motivo_rechazo: null,
-        nota: "Comisión 10% del viaje Chacao → Altamira",
-        created_at: "2026-10-30T12:00:00.000Z",
-        aprobada_en: null,
-      },
-    ]);
-  }
-
-  if (url.pathname.startsWith("/rest/v1/rpc/")) {
-    const fn = url.pathname.slice("/rest/v1/rpc/".length);
-    const payload = raw ? JSON.parse(raw) : {};
-    rpcCalls.push({ fn, payload, authorization: req.headers.authorization });
-
-    if (fn === "mi_billetera") {
-      return json(res, 200, {
-        billetera: "piloto",
-        saldo_billetera: 20,
-        reservado_usd: 1,
-        disponible_usd: 19,
-        estado_billetera: "activo",
-        conductor_estado: "activo",
-        limites: {
-          comision_porcentaje: 0.1,
-          comision_minima_usd: 0.1,
-          saldo_minimo_usd: 1,
-          alerta_saldo_bajo_usd: 2,
-          recarga_minima_usd: 5,
-          recarga_maxima_usd: 50,
-          sla_aprobacion_minutos: 15,
-          bienvenida_usd: 2,
-        },
-      });
-    }
-
-    if (fn === "cancelar_viaje") {
-      if (payload.p_viaje_id === OK_TRIP) {
-        return json(res, 200, {
-          ok: true,
-          viaje_id: OK_TRIP,
-          estado: "cancelado",
-          reserva_liberada: true,
-          motivo: payload.p_motivo,
-        });
-      }
-    }
-
-    if (fn === "pagar_viaje_con_saldo") {
-      if (payload.p_viaje_id === OK_TRIP) {
-        return json(res, 200, {
-          ok: true,
-          ya_procesado: false,
-          viaje_id: OK_TRIP,
-          estado_viaje: "finalizado",
-          precio_usd: 10,
-          comision_usd: 1,
-          neto_conductor: 9,
-          saldo_cliente: 10,
-          saldo_conductor: 19,
-          conductor_activo: true,
-        });
-      }
-      if (payload.p_viaje_id === NO_FUNDS_TRIP) {
-        return json(res, 200, {
-          ok: false,
-          motivo: "saldo_insuficiente",
-          requiere_recarga: true,
-          viaje_id: NO_FUNDS_TRIP,
-          precio_usd: 50,
-          saldo_cliente: 10,
-        });
-      }
-      if (payload.p_viaje_id === FORBIDDEN_TRIP) {
-        return json(res, 403, { code: "42501", message: "NO_AUTORIZADO" });
-      }
-    }
-
-    if (fn === "reportar_recarga") {
-      return json(res, 200, {
-        ok: true,
-        transaccion_id: "9f1c0000-0000-0000-0000-000000000000",
-        estado: "pendiente",
-        metodo: payload.p_metodo,
-        monto_usd: payload.p_monto_usd,
-      });
-    }
-
-    if (fn === "crear_intencion_pago") {
-      return json(res, 200, {
-        ok: true,
-        pago: {
-          id: INTENT_ID,
-          codigo: "LLG-ABCDEF0123",
-          metodo: payload.p_metodo,
-          proveedor: payload.p_proveedor,
-          estado: "pendiente",
-          monto_usd: payload.p_monto_usd,
-          monto_bs: payload.p_monto_bs,
-          tasa_bs: payload.p_tasa_bs,
-          checkout_url: payload.p_checkout_url,
-          instrucciones: payload.p_instrucciones,
-          expira_en: payload.p_expira_en,
-          billetera: "piloto",
-        },
-      });
-    }
-
-    if (fn === "actualizar_intencion_pago") {
-      return json(res, 200, { ok: true, pago_id: payload.p_pago_id });
-    }
-
-    if (fn === "mis_pagos") {
-      return json(res, 200, [
-        {
-          id: INTENT_ID,
-          codigo: "LLG-ABCDEF0123",
-          metodo: "pago_movil",
-          proveedor: "manual",
-          estado: "en_revision",
-          monto_usd: 10,
-          monto_bs: 1000,
-          tasa_bs: 100,
-          checkout_url: null,
-          instrucciones: { tipo: "pago_movil", banco: "Banesco" },
-          referencia_reportada: "123456",
-          comprobante_url: null,
-          expira_en: "2026-10-31T15:00:00.000Z",
-          confirmado_en: null,
-          motivo_rechazo: null,
-          created_at: "2026-10-31T14:30:00.000Z",
-        },
-      ]);
-    }
-
-    if (fn === "reportar_pago") {
-      return json(res, 200, {
-        ok: true,
-        ya_reportado: false,
-        pago_id: payload.p_pago_id,
-        estado: "en_revision",
-        referencia: payload.p_referencia,
-      });
-    }
-
-    if (fn === "cancelar_pago") {
-      return json(res, 200, {
-        ok: true,
-        ya_cancelado: false,
-        pago_id: payload.p_pago_id,
-        estado: "cancelado",
-      });
-    }
-
-    if (fn === "registrar_documento_conductor") {
-      if (hashDuplicado && payload.p_hash_sha256 === hashDuplicado) {
-        return json(res, 409, {
-          code: "23505",
-          message: "DOCUMENTO_DUPLICADO",
-          details: null,
-          hint: null,
-        });
-      }
-      return json(res, 200, {
-        ok: true,
-        documento: {
-          id: "d0000000-0000-0000-0000-000000000001",
-          tipo: payload.p_tipo,
-          mime: payload.p_mime,
-          bytes: payload.p_bytes,
-          ocr_estado: payload.p_ocr_estado,
-          ocr_confianza: payload.p_ocr_confianza,
-          created_at: "2026-10-31T15:10:00.000Z",
-          updated_at: "2026-10-31T15:10:00.000Z",
-        },
-      });
-    }
-
-    if (fn === "enviar_verificacion_conductor") {
-      return json(res, 200, {
-        ok: true,
-        verificacion: "pendiente",
-        riesgo_puntaje: 65,
-        riesgo_nivel: "alto",
-        motivos: [{ codigo: "cedula_no_coincide", peso: 40 }],
-        documentos: 4,
-        enviado_en: "2026-10-31T15:20:00.000Z",
-      });
-    }
-
-    if (fn === "verificar_conductor") {
-      return json(res, 200, {
-        ok: true,
-        usuario_id: payload.p_usuario_id,
-        verificacion: payload.p_aprobado ? "aprobado" : "rechazado",
-        motivo_rechazo: payload.p_motivo ?? null,
-      });
-    }
-
-    return json(res, 404, { code: "PGRST202", message: "rpc no encontrada" });
-  }
-
-  return json(res, 404, { error: "not_found" });
-});
-
-let appServer;
-
-await new Promise((resolve) => fakeSupabase.listen(0, "127.0.0.1", resolve));
-const fakeUrl = `http://127.0.0.1:${fakeSupabase.address().port}`;
-
-process.env.SUPABASE_URL = fakeUrl;
-process.env.SUPABASE_ANON_KEY = "test-anon-key";
-process.env.CORS_ORIGIN = "http://localhost:5173";
+process.env.DATABASE_URL = `postgres://postgres:postgres@localhost:${PUERTO_PG}/${BASE}`;
+process.env.AUTH_JWT_SECRET = "secreto-jwt-de-pruebas";
+process.env.OTP_SECRET = "pepper-otp-de-pruebas";
+process.env.OTP_LOG_EN_DESARROLLO = "1";
+process.env.OTP_MAX_POR_IP = "100";
+process.env.PUBLIC_API_URL = URL_API;
+process.env.STORAGE_DRIVER = "local";
+process.env.STORAGE_LOCAL_DIR = DIR_ALMACEN;
 process.env.PAGO_MOVIL_BANCO = "Banesco";
-process.env.PAGO_MOVIL_TELEFONO = "04141234567";
-process.env.PAGO_MOVIL_CEDULA = "V-12345678";
+process.env.PAGO_MOVIL_TELEFONO = "+584141234567";
+process.env.PAGO_MOVIL_CEDULA = "V12345678";
 process.env.PAGO_MOVIL_TITULAR = "Llégate C.A.";
 process.env.PAGO_MOVIL_TASA_BS = "100";
-process.env.PAGO_MOVIL_EXPIRA_MINUTOS = "30";
-process.env.OTP_MAX_POR_TELEFONO = "3";
-process.env.OTP_MAX_POR_IP = "50";
-process.env.OTP_MAX_VERIFICACIONES = "6";
-process.env.OTP_VENTANA_MINUTOS = "10";
-
-const { app } = await import("../src/app.js");
-
-await new Promise((resolve) => {
-  appServer = app.listen(0, "127.0.0.1", resolve);
-});
-const baseUrl = `http://127.0.0.1:${appServer.address().port}`;
-
-test.after(async () => {
-  await new Promise((resolve) => appServer.close(resolve));
-  await new Promise((resolve) => fakeSupabase.close(resolve));
-});
-
-function post(path, { token, body } = {}) {
-  const headers = {};
-  if (token) headers.authorization = `Bearer ${token}`;
-  if (body !== undefined) headers["content-type"] = "application/json";
-  return fetch(`${baseUrl}${path}`, {
-    method: "POST",
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-}
-
-function lastRpc() {
-  return rpcCalls.at(-1);
-}
-
-test("POST /trips/:id/pagar-saldo cobra con saldo y devuelve los saldos", async () => {
-  const before = rpcCalls.length;
-  const response = await post(`/trips/${OK_TRIP}/pagar-saldo`, { token: "valid-client" });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(body.comision_usd, 1);
-  assert.equal(body.saldo_cliente, 10);
-  assert.equal(body.saldo_conductor, 19);
-  assert.equal(rpcCalls.length, before + 1);
-
-  const rpc = lastRpc();
-  assert.equal(rpc.fn, "pagar_viaje_con_saldo");
-  assert.deepEqual(rpc.payload, { p_viaje_id: OK_TRIP });
-  assert.equal(rpc.authorization, "Bearer valid-client");
-});
-
-test("POST /trips/:id/pagar-saldo responde 409 cuando el cliente no tiene saldo", async () => {
-  const response = await post(`/trips/${NO_FUNDS_TRIP}/pagar-saldo`, { token: "valid-client" });
-  const body = await response.json();
-
-  assert.equal(response.status, 409);
-  assert.equal(body.ok, false);
-  assert.equal(body.motivo, "saldo_insuficiente");
-  assert.equal(body.requiere_recarga, true);
-});
-
-test("POST /trips/:id/pagar-saldo traduce el rechazo de la RPC a 403", async () => {
-  const response = await post(`/trips/${FORBIDDEN_TRIP}/pagar-saldo`, { token: "valid-client" });
-  const body = await response.json();
-
-  assert.equal(response.status, 403);
-  assert.equal(body.error, "no_autorizado");
-});
-
-test("POST /trips/:id/pagar-saldo exige token", async () => {
-  const before = rpcCalls.length;
-  const response = await post(`/trips/${OK_TRIP}/pagar-saldo`);
-  const body = await response.json();
-
-  assert.equal(response.status, 401);
-  assert.equal(body.error, "token_requerido");
-  assert.equal(rpcCalls.length, before);
-});
-
-test("POST /trips/:id/pagar-saldo rechaza un token inválido", async () => {
-  const response = await post(`/trips/${OK_TRIP}/pagar-saldo`, { token: "expirado" });
-  const body = await response.json();
-
-  assert.equal(response.status, 401);
-  assert.equal(body.error, "token_invalido");
-});
-
-test("POST /trips/:id/pagar-saldo valida el UUID antes de llamar a la RPC", async () => {
-  const before = rpcCalls.length;
-  const response = await post("/trips/no-es-un-uuid/pagar-saldo", { token: "valid-client" });
-  const body = await response.json();
-
-  assert.equal(response.status, 422);
-  assert.equal(body.error, "datos_invalidos");
-  assert.equal(body.detalles[0].campo, "id");
-  assert.equal(rpcCalls.length, before);
-});
-
-test("POST /wallet/recargas/pago-movil rechaza referencias que no son numéricas", async () => {
-  const before = rpcCalls.length;
-  const response = await post("/wallet/recargas/pago-movil", {
-    token: "valid-client",
-    body: { monto_usd: 5, banco: "Banesco", referencia: "REF-001" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 422);
-  assert.equal(body.error, "datos_invalidos");
-  assert.equal(body.detalles[0].campo, "referencia");
-  assert.equal(rpcCalls.length, before);
-});
-
-test("POST /wallet/recargas/pago-movil reporta la recarga con datos válidos", async () => {
-  const response = await post("/wallet/recargas/pago-movil", {
-    token: "valid-client",
-    body: { monto_usd: 5, banco: "Banesco", referencia: "0123456789" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 201);
-  assert.equal(body.estado, "pendiente");
-
-  const rpc = lastRpc();
-  assert.equal(rpc.fn, "reportar_recarga");
-  assert.deepEqual(rpc.payload, {
-    p_metodo: "pago_movil",
-    p_monto_usd: 5,
-    p_banco: "Banesco",
-    p_referencia: "0123456789",
-    p_comprobante_url: null,
-  });
-});
-
-test("POST /wallet/recargas/binance acepta el ID de orden y rechaza el formato corto", async () => {
-  const short = await post("/wallet/recargas/binance", {
-    token: "valid-client",
-    body: { monto_usd: 10, referencia: "ABC" },
-  });
-  assert.equal(short.status, 422);
-
-  const response = await post("/wallet/recargas/binance", {
-    token: "valid-client",
-    body: { monto_usd: 10, referencia: "TX-123456789" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 201);
-  assert.equal(body.estado, "pendiente");
-  assert.equal(lastRpc().payload.p_metodo, "binance_pay");
-  assert.equal(lastRpc().payload.p_banco, "Binance");
-});
-
-test("GET /wallet/billetera devuelve saldo, reserva y límites del prepago", async () => {
-  const response = await fetch(`${baseUrl}/wallet/billetera`, {
-    headers: { authorization: "Bearer valid-client" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.billetera, "piloto");
-  assert.equal(body.saldo_billetera, 20);
-  assert.equal(body.reservado_usd, 1);
-  assert.equal(body.disponible_usd, 19);
-  assert.equal(body.limites.sla_aprobacion_minutos, 15);
-  assert.equal(body.limites.recarga_minima_usd, 5);
-
-  const rpc = lastRpc();
-  assert.equal(rpc.fn, "mi_billetera");
-});
-
-test("GET /wallet/movimientos lista el libro mayor con la billetera explícita", async () => {
-  const response = await fetch(`${baseUrl}/wallet/movimientos`, {
-    headers: { authorization: "Bearer valid-client" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(body.movimientos.length, 1);
-  assert.equal(body.movimientos[0].billetera, "piloto");
-  assert.equal(body.movimientos[0].tipo, "comision");
-});
-
-test("POST /trips/:id/cancelar libera la reserva de comisión", async () => {
-  const response = await post(`/trips/${OK_TRIP}/cancelar`, {
-    token: "valid-client",
-    body: { motivo: "El pasajero no salió" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(body.reserva_liberada, true);
-  assert.deepEqual(lastRpc().payload, {
-    p_viaje_id: OK_TRIP,
-    p_motivo: "El pasajero no salió",
-  });
-});
-
-test("POST /trips/:id/cancelar valida el UUID antes de llamar a la RPC", async () => {
-  const before = rpcCalls.length;
-  const response = await post("/trips/no-es-un-uuid/cancelar", {
-    token: "valid-client",
-    body: {},
-  });
-
-  assert.equal(response.status, 422);
-  assert.equal(rpcCalls.length, before);
-});
-
-test("GET /auth/me devuelve el mismo perfil unificado que usa la app", async () => {
-  const response = await fetch(`${baseUrl}/auth/me`, {
-    headers: { authorization: "Bearer valid-client" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(body.usuario.id, CLIENT_ID);
-  assert.equal(body.usuario.rol, "conductor");
-  assert.equal(body.usuario.saldo_billetera, 20);
-  assert.equal(body.conductor.placa, "AB123CD");
-  assert.equal(body.conductor.verificacion, "aprobado");
-  assert.equal(body.capacidades.puede_pedir_viajes, false);
-  assert.equal(body.capacidades.puede_conducir, true);
-});
-
-test("POST /auth/refresh renueva la sesión con el refresh_token", async () => {
-  const response = await post("/auth/refresh", { body: { refresh_token: "valid-refresh" } });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(body.access_token, "new-access");
-  assert.equal(body.refresh_token, "new-refresh");
-  assert.equal(body.usuario.id, CLIENT_ID);
-});
-
-test("POST /auth/refresh responde 401 cuando el refresh_token no sirve", async () => {
-  const response = await post("/auth/refresh", { body: { refresh_token: "refresh-expirado" } });
-  const body = await response.json();
-
-  assert.equal(response.status, 401);
-  assert.equal(body.error, "sesion_invalida");
-});
-
-test("POST /auth/refresh valida el cuerpo antes de llamar a Auth", async () => {
-  const response = await post("/auth/refresh", { body: { refresh_token: "corto" } });
-  const body = await response.json();
-
-  assert.equal(response.status, 422);
-  assert.equal(body.error, "datos_invalidos");
-  assert.equal(body.detalles[0].campo, "refresh_token");
-});
-
-test("POST /auth/logout cierra solo la sesión actual", async () => {
-  const before = logoutCalls.length;
-  const response = await post("/auth/logout", { token: "valid-client" });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(logoutCalls.length, before + 1);
-  assert.equal(logoutCalls.at(-1).token, "valid-client");
-  assert.equal(logoutCalls.at(-1).scope, "local");
-});
-
-test("POST /auth/logout exige token", async () => {
-  const before = logoutCalls.length;
-  const response = await post("/auth/logout");
-  const body = await response.json();
-
-  assert.equal(response.status, 401);
-  assert.equal(body.error, "token_requerido");
-  assert.equal(logoutCalls.length, before);
-});
-
-test("GET /payments/metodos informa qué pasarelas están configuradas", async () => {
-  const response = await fetch(`${baseUrl}/payments/metodos`, {
-    headers: { authorization: "Bearer valid-client" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.deepEqual(
-    body.metodos.map((metodo) => [metodo.id, metodo.disponible]),
-    [
-      ["pago_movil", true],
-      ["binance_pay", false],
-    ],
-  );
-});
-
-test("POST /payments/intents crea una intención de Pago Móvil con monto en bolívares", async () => {
-  const before = rpcCalls.length;
-  const response = await post("/payments/intents", {
-    token: "valid-client",
-    body: { metodo: "pago_movil", monto_usd: 10 },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 201);
-  assert.equal(body.pago.codigo, "LLG-ABCDEF0123");
-  assert.equal(body.pago.monto_bs, 1000);
-  assert.equal(rpcCalls.length, before + 1);
-
-  const rpc = lastRpc();
-  assert.equal(rpc.fn, "crear_intencion_pago");
-  assert.equal(rpc.payload.p_metodo, "pago_movil");
-  assert.equal(rpc.payload.p_proveedor, "manual");
-  assert.equal(rpc.payload.p_monto_bs, 1000);
-  assert.equal(rpc.payload.p_tasa_bs, 100);
-  assert.equal(rpc.payload.p_instrucciones.banco, "Banesco");
-  assert.equal(typeof rpc.payload.p_expira_en, "string");
-});
-
-test("POST /payments/intents valida el método y el monto antes de llamar a la RPC", async () => {
-  const before = rpcCalls.length;
-  const response = await post("/payments/intents", {
-    token: "valid-client",
-    body: { metodo: "efectivo", monto_usd: 10 },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 422);
-  assert.equal(body.error, "datos_invalidos");
-  assert.equal(rpcCalls.length, before);
-});
-
-test("POST /payments/intents no inventa Binance si no está configurado", async () => {
-  const before = rpcCalls.length;
-  const response = await post("/payments/intents", {
-    token: "valid-client",
-    body: { metodo: "binance_pay", monto_usd: 10 },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 503);
-  assert.equal(body.error, "binance_no_configurado");
-  assert.equal(rpcCalls.length, before);
-});
-
-test("GET /payments lista las intenciones propias", async () => {
-  const response = await fetch(`${baseUrl}/payments`, {
-    headers: { authorization: "Bearer valid-client" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(body.pagos.length, 1);
-  assert.equal(body.pagos[0].estado, "en_revision");
-  assert.equal(lastRpc().fn, "mis_pagos");
-});
-
-test("POST /payments/:id/report reporta la referencia bancaria", async () => {
-  const response = await post(`/payments/${INTENT_ID}/report`, {
-    token: "valid-client",
-    body: { referencia: "123456" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.estado, "en_revision");
-  assert.deepEqual(lastRpc().payload, {
-    p_pago_id: INTENT_ID,
-    p_referencia: "123456",
-    p_comprobante_url: null,
-  });
-});
-
-test("POST /payments/:id/report rechaza referencias inválidas y UUID inválidos", async () => {
-  const before = rpcCalls.length;
-  const malaReferencia = await post(`/payments/${INTENT_ID}/report`, {
-    token: "valid-client",
-    body: { referencia: "REF-1" },
-  });
-  assert.equal(malaReferencia.status, 422);
-
-  const malUuid = await post("/payments/no-es-uuid/report", {
-    token: "valid-client",
-    body: { referencia: "123456" },
-  });
-  assert.equal(malUuid.status, 422);
-  assert.equal(rpcCalls.length, before);
-});
-
-test("POST /payments/:id/cancel cancela una intención pendiente", async () => {
-  const response = await post(`/payments/${INTENT_ID}/cancel`, { token: "valid-client" });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.estado, "cancelado");
-  assert.deepEqual(lastRpc().payload, { p_pago_id: INTENT_ID });
-});
-
-test("las rutas de pagos exigen sesión", async () => {
-  const response = await fetch(`${baseUrl}/payments`);
-  const body = await response.json();
-
-  assert.equal(response.status, 401);
-  assert.equal(body.error, "token_requerido");
-});
-
-// ---------------------------------------------------------------------------
-// Paso 4: documentos del piloto, riesgo y panel administrativo
-// ---------------------------------------------------------------------------
-
-test("POST /drivers/me/documentos exige sesión", async () => {
-  const response = await post("/drivers/me/documentos", {
-    body: { tipo: "cedula_frente", mime: "image/png", contenido_base64: PNG_BASE64 },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 401);
-  assert.equal(body.error, "token_requerido");
-});
-
-test("POST /drivers/me/documentos rechaza archivos que no son imagen ni PDF", async () => {
-  const response = await post("/drivers/me/documentos", {
-    token: "valid-client",
-    body: {
-      tipo: "cedula_frente",
-      mime: "image/png",
-      contenido_base64: Buffer.from("esto no es un documento real").toString("base64"),
-    },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 422);
-  assert.equal(body.error, "formato_no_soportado");
-});
-
-test("POST /drivers/me/documentos compara los bytes con el MIME declarado", async () => {
-  const response = await post("/drivers/me/documentos", {
-    token: "valid-client",
-    body: { tipo: "cedula_frente", mime: "image/jpeg", contenido_base64: PNG_BASE64 },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 422);
-  assert.equal(body.error, "mime_no_coincide");
-});
-
-test("POST /drivers/me/documentos sube, calcula el hash y registra la fila", async () => {
-  const uploadsAntes = storageUploads;
-  const response = await post("/drivers/me/documentos", {
-    token: "valid-client",
-    body: { tipo: "cedula_frente", mime: "image/png", contenido_base64: PNG_BASE64 },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 201);
-  assert.equal(body.ok, true);
-  assert.equal(body.documento.tipo, "cedula_frente");
-  assert.equal(storageUploads, uploadsAntes + 1);
-
-  const rpc = lastRpc();
-  assert.equal(rpc.fn, "registrar_documento_conductor");
-  assert.equal(rpc.authorization, "Bearer valid-client");
-  assert.equal(rpc.payload.p_mime, "image/png");
-  assert.equal(rpc.payload.p_bytes, Buffer.from(PNG_BASE64, "base64").length);
-  assert.equal(rpc.payload.p_ocr_estado, "no_configurado");
-  assert.match(rpc.payload.p_hash_sha256, /^[0-9a-f]{64}$/);
-  assert.ok(rpc.payload.p_storage_path.startsWith(`${CLIENT_ID}/cedula_frente-`));
-  assert.ok(rpc.payload.p_storage_path.endsWith(".png"));
-});
-
-test("POST /drivers/me/documentos borra el archivo subido si la RPC lo rechaza", async () => {
-  const bytes = Buffer.concat([
+process.env.NODE_ENV = "test";
+
+const CLIENTE = { id: "22222222-2222-2222-2222-222222222222", telefono: "+584141111111" };
+const ADMIN = { id: "33333333-3333-3333-3333-333333333333", telefono: "+584143333333" };
+const PILOTO = { id: "11111111-1111-1111-1111-111111111111", telefono: "+584141111112" };
+// Este número no existe en la base: el primer /auth/otp debe crear la cuenta.
+const ASPIRANTE = { telefono: "+584146666666" };
+
+let pg;
+let clienteSql;
+let servidor;
+let cerrarPool;
+const sesiones = {};
+
+function png(etiqueta) {
+  return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    Buffer.from("documento-duplicado"),
+    Buffer.from(etiqueta),
   ]);
-  hashDuplicado = createHash("sha256").update(bytes).digest("hex");
-  const borradosAntes = storageDeletes;
+}
 
-  const response = await post("/drivers/me/documentos", {
-    token: "valid-client",
-    body: {
-      tipo: "cedula_reverso",
-      mime: "image/png",
-      contenido_base64: bytes.toString("base64"),
+async function sql(consulta, parametros = []) {
+  return (await clienteSql.query(consulta, parametros)).rows;
+}
+
+async function pedir(metodo, ruta, { cuerpo, token, headers = {} } = {}) {
+  const respuesta = await fetch(`${URL_API}${ruta}`, {
+    method: metodo,
+    headers: {
+      ...(cuerpo === undefined ? {} : { "content-type": "application/json" }),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...headers,
     },
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
   });
-  hashDuplicado = null;
-  const body = await response.json();
 
-  assert.equal(response.status, 409);
-  assert.equal(body.error, "23505");
-  assert.equal(storageDeletes, borradosAntes + 1);
-});
+  const texto = await respuesta.text();
+  let datos = null;
+  try {
+    datos = texto ? JSON.parse(texto) : null;
+  } catch {
+    datos = texto;
+  }
 
-test("GET /drivers/me devuelve el estado de verificación y los documentos sin OCR", async () => {
-  const response = await fetch(`${baseUrl}/drivers/me`, {
-    headers: { authorization: "Bearer valid-client" },
+  return { status: respuesta.status, cuerpo: datos, headers: respuesta.headers };
+}
+
+// El canal de OTP en pruebas es el log del servidor: se intercepta para leer
+// el código, igual que haría un SMS real.
+async function pedirCodigo(telefono, { rol = "cliente", nombre } = {}) {
+  let codigo = null;
+  const original = console.log;
+
+  console.log = (mensaje, ...resto) => {
+    const texto = [mensaje, ...resto].map(String).join(" ");
+    const encontrado = texto.match(/^\[otp\] (\+\d+): (\d{6})$/);
+    if (encontrado) {
+      if (encontrado[1] === telefono) codigo = encontrado[2];
+      return;
+    }
+    original(mensaje, ...resto);
+  };
+
+  try {
+    const respuesta = await pedir("POST", "/auth/otp", { cuerpo: { telefono, rol, nombre } });
+    assert.equal(respuesta.status, 202, JSON.stringify(respuesta.cuerpo));
+  } finally {
+    console.log = original;
+  }
+
+  assert.ok(codigo, `No se capturó el código OTP de ${telefono}`);
+  return codigo;
+}
+
+async function entrar(telefono, opciones) {
+  const codigo = await pedirCodigo(telefono, opciones);
+  const respuesta = await pedir("POST", "/auth/verify", {
+    cuerpo: { telefono, token: codigo },
   });
-  const body = await response.json();
+  assert.equal(respuesta.status, 200, JSON.stringify(respuesta.cuerpo));
+  return respuesta.cuerpo;
+}
 
-  assert.equal(response.status, 200);
-  assert.equal(body.conductor.riesgo_puntaje, 65);
-  assert.equal(body.conductor.intentos_verificacion, 1);
-  assert.equal(body.documentos.length, 4);
-  assert.equal(body.documentos[0].ocr_estado, "no_configurado");
-  assert.equal("ocr_texto" in body.documentos[0], false);
-});
+async function sesion(nombre, cuenta, opciones) {
+  sesiones[nombre] ??= await entrar(cuenta.telefono, opciones);
+  return sesiones[nombre];
+}
 
-test("POST /drivers/me/enviar devuelve el riesgo explicable", async () => {
-  const response = await post("/drivers/me/enviar", { token: "valid-client" });
-  const body = await response.json();
+before(async () => {
+  rmSync(DIR_ALMACEN, { recursive: true, force: true });
 
-  assert.equal(response.status, 200);
-  assert.equal(body.verificacion, "pendiente");
-  assert.equal(body.riesgo_puntaje, 65);
-  assert.equal(body.riesgo_nivel, "alto");
-  assert.equal(body.documentos, 4);
+  const arranque = await iniciarPostgres({ puerto: PUERTO_PG, base: BASE, datos: DIR_DATOS });
+  pg = arranque.pg;
+  clienteSql = pg.getPgClient(BASE);
+  await clienteSql.connect();
+  await aplicarMigraciones(clienteSql, listarMigraciones());
 
-  const rpc = lastRpc();
-  assert.equal(rpc.fn, "enviar_verificacion_conductor");
-  assert.deepEqual(rpc.payload, {});
-});
+  await sql(
+    `insert into auth.users (id, phone, phone_confirmed_at, raw_user_meta_data) values
+       ($1, $2, now(), '{"nombre":"Ana Cliente","rol":"cliente"}'),
+       ($3, $4, now(), '{"nombre":"Admin Uno","rol":"admin"}'),
+       ($5, $6, now(), '{"nombre":"Carlos Conductor","rol":"conductor"}')`,
+    [CLIENTE.id, CLIENTE.telefono, ADMIN.id, ADMIN.telefono, PILOTO.id, PILOTO.telefono],
+  );
 
-test("GET /admin/conductores exige rol administrador", async () => {
-  const response = await fetch(`${baseUrl}/admin/conductores`, {
-    headers: { authorization: "Bearer valid-client" },
-  });
-  const body = await response.json();
+  await sql("update public.usuarios set rol = 'admin' where id = $1", [ADMIN.id]);
+  await sql("update public.usuarios set saldo_billetera = 20 where id = $1", [CLIENTE.id]);
+  await sql("update public.usuarios set saldo_billetera = 10 where id = $1", [PILOTO.id]);
+  await sql(
+    `insert into public.conductores_detalles (
+       usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, anio,
+       verificacion, estado
+     ) values ($1, 'V12345678', 'carro', 'AB123CD', 'Toyota', 'Corolla', 2018, 'aprobado', 'activo')`,
+    [PILOTO.id],
+  );
 
-  assert.equal(response.status, 403);
-  assert.equal(body.error, "solo_admin");
-});
+  const { app } = await import("../src/app.js");
+  ({ cerrarPool } = await import("../src/db.js"));
 
-test("GET /admin/conductores mezcla perfil, riesgo y documentos", async () => {
-  const response = await fetch(`${baseUrl}/admin/conductores?verificacion=pendiente`, {
-    headers: { authorization: "Bearer valid-admin" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.conductores.length, 1);
-  assert.equal(body.conductores[0].riesgo_puntaje, 65);
-  assert.equal(body.conductores[0].usuario.nombre, "Ana Cliente");
-  assert.equal(body.conductores[0].documentos.length, 4);
-});
-
-test("GET /admin/conductores/:id firma los documentos y lista la auditoría", async () => {
-  const firmasAntes = signedUrls;
-  const response = await fetch(`${baseUrl}/admin/conductores/${CLIENT_ID}`, {
-    headers: { authorization: "Bearer valid-admin" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.conductor.riesgo_motivos[0].codigo, "cedula_no_coincide");
-  assert.equal(body.usuario.email, "ana@example.com");
-  assert.equal(body.documentos.length, 4);
-  assert.match(body.documentos[0].url, /token=prueba/);
-  assert.equal(body.eventos[0].tipo, "verificacion_enviada");
-  assert.equal(signedUrls, firmasAntes + 4);
-});
-
-test("GET /admin/conductores/:id responde 403 a quien no es admin", async () => {
-  const response = await fetch(`${baseUrl}/admin/conductores/${CLIENT_ID}`, {
-    headers: { authorization: "Bearer valid-client" },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 403);
-  assert.equal(body.error, "solo_admin");
-});
-
-test("POST /admin/conductores/:id/verificar aprueba y delega en la RPC", async () => {
-  const response = await post(`/admin/conductores/${CLIENT_ID}/verificar`, {
-    token: "valid-admin",
-    body: { aprobado: true },
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(body.verificacion, "aprobado");
-
-  const rpc = lastRpc();
-  assert.equal(rpc.fn, "verificar_conductor");
-  assert.deepEqual(rpc.payload, {
-    p_usuario_id: CLIENT_ID,
-    p_aprobado: true,
-    p_motivo: null,
+  servidor = await new Promise((resolver) => {
+    const actual = app.listen(PUERTO_API, "127.0.0.1", () => resolver(actual));
   });
 });
 
-// ---------------------------------------------------------------------------
-// OTP: límites por teléfono y por intento de verificación
-// ---------------------------------------------------------------------------
+after(async () => {
+  if (servidor) await new Promise((resolver) => servidor.close(resolver));
+  if (cerrarPool) await cerrarPool().catch(() => {});
+  if (clienteSql) await clienteSql.end().catch(() => {});
+  if (pg) await pg.stop().catch(() => {});
+  rmSync(DIR_ALMACEN, { recursive: true, force: true });
+  rmSync(DIR_DATOS, { recursive: true, force: true });
+});
+
+test("GET /health responde sin tocar la base de datos", async () => {
+  const respuesta = await pedir("GET", "/health");
+  assert.equal(respuesta.status, 200);
+  assert.deepEqual(respuesta.cuerpo, { ok: true, servicio: "llegate-api" });
+});
+
+test("el registro por SMS crea la cuenta y entrega tokens propios", async () => {
+  const codigo = await pedirCodigo(ASPIRANTE.telefono, { rol: "conductor", nombre: "Nuevo Piloto" });
+  assert.match(codigo, /^\d{6}$/);
+
+  const [guardado] = await sql("select intentos from auth.otp_codigos where telefono = $1", [
+    ASPIRANTE.telefono,
+  ]);
+  assert.equal(guardado.intentos, 0);
+
+  const incorrecto = codigo === "000000" ? "111111" : "000000";
+  const fallo = await pedir("POST", "/auth/verify", {
+    cuerpo: { telefono: ASPIRANTE.telefono, token: incorrecto },
+  });
+  assert.equal(fallo.status, 401);
+  assert.equal(fallo.cuerpo.error, "codigo_invalido");
+
+  const [trasFallo] = await sql("select intentos from auth.otp_codigos where telefono = $1", [
+    ASPIRANTE.telefono,
+  ]);
+  assert.equal(trasFallo.intentos, 1);
+
+  const verificado = await pedir("POST", "/auth/verify", {
+    cuerpo: { telefono: ASPIRANTE.telefono, token: codigo },
+  });
+  assert.equal(verificado.status, 200);
+  assert.equal(verificado.cuerpo.ok, true);
+  assert.equal(verificado.cuerpo.usuario.telefono, ASPIRANTE.telefono);
+  assert.match(verificado.cuerpo.usuario.id, /^[0-9a-f-]{36}$/);
+  assert.ok(verificado.cuerpo.access_token);
+  assert.ok(verificado.cuerpo.refresh_token);
+  assert.ok(Number.isInteger(verificado.cuerpo.expires_at));
+
+  const [reutilizado] = await sql("select 1 from auth.otp_codigos where telefono = $1", [
+    ASPIRANTE.telefono,
+  ]);
+  assert.equal(reutilizado, undefined);
+
+  const perfil = await pedir("GET", "/auth/me", { token: verificado.cuerpo.access_token });
+  assert.equal(perfil.status, 200);
+  assert.equal(perfil.cuerpo.usuario.rol, "conductor");
+  assert.equal(perfil.cuerpo.usuario.telefono_verificado, true);
+  assert.equal(perfil.cuerpo.conductor, null);
+  assert.equal(perfil.cuerpo.capacidades.puede_pedir_viajes, false);
+  assert.ok(!perfil.cuerpo.capacidades.puede_conducir);
+
+  sesiones.aspirante = verificado.cuerpo;
+});
+
+test("refresh rota el token y logout revoca solo esa sesión", async () => {
+  const sinToken = await pedir("GET", "/auth/me");
+  assert.equal(sinToken.status, 401);
+  assert.equal(sinToken.cuerpo.error, "token_requerido");
+
+  const falso = await pedir("GET", "/auth/me", { token: "no.es.un.jwt" });
+  assert.equal(falso.status, 401);
+  assert.equal(falso.cuerpo.error, "token_invalido");
+
+  const inicial = await sesion("cliente", CLIENTE);
+
+  const renovado = await pedir("POST", "/auth/refresh", {
+    cuerpo: { refresh_token: inicial.refresh_token },
+  });
+  assert.equal(renovado.status, 200);
+  assert.notEqual(renovado.cuerpo.refresh_token, inicial.refresh_token);
+
+  const viejo = await pedir("POST", "/auth/refresh", {
+    cuerpo: { refresh_token: inicial.refresh_token },
+  });
+  assert.equal(viejo.status, 401);
+  assert.equal(viejo.cuerpo.error, "sesion_invalida");
+
+  const perfil = await pedir("GET", "/auth/me", { token: renovado.cuerpo.access_token });
+  assert.equal(perfil.status, 200);
+  assert.equal(perfil.cuerpo.usuario.id, CLIENTE.id);
+  assert.equal(perfil.cuerpo.usuario.rol, "cliente");
+  assert.equal(perfil.cuerpo.conductor, null);
+  assert.equal(perfil.cuerpo.capacidades.puede_pedir_viajes, true);
+
+  const salida = await pedir("POST", "/auth/logout", { token: renovado.cuerpo.access_token });
+  assert.equal(salida.status, 200);
+
+  const despues = await pedir("GET", "/auth/me", { token: renovado.cuerpo.access_token });
+  assert.equal(despues.status, 401);
+  assert.equal(despues.cuerpo.error, "sesion_invalida");
+
+  // La web y la app pueden mantener sesiones separadas de la misma cuenta.
+  sesiones.cliente = await entrar(CLIENTE.telefono);
+});
 
 test("POST /auth/otp limita los códigos pedidos por teléfono", async () => {
-  resetRateLimits();
-  const telefono = "+584141239999";
-
+  const telefono = "+584149990001";
   for (let intento = 0; intento < 3; intento += 1) {
-    const response = await post("/auth/otp", { body: { telefono, rol: "conductor" } });
-    const body = await response.json();
-    assert.equal(response.status, 202);
-    assert.equal(body.mensaje, "Código enviado por SMS");
+    const respuesta = await pedir("POST", "/auth/otp", { cuerpo: { telefono } });
+    assert.equal(respuesta.status, 202);
   }
 
-  const enviosAntes = otpRequests.length;
-  const bloqueado = await post("/auth/otp", { body: { telefono } });
-  const body = await bloqueado.json();
-
+  const bloqueado = await pedir("POST", "/auth/otp", { cuerpo: { telefono } });
   assert.equal(bloqueado.status, 429);
-  assert.equal(body.error, "demasiados_intentos");
-  assert.ok(Number(bloqueado.headers.get("retry-after")) > 0);
-  assert.ok(body.detalles.retry_after > 0);
-  assert.equal(otpRequests.length, enviosAntes);
+  assert.equal(bloqueado.cuerpo.error, "demasiados_intentos");
+  assert.ok(bloqueado.cuerpo.detalles.retry_after > 0);
+  assert.ok(bloqueado.headers.get("retry-after"));
+
+  const invalido = await pedir("POST", "/auth/otp", { cuerpo: { telefono: "04141234567" } });
+  assert.equal(invalido.status, 422);
+  assert.equal(invalido.cuerpo.error, "datos_invalidos");
 });
 
-test("POST /auth/verify limita los intentos con el mismo teléfono", async () => {
-  resetRateLimits();
-  const telefono = "+584141238888";
+test("las rutas de administración exigen rol admin", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+  const clienteSesion = await pedir("GET", "/admin/recargas", { token: cliente.access_token });
+  assert.equal(clienteSesion.status, 403);
+  assert.equal(clienteSesion.cuerpo.error, "solo_admin");
 
-  for (let intento = 0; intento < 6; intento += 1) {
-    const response = await post("/auth/verify", { body: { telefono, token: "000000" } });
-    const body = await response.json();
-    assert.equal(response.status, 401);
-    assert.equal(body.error, "codigo_invalido");
+  const admin = await sesion("admin", ADMIN);
+  const recargas = await pedir("GET", "/admin/recargas", { token: admin.access_token });
+  assert.equal(recargas.status, 200);
+  assert.ok(Array.isArray(recargas.cuerpo.recargas));
+
+  const adminPerfil = await pedir("GET", "/auth/me", { token: admin.access_token });
+  assert.equal(adminPerfil.cuerpo.usuario.rol, "admin");
+  assert.equal(adminPerfil.cuerpo.capacidades.puede_pedir_viajes, false);
+
+  const filtroInvalido = await pedir("GET", "/admin/conductores?verificacion=otro", {
+    token: admin.access_token,
+  });
+  assert.equal(filtroInvalido.status, 422);
+});
+
+test("los métodos de pago reflejan la configuración del servidor", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+
+  const metodos = await pedir("GET", "/payments/metodos", { token: cliente.access_token });
+  assert.equal(metodos.status, 200);
+  assert.deepEqual(metodos.cuerpo.metodos, [
+    { id: "pago_movil", disponible: true, revision: "manual" },
+    { id: "binance_pay", disponible: false, revision: "automatica" },
+  ]);
+
+  const binance = await pedir("POST", "/payments/intents", {
+    token: cliente.access_token,
+    cuerpo: { metodo: "binance_pay", monto_usd: 10 },
+  });
+  assert.equal(binance.status, 503);
+  assert.equal(binance.cuerpo.error, "binance_no_configurado");
+
+  const webhook = await fetch(`${URL_API}/webhooks/binance-pay`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ bizStatus: "PAY_SUCCESS" }),
+  });
+  assert.equal(webhook.status, 503);
+  assert.deepEqual(await webhook.json(), {
+    returnCode: "FAIL",
+    returnMessage: "webhook_no_configurado",
+  });
+});
+
+test("Pago Móvil: intención, reporte, confirmación admin y saldo", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+  const admin = await sesion("admin", ADMIN);
+
+  const intencion = await pedir("POST", "/payments/intents", {
+    token: cliente.access_token,
+    cuerpo: { metodo: "pago_movil", monto_usd: 10 },
+  });
+  assert.equal(intencion.status, 201);
+  const pago = intencion.cuerpo.pago;
+  assert.ok(pago?.id);
+  assert.equal(pago.estado, "pendiente");
+  assert.equal(pago.billetera, "pasajero");
+  assert.equal(pago.monto_bs, 1000);
+  assert.equal(pago.tasa_bs, 100);
+  assert.equal(pago.instrucciones.banco, "Banesco");
+  assert.equal(pago.instrucciones.monto_bs, 1000);
+  assert.match(pago.codigo, /^LLG-[0-9A-F]{10}$/);
+
+  const listado = await pedir("GET", "/payments", { token: cliente.access_token });
+  assert.equal(listado.status, 200);
+  assert.ok(listado.cuerpo.pagos.some((item) => item.id === pago.id));
+
+  const referenciaInvalida = await pedir("POST", `/payments/${pago.id}/report`, {
+    token: cliente.access_token,
+    cuerpo: { referencia: "abc" },
+  });
+  assert.equal(referenciaInvalida.status, 422);
+
+  const reporte = await pedir("POST", `/payments/${pago.id}/report`, {
+    token: cliente.access_token,
+    cuerpo: { referencia: "123456" },
+  });
+  assert.equal(reporte.status, 200);
+  assert.equal(reporte.cuerpo.estado, "en_revision");
+  assert.equal(reporte.cuerpo.ya_reportado, false);
+
+  const repetido = await pedir("POST", `/payments/${pago.id}/report`, {
+    token: cliente.access_token,
+    cuerpo: { referencia: "123456" },
+  });
+  assert.equal(repetido.status, 200);
+  assert.equal(repetido.cuerpo.ya_reportado, true);
+
+  const cola = await pedir("GET", "/admin/pagos?estado=en_revision", { token: admin.access_token });
+  assert.equal(cola.status, 200);
+  assert.ok(cola.cuerpo.pagos.some((item) => item.id === pago.id));
+
+  const confirmacion = await pedir("POST", `/admin/pagos/${pago.id}/confirmar`, {
+    token: admin.access_token,
+  });
+  assert.equal(confirmacion.status, 200);
+  assert.equal(confirmacion.cuerpo.estado, "confirmado");
+  assert.equal(confirmacion.cuerpo.saldo_billetera, 30);
+  assert.ok(confirmacion.cuerpo.transaccion_id);
+
+  const idempotente = await pedir("POST", `/admin/pagos/${pago.id}/confirmar`, {
+    token: admin.access_token,
+  });
+  assert.equal(idempotente.status, 200);
+  assert.equal(idempotente.cuerpo.ya_confirmado, true);
+
+  const billetera = await pedir("GET", "/wallet/billetera", { token: cliente.access_token });
+  assert.equal(billetera.status, 200);
+  assert.equal(billetera.cuerpo.billetera, "pasajero");
+  assert.equal(billetera.cuerpo.saldo_billetera, 30);
+  assert.equal(billetera.cuerpo.limites.comision_porcentaje, 0.1);
+
+  const movimientos = await pedir("GET", "/wallet/movimientos", { token: cliente.access_token });
+  const recarga = movimientos.cuerpo.movimientos.find(
+    (item) => item.tipo === "recarga" && item.referencia === "123456",
+  );
+  assert.ok(recarga);
+  assert.equal(recarga.estado, "aprobada");
+  assert.equal(recarga.banco, "Banesco");
+  assert.equal(recarga.monto_usd, 10);
+});
+
+test("las recargas legadas se aprueban desde el panel", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+  const admin = await sesion("admin", ADMIN);
+
+  const reporte = await pedir("POST", "/wallet/recargas/pago-movil", {
+    token: cliente.access_token,
+    cuerpo: { monto_usd: 10, banco: "Banesco", referencia: "654321" },
+  });
+  assert.equal(reporte.status, 201);
+  assert.equal(reporte.cuerpo.estado, "pendiente");
+  assert.equal(reporte.cuerpo.billetera, "pasajero");
+  assert.ok(reporte.cuerpo.transaccion_id);
+
+  const duplicada = await pedir("POST", "/wallet/recargas/pago-movil", {
+    token: cliente.access_token,
+    cuerpo: { monto_usd: 10, banco: "Banesco", referencia: "654321" },
+  });
+  assert.equal(duplicada.status, 409);
+
+  const cola = await pedir("GET", "/admin/recargas?estado=pendiente", {
+    token: admin.access_token,
+  });
+  assert.equal(cola.status, 200);
+  assert.ok(cola.cuerpo.recargas.some((item) => item.id === reporte.cuerpo.transaccion_id));
+
+  const aprobada = await pedir(
+    "POST",
+    `/admin/recargas/${reporte.cuerpo.transaccion_id}/aprobar`,
+    { token: admin.access_token },
+  );
+  assert.equal(aprobada.status, 200);
+  assert.equal(aprobada.cuerpo.ok, true);
+  assert.equal(aprobada.cuerpo.saldo_billetera, 40);
+
+  const otraVez = await pedir(
+    "POST",
+    `/admin/recargas/${reporte.cuerpo.transaccion_id}/aprobar`,
+    { token: admin.access_token },
+  );
+  assert.equal(otraVez.status, 409);
+  assert.equal(otraVez.cuerpo.motivo, "ya_procesada");
+
+  const recargaInvalida = await pedir("POST", "/wallet/recargas/pago-movil", {
+    token: cliente.access_token,
+    cuerpo: { monto_usd: 5, banco: "Banesco", referencia: "12" },
+  });
+  assert.equal(recargaInvalida.status, 422);
+});
+
+test("un piloto sube documentos, se le calcula el riesgo y el admin lo aprueba", async () => {
+  const aspirante = await sesion("aspirante", ASPIRANTE);
+  const aspiranteId = aspirante.usuario.id;
+  const admin = await sesion("admin", ADMIN);
+  const cliente = await sesion("cliente", CLIENTE);
+
+  const registro = await pedir("POST", "/drivers/me", {
+    token: aspirante.access_token,
+    cuerpo: {
+      cedula: "v87654321",
+      tipo_vehiculo: "moto",
+      placa: "xy987zt",
+      marca: "Bera",
+      modelo: "SBR",
+      anio: 2021,
+    },
+  });
+  assert.equal(registro.status, 201);
+  assert.equal(registro.cuerpo.conductor.cedula, "V87654321");
+  assert.equal(registro.cuerpo.conductor.placa, "XY987ZT");
+  assert.equal(registro.cuerpo.conductor.verificacion, "pendiente");
+
+  const repetido = await pedir("POST", "/drivers/me", {
+    token: aspirante.access_token,
+    cuerpo: { cedula: "V87654321", tipo_vehiculo: "moto", placa: "XY987ZT" },
+  });
+  assert.equal(repetido.status, 409);
+  assert.equal(repetido.cuerpo.error, "registro_existente");
+
+  const gif = await pedir("POST", "/drivers/me/documentos", {
+    token: aspirante.access_token,
+    cuerpo: { tipo: "licencia", mime: "image/gif", contenido_base64: png("gif").toString("base64") },
+  });
+  assert.equal(gif.status, 422);
+
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from("foto-de-prueba")]);
+  const mimeFalso = await pedir("POST", "/drivers/me/documentos", {
+    token: aspirante.access_token,
+    cuerpo: { tipo: "licencia", mime: "image/png", contenido_base64: jpeg.toString("base64") },
+  });
+  assert.equal(mimeFalso.status, 422);
+  assert.equal(mimeFalso.cuerpo.error, "mime_no_coincide");
+
+  const documentos = {};
+  for (const tipo of ["cedula_frente", "cedula_reverso", "licencia"]) {
+    documentos[tipo] = png(`documento-${tipo}`);
+    const subida = await pedir("POST", "/drivers/me/documentos", {
+      token: aspirante.access_token,
+      cuerpo: { tipo, mime: "image/png", contenido_base64: documentos[tipo].toString("base64") },
+    });
+    assert.equal(subida.status, 201, JSON.stringify(subida.cuerpo));
+    assert.equal(subida.cuerpo.documento.tipo, tipo);
+    assert.equal(subida.cuerpo.documento.ocr_estado, "no_configurado");
   }
 
-  const bloqueado = await post("/auth/verify", { body: { telefono, token: "123456" } });
-  const body = await bloqueado.json();
+  const incompleto = await pedir("POST", "/drivers/me/enviar", {
+    token: aspirante.access_token,
+  });
+  assert.equal(incompleto.status, 400);
+  assert.match(incompleto.cuerpo.mensaje, /DOCUMENTOS_INCOMPLETOS/);
 
-  assert.equal(bloqueado.status, 429);
-  assert.equal(body.error, "demasiados_intentos");
+  documentos.certificado_medico = png("documento-certificado_medico");
+  const cuarto = await pedir("POST", "/drivers/me/documentos", {
+    token: aspirante.access_token,
+    cuerpo: {
+      tipo: "certificado_medico",
+      mime: "image/png",
+      contenido_base64: documentos.certificado_medico.toString("base64"),
+    },
+  });
+  assert.equal(cuarto.status, 201);
+
+  const envio = await pedir("POST", "/drivers/me/enviar", { token: aspirante.access_token });
+  assert.equal(envio.status, 200);
+  assert.equal(envio.cuerpo.ok, true);
+  assert.equal(envio.cuerpo.verificacion, "pendiente");
+  assert.equal(envio.cuerpo.documentos, 4);
+  assert.equal(envio.cuerpo.riesgo_puntaje, 0);
+  assert.equal(envio.cuerpo.riesgo_nivel, "bajo");
+  assert.ok(envio.cuerpo.motivos.some((motivo) => motivo.codigo === "ocr_no_disponible"));
+  assert.ok(envio.cuerpo.enviado_en);
+
+  const detallePiloto = await pedir("GET", "/drivers/me", { token: aspirante.access_token });
+  assert.equal(detallePiloto.status, 200);
+  assert.equal(detallePiloto.cuerpo.documentos.length, 4);
+  assert.equal(detallePiloto.cuerpo.conductor.intentos_verificacion, 1);
+
+  const cola = await pedir("GET", "/admin/conductores?verificacion=pendiente", {
+    token: admin.access_token,
+  });
+  assert.equal(cola.status, 200);
+  const enCola = cola.cuerpo.conductores.find(
+    (conductor) => conductor.usuario_id === aspiranteId,
+  );
+  assert.ok(enCola);
+  assert.equal(enCola.riesgo_puntaje, 0);
+  assert.equal(enCola.usuario.telefono, ASPIRANTE.telefono);
+  assert.equal(enCola.documentos.length, 4);
+
+  const revision = await pedir(`GET`, `/admin/conductores/${aspiranteId}`, {
+    token: admin.access_token,
+  });
+  assert.equal(revision.status, 200);
+  assert.equal(revision.cuerpo.documentos.length, 4);
+  assert.ok(revision.cuerpo.eventos.length >= 1);
+
+  const frente = revision.cuerpo.documentos.find((item) => item.tipo === "cedula_frente");
+  assert.ok(frente.url.startsWith(`${URL_API}/files/`));
+
+  const descarga = await fetch(frente.url);
+  assert.equal(descarga.status, 200);
+  assert.equal(descarga.headers.get("content-type"), "image/png");
+  assert.equal(descarga.headers.get("x-content-type-options"), "nosniff");
+  const bytes = Buffer.from(await descarga.arrayBuffer());
+  assert.ok(bytes.equals(documentos.cedula_frente));
+
+  const token = new URL(frente.url).pathname.split("/").pop();
+  const datos = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
+  datos.p = `${aspiranteId}/otro-archivo.png`;
+  const manipulado = Buffer.from(JSON.stringify(datos)).toString("base64url");
+  const alterado = await pedir("GET", `/files/${manipulado}`);
+  assert.equal(alterado.status, 403);
+  assert.equal(alterado.cuerpo.error, "enlace_invalido");
+
+  const ajeno = await pedir("GET", `/admin/conductores/${aspiranteId}`, {
+    token: cliente.access_token,
+  });
+  assert.equal(ajeno.status, 403);
+
+  const aprobacion = await pedir(
+    "POST",
+    `/admin/conductores/${aspiranteId}/verificar`,
+    { token: admin.access_token, cuerpo: { aprobado: true } },
+  );
+  assert.equal(aprobacion.status, 200);
+  assert.equal(aprobacion.cuerpo.verificacion, "aprobado");
+  assert.equal(aprobacion.cuerpo.estado, "activo");
+  assert.equal(aprobacion.cuerpo.bienvenida_usd, 2);
+  assert.equal(aprobacion.cuerpo.saldo_billetera, 2);
+
+  const perfil = await pedir("GET", "/auth/me", { token: aspirante.access_token });
+  assert.equal(perfil.status, 200);
+  assert.equal(perfil.cuerpo.conductor.verificacion, "aprobado");
+  assert.equal(perfil.cuerpo.conductor.estado, "activo");
+  assert.deepEqual(perfil.cuerpo.capacidades, {
+    puede_pedir_viajes: false,
+    puede_conducir: true,
+  });
+
+  const despues = await pedir("POST", "/drivers/me/documentos", {
+    token: aspirante.access_token,
+    cuerpo: {
+      tipo: "licencia",
+      mime: "image/png",
+      contenido_base64: png("licencia-nueva").toString("base64"),
+    },
+  });
+  assert.equal(despues.status, 400);
+  assert.match(despues.cuerpo.mensaje, /CONDUCTOR_YA_APROBADO/);
 });
 
-test("el API mantiene el health check", async () => {
-  const response = await fetch(`${baseUrl}/health`);
-  const body = await response.json();
+test("un viaje con saldo se acepta, inicia y cobra con la comisión del 10%", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+  const piloto = await sesion("piloto", PILOTO);
 
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(authCalls > 0, true);
+  const creacion = await pedir("POST", "/trips", {
+    token: cliente.access_token,
+    cuerpo: {
+      origen: "Altamira",
+      destino: "Chacao",
+      precio_usd: 5,
+      distancia_km: 2.5,
+      metodo_pago: "saldo",
+    },
+  });
+  assert.equal(creacion.status, 201);
+  assert.equal(creacion.cuerpo.viaje.estado, "solicitado");
+  assert.equal(creacion.cuerpo.viaje.precio_usd, 5);
+
+  const viajeId = creacion.cuerpo.viaje.id;
+  const antes = await pedir("POST", `/trips/${viajeId}/pagar-saldo`, {
+    token: cliente.access_token,
+  });
+  assert.equal(antes.status, 400);
+  assert.match(antes.cuerpo.mensaje, /VIAJE_SIN_CONDUCTOR/);
+
+  const aceptado = await pedir("POST", `/trips/${viajeId}/aceptar`, {
+    token: piloto.access_token,
+  });
+  assert.equal(aceptado.status, 200);
+  assert.equal(aceptado.cuerpo.ok, true);
+  assert.equal(aceptado.cuerpo.estado, "aceptado");
+  assert.equal(aceptado.cuerpo.comision_usd, 0.5);
+  assert.equal(aceptado.cuerpo.disponible_usd, 9.5);
+
+  const iniciado = await pedir("POST", `/trips/${viajeId}/iniciar`, {
+    token: piloto.access_token,
+  });
+  assert.equal(iniciado.status, 200);
+  assert.equal(iniciado.cuerpo.estado, "en_curso");
+
+  const pagado = await pedir("POST", `/trips/${viajeId}/pagar-saldo`, {
+    token: cliente.access_token,
+  });
+  assert.equal(pagado.status, 200);
+  assert.equal(pagado.cuerpo.ok, true);
+  assert.equal(pagado.cuerpo.comision_usd, 0.5);
+  assert.equal(pagado.cuerpo.saldo_cliente, 35);
+  assert.equal(pagado.cuerpo.saldo_conductor, 14.5);
+  assert.equal(pagado.cuerpo.estado_viaje, "finalizado");
+
+  const idempotente = await pedir("POST", `/trips/${viajeId}/pagar-saldo`, {
+    token: cliente.access_token,
+  });
+  assert.equal(idempotente.status, 200);
+  assert.equal(idempotente.cuerpo.ya_procesado, true);
+  assert.equal(idempotente.cuerpo.saldo_cliente, 35);
+
+  const detalle = await pedir("GET", `/trips/${viajeId}`, { token: cliente.access_token });
+  assert.equal(detalle.status, 200);
+  assert.equal(detalle.cuerpo.viaje.estado, "finalizado");
+  assert.equal(detalle.cuerpo.viaje.comision_usd, 0.5);
+
+  const segundo = await pedir("POST", "/trips", {
+    token: cliente.access_token,
+    cuerpo: {
+      origen: "Chacao",
+      destino: "Sabana Grande",
+      precio_usd: 5,
+      metodo_pago: "saldo",
+    },
+  });
+  const segundoId = segundo.cuerpo.viaje.id;
+  const aceptado2 = await pedir("POST", `/trips/${segundoId}/aceptar`, {
+    token: piloto.access_token,
+  });
+  assert.equal(aceptado2.cuerpo.ok, true);
+
+  const cancelado = await pedir("POST", `/trips/${segundoId}/cancelar`, {
+    token: cliente.access_token,
+    cuerpo: { motivo: "Cambio de planes" },
+  });
+  assert.equal(cancelado.status, 200);
+  assert.equal(cancelado.cuerpo.estado, "cancelado");
+  assert.equal(cancelado.cuerpo.reserva_liberada, true);
+
+  const uuidInvalido = await pedir("POST", "/trips/no-es-uuid/aceptar", {
+    token: piloto.access_token,
+  });
+  assert.equal(uuidInvalido.status, 422);
 });

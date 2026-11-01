@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-
-// ocr.js importa config.js, que exige estas variables al cargar.
-process.env.SUPABASE_URL = "http://127.0.0.1:1";
-process.env.SUPABASE_ANON_KEY = "clave-anon-de-prueba";
+import "./setup.mjs";
 
 const { extraerTexto, ocrDisponible } = await import("../src/verification/ocr.js");
 
