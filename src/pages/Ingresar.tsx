@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { Badge, Button, DemoNote, Money } from "../components/ui";
 import { Reveal } from "../components/Motion";
+import { RealAuth } from "../components/RealAuth";
+import { realAuthEnabled } from "../lib/api";
 import { isContact } from "../lib/validation";
 import { useUI } from "../lib/ui";
 
@@ -264,18 +266,31 @@ export function IngresarPage() {
           </aside>
         </Reveal>
 
-        <Reveal delay={0.08} className="mx-auto flex w-full max-w-[500px] flex-col justify-center lg:mx-0 lg:max-w-none">
+        <Reveal
+          delay={0.08}
+          className="mx-auto flex w-full min-w-0 max-w-[500px] flex-col justify-center lg:mx-0 lg:max-w-none"
+        >
           <div className="card relative overflow-hidden p-5 sm:p-7 lg:p-8">
             <div className="flex items-center justify-between gap-3">
               <Badge tone="brand" className="uppercase tracking-[0.14em]">
-                <Sparkles className="h-3 w-3" /> Acceso anticipado
+                {realAuthEnabled ? (
+                  <>
+                    <ShieldCheck className="h-3 w-3" /> Acceso real
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3 w-3" /> Acceso anticipado
+                  </>
+                )}
               </Badge>
               <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">
-                Demo
+                {realAuthEnabled ? "Producción" : "Demo"}
               </span>
             </div>
 
-            {done ? (
+            {realAuthEnabled ? (
+              <RealAuth mode="login" />
+            ) : done ? (
               <div className="animate-pop py-4 text-center">
                 <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/15 text-brand-400">
                   <CheckCircle2 className="h-7 w-7" />
@@ -424,7 +439,9 @@ export function IngresarPage() {
           </div>
 
           <p className="mt-4 text-center text-[11px] text-ink-500">
-            Llégate App · Prototipo de rediseño con datos de ejemplo
+            {realAuthEnabled
+              ? "Llégate App · Cuenta real compartida con la app"
+              : "Llégate App · Prototipo de rediseño con datos de ejemplo"}
           </p>
         </Reveal>
       </div>

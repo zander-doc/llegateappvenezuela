@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, ServiceIcon } from "./ui";
 import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
+import { realAuthEnabled } from "../lib/api";
 import { useUI } from "../lib/ui";
 import { DEMO_BCV_RATE, formatRate } from "../lib/format";
 
@@ -69,7 +70,7 @@ export function Header() {
               Prototipo de rediseño
             </span>
             <span className="text-ink-700" aria-hidden="true">·</span>
-            <span>Datos de ejemplo</span>
+            <span>{realAuthEnabled ? "Cuenta real activa" : "Datos de ejemplo"}</span>
           </div>
           <div className="flex items-center gap-1">
             <Link
@@ -423,7 +424,9 @@ export function Header() {
                   </button>
                 </div>
                 <p className="mt-4 text-[11px] leading-relaxed text-ink-500">
-                  Prototipo de rediseño con datos de ejemplo. No es el sitio oficial ni procesa solicitudes reales.
+                  {realAuthEnabled
+                    ? "Prototipo de rediseño. Las cuentas de pasajero son reales; el resto del contenido es de ejemplo."
+                    : "Prototipo de rediseño con datos de ejemplo. No es el sitio oficial ni procesa solicitudes reales."}
                 </p>
               </div>
 

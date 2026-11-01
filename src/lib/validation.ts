@@ -13,6 +13,14 @@ export function isVenezuelanPhone(value: string) {
   return /^(0\d{10}|58\d{10}|\d{10})$/.test(normalizeDigits(value));
 }
 
+export function toVenezuelanE164(value: string): string | null {
+  const digits = normalizeDigits(value);
+  if (digits.length === 12 && digits.startsWith("58")) return `+${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) return `+58${digits.slice(1)}`;
+  if (digits.length === 10) return `+58${digits}`;
+  return null;
+}
+
 export function isContact(value: string) {
   const clean = value.trim();
   if (!clean) return false;

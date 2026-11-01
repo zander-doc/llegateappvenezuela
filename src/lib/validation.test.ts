@@ -6,6 +6,7 @@ import {
   isPersonName,
   isVenezuelanPhone,
   normalizeDigits,
+  toVenezuelanE164,
 } from "./validation";
 
 describe("validation", () => {
@@ -28,8 +29,16 @@ describe("validation", () => {
     expect(isVenezuelanPhone("llámame")).toBe(false);
   });
 
-  it("acepta correo o teléfono como contacto", () => {
-    expect(isContact("maria@ejemplo.com")).toBe(true);
+  it("normaliza teléfonos venezolanos al formato E.164", () => {
+    expect(toVenezuelanE164("0414 1234567")).toBe("+584141234567");
+    expect(toVenezuelanE164("+58 414 1234567")).toBe("+584141234567");
+    expect(toVenezuelanE164("4141234567")).toBe("+584141234567");
+    expect(toVenezuelanE164("584141234567")).toBe("+584141234567");
+    expect(toVenezuelanE164("0414-123")).toBeNull();
+    expect(toVenezuelanE164("")).toBeNull();
+  });
+
+  it("acepta correo o teléfono como contacto", () => {    expect(isContact("maria@ejemplo.com")).toBe(true);
     expect(isContact("0414 1234567")).toBe(true);
     expect(isContact("12345")).toBe(false);
     expect(isContact("   ")).toBe(false);

@@ -81,6 +81,19 @@ export const binanceSchema = z.object({
   comprobante_url: documento.optional(),
 });
 
+export const paymentIntentSchema = z.object({
+  metodo: z.enum(["pago_movil", "binance_pay"]),
+  monto_usd: montoUsd,
+});
+
+export const paymentReportSchema = z.object({
+  referencia: z
+    .string()
+    .trim()
+    .regex(/^\d{6,12}$/, "La referencia del Pago Móvil debe tener de 6 a 12 dígitos"),
+  comprobante_url: documento.optional(),
+});
+
 export const createTripSchema = z.object({
   origen: z.string().trim().min(3).max(200),
   destino: z.string().trim().min(3).max(200),

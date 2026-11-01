@@ -5,13 +5,19 @@ import { errorHandler } from "./http.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { driversRouter } from "./routes/drivers.js";
+import { paymentsRouter } from "./routes/payments.js";
 import { tripsRouter } from "./routes/trips.js";
 import { walletRouter } from "./routes/wallet.js";
+import { webhooksRouter } from "./routes/webhooks.js";
 
 export const app = express();
 
 app.disable("x-powered-by");
 app.use(cors({ origin: config.corsOrigins }));
+
+// Los webhooks verifican la firma sobre el cuerpo crudo, antes del parser JSON.
+app.use("/webhooks", webhooksRouter);
+
 app.use(express.json({ limit: "256kb" }));
 
 app.get("/health", (_req, res) => {
@@ -21,6 +27,7 @@ app.get("/health", (_req, res) => {
 app.use("/auth", authRouter);
 app.use("/drivers", driversRouter);
 app.use("/wallet", walletRouter);
+app.use("/payments", paymentsRouter);
 app.use("/trips", tripsRouter);
 app.use("/admin", adminRouter);
 

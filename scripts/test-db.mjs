@@ -106,7 +106,12 @@ for (const migration of migrations) {
 }
 
 console.log("Ejecutando pruebas SQL…\n");
-for (const testFile of ["10_billetera.sql", "20_prepago.sql", "30_identidad.sql"]) {
+for (const testFile of [
+  "10_billetera.sql",
+  "20_prepago.sql",
+  "30_identidad.sql",
+  "40_pagos.sql",
+]) {
   const output = psql(readFileSync(join(root, "supabase", "tests", testFile), "utf8"), {
     quiet: false,
   });

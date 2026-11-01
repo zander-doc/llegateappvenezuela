@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { Badge, Button, DemoNote } from "../components/ui";
 import { Reveal } from "../components/Motion";
+import { RealAuth } from "../components/RealAuth";
+import { realAuthEnabled } from "../lib/api";
 import { saveDemoLead } from "../lib/demoStorage";
 import { isCedula, isEmail, isPersonName, isVenezuelanPhone } from "../lib/validation";
 import { HUBS } from "../data/site";
@@ -375,8 +377,20 @@ export function CuentaRegistroPage() {
 
               <ol className="mt-9 grid gap-4">
                 {[
-                  { n: "01", title: "Completa tus datos", text: "Nombre, contacto y ciudad en un solo paso." },
-                  { n: "02", title: "Protege tu cuenta", text: "Creas tu contraseña y aceptas las condiciones." },
+                  {
+                    n: "01",
+                    title: "Completa tus datos",
+                    text: realAuthEnabled
+                      ? "Nombre y teléfono en un solo paso."
+                      : "Nombre, contacto y ciudad en un solo paso.",
+                  },
+                  {
+                    n: "02",
+                    title: realAuthEnabled ? "Verifica tu teléfono" : "Protege tu cuenta",
+                    text: realAuthEnabled
+                      ? "Recibes un código SMS y confirmas tu número."
+                      : "Creas tu contraseña y aceptas las condiciones.",
+                  },
                   { n: "03", title: "Empieza a moverte", text: "Elige tu servicio y pide tu primer viaje." },
                 ].map((step) => (
                   <li key={step.n} className="flex items-start gap-3">
@@ -412,9 +426,21 @@ export function CuentaRegistroPage() {
             </aside>
           </Reveal>
 
-          <Reveal delay={0.08}>
+          <Reveal delay={0.08} className="min-w-0">
             <div ref={cardRef} className="card scroll-mt-28 overflow-hidden p-5 sm:p-7 lg:p-8">
-              {done ? (
+              {realAuthEnabled ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Badge tone="brand" className="uppercase tracking-[0.14em]">
+                      <Sparkles className="h-3 w-3" /> Cuenta real
+                    </Badge>
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">
+                      Producción
+                    </span>
+                  </div>
+                  <RealAuth mode="register" />
+                </>
+              ) : done ? (
                 <div className="animate-pop py-4 text-center">
                   <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/15 text-brand-400">
                     <CheckCircle2 className="h-8 w-8" />
@@ -752,7 +778,10 @@ export function CuentaRegistroPage() {
             </div>
 
             <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-ink-500">
-              <ShieldCheck className="h-3.5 w-3.5" /> Llégate App · Prototipo de rediseño con datos de ejemplo
+              <ShieldCheck className="h-3.5 w-3.5" />
+              {realAuthEnabled
+                ? "Cuenta real · los mismos datos funcionan en la web y en la app"
+                : "Llégate App · Prototipo de rediseño con datos de ejemplo"}
             </p>
           </Reveal>
         </div>

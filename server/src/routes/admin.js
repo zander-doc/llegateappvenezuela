@@ -54,6 +54,51 @@ adminRouter.post(
 );
 
 adminRouter.get(
+  "/pagos",
+  asyncHandler(async (req, res) => {
+    const estado = req.query.estado ?? "en_revision";
+    const pagos = unwrap(
+      await req.supabase
+        .from("pagos")
+        .select(
+          "id, usuario_id, metodo, proveedor, estado, monto_usd, monto_bs, tasa_bs, codigo, referencia_reportada, comprobante_url, checkout_url, expira_en, confirmado_en, motivo_rechazo, created_at"
+        )
+        .eq("estado", estado)
+        .order("created_at", { ascending: true })
+        .limit(100)
+    );
+
+    res.json({ ok: true, pagos });
+  })
+);
+
+adminRouter.post(
+  "/pagos/:id/confirmar",
+  asyncHandler(async (req, res) => {
+    const id = parse(uuidSchema, req.params.id, "id");
+    const resultado = unwrap(await req.supabase.rpc("confirmar_pago_admin", { p_pago_id: id }));
+
+    res.status(resultado.ok ? 200 : 409).json(resultado);
+  })
+);
+
+adminRouter.post(
+  "/pagos/:id/rechazar",
+  asyncHandler(async (req, res) => {
+    const id = parse(uuidSchema, req.params.id, "id");
+    const body = parse(rejectSchema, req.body);
+    const resultado = unwrap(
+      await req.supabase.rpc("rechazar_pago", {
+        p_pago_id: id,
+        p_motivo: body.motivo,
+      })
+    );
+
+    res.status(resultado.ok ? 200 : 409).json(resultado);
+  })
+);
+
+adminRouter.get(
   "/conductores",
   asyncHandler(async (req, res) => {
     const verificacion = req.query.verificacion ?? "pendiente";
