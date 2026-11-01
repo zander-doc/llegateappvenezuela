@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { config } from "./config.js";
+import { pool } from "./db.js";
 import { errorHandler } from "./http.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
@@ -28,6 +29,39 @@ app.use(express.json({ limit: "256kb" }));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, servicio: "llegate-api" });
+});
+
+// Diagnóstico de la base: devuelve el error real del driver (sin credenciales)
+// para poder corregir DATABASE_URL en producción sin abrir los logs.
+function destinoBase() {
+  try {
+    const url = new URL(config.databaseUrl);
+    return `${url.hostname}${url.port ? `:${url.port}` : ""}${url.pathname}`;
+  } catch {
+    return "DATABASE_URL no es una URL válida";
+  }
+}
+
+app.get("/health/db", async (_req, res) => {
+  const inicio = Date.now();
+  try {
+    await pool.query({ text: "select 1", query_timeout: 5_000 });
+    res.json({ ok: true, base: destinoBase(), latencia_ms: Date.now() - inicio });
+  } catch (error) {
+    // node-postgres agrupa los fallos de conexión en un AggregateError cuyo
+    // mensaje viene vacío; el detalle útil está en `errors`.
+    const detalles = [error.message, ...(error.errors ?? []).map((item) => item.message)];
+    res.status(503).json({
+      ok: false,
+      base: destinoBase(),
+      latencia_ms: Date.now() - inicio,
+      codigo: error.code ?? error.errors?.[0]?.code ?? null,
+      mensaje: detalles
+        .filter(Boolean)
+        .join(" | ")
+        .replace(/postgres(?:ql)?:\/\/\S+/gi, "[url oculta]"),
+    });
+  }
 });
 
 app.use("/auth", authRouter);

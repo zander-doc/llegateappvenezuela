@@ -172,6 +172,14 @@ test("GET /health responde sin tocar la base de datos", async () => {
   assert.deepEqual(respuesta.cuerpo, { ok: true, servicio: "llegate-api" });
 });
 
+test("GET /health/db confirma la conexión con la base", async () => {
+  const respuesta = await pedir("GET", "/health/db");
+  assert.equal(respuesta.status, 200);
+  assert.equal(respuesta.cuerpo.ok, true);
+  assert.equal(respuesta.cuerpo.base, `localhost:${PUERTO_PG}/${BASE}`);
+  assert.equal(typeof respuesta.cuerpo.latencia_ms, "number");
+});
+
 test("el registro por SMS crea la cuenta y entrega tokens propios", async () => {
   const codigo = await pedirCodigo(ASPIRANTE.telefono, { rol: "conductor", nombre: "Nuevo Piloto" });
   assert.match(codigo, /^\d{6}$/);
