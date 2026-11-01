@@ -46,6 +46,8 @@ function destinoBase() {
 function pistaFormato(valor) {
   return {
     empieza_con_postgresql: /^postgres(ql)?:\/\//.test(valor),
+    contiene_esquema_postgresql: /postgres(ql)?:\/\//.test(valor),
+    empieza_con_database_url: /^database_url\s*=/i.test(valor),
     tiene_arroba: valor.includes("@"),
     tiene_espacios: /\s/.test(valor),
     entre_comillas: /^["'“‘]/.test(valor) || /["'”’]$/.test(valor),
