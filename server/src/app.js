@@ -34,35 +34,15 @@ app.get("/health", (_req, res) => {
 // Diagnóstico de la base: devuelve el error real del driver (sin credenciales)
 // para poder corregir DATABASE_URL en producción sin abrir los logs.
 function destinoBase() {
-  try {
-    const url = new URL(config.databaseUrl);
-    return `${url.hostname}${url.port ? `:${url.port}` : ""}${url.pathname}`;
-  } catch {
-    return "DATABASE_URL no es una URL válida";
-  }
-}
-
-// Solo se responden señales de forma; nunca el valor ni la contraseña.
-function pistaFormato(valor) {
-  return {
-    empieza_con_postgresql: /^postgres(ql)?:\/\//.test(valor),
-    contiene_esquema_postgresql: /postgres(ql)?:\/\//.test(valor),
-    empieza_con_database_url: /^database_url\s*=/i.test(valor),
-    tiene_arroba: valor.includes("@"),
-    tiene_espacios: /\s/.test(valor),
-    entre_comillas: /^["'“‘]/.test(valor) || /["'”’]$/.test(valor),
-    solo_ascii: /^[\x20-\x7e]+$/.test(valor),
-  };
+  const url = new URL(config.databaseUrl);
+  return `${url.hostname}${url.port ? `:${url.port}` : ""}${url.pathname}`;
 }
 
 app.get("/health/db", async (_req, res) => {
   const inicio = Date.now();
-  // La longitud del valor (no su contenido) distingue una cadena truncada de
-  // una completa, que suele rondar los 150–200 caracteres.
-  const caracteres = config.databaseUrl.length;
   try {
     await pool.query({ text: "select 1", query_timeout: 5_000 });
-    res.json({ ok: true, base: destinoBase(), caracteres, latencia_ms: Date.now() - inicio });
+    res.json({ ok: true, base: destinoBase(), latencia_ms: Date.now() - inicio });
   } catch (error) {
     // node-postgres agrupa los fallos de conexión en un AggregateError cuyo
     // mensaje viene vacío; el detalle útil está en `errors`.
@@ -70,9 +50,7 @@ app.get("/health/db", async (_req, res) => {
     res.status(503).json({
       ok: false,
       base: destinoBase(),
-      caracteres,
       latencia_ms: Date.now() - inicio,
-      formato: pistaFormato(config.databaseUrl),
       codigo: error.code ?? error.errors?.[0]?.code ?? null,
       mensaje: detalles
         .filter(Boolean)

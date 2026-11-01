@@ -127,7 +127,7 @@ vuelve a ejecutar `npm run build`.
 | Método | Ruta | Quién | Descripción |
 | --- | --- | --- | --- |
 | GET | `/health` | público | Vida del proceso, sin tocar la base |
-| GET | `/health/db` | público | Prueba la conexión a la base; si falla devuelve `codigo`, `mensaje` (sin credenciales) y cuántos caracteres tiene `DATABASE_URL` |
+| GET | `/health/db` | público | Prueba la conexión a la base y, si falla, devuelve `codigo` y `mensaje` sin credenciales |
 | POST | `/auth/otp` | público | Envía el código OTP (`telefono`, `rol`, `nombre` opcional) |
 | POST | `/auth/verify` | público | Verifica el código y entrega la sesión |
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
@@ -801,6 +801,12 @@ reescritura a `index.html` para las rutas de React).
 `VITE_API_URL` se toma del servicio de la API, así que la web queda conectada
 sin editar nada. Los secretos de sesión y OTP los genera Render
 (`generateValue`). `DATABASE_URL` no se guarda en el repositorio.
+
+La API comprueba `DATABASE_URL` al arrancar: si no empieza por `postgresql://`,
+viene entre comillas o no incluye el servidor, el proceso se detiene con un
+mensaje que dice cuántos caracteres tiene y en qué punto está el problema, sin
+imprimir el valor ni la contraseña. Para revisar la conexión con el servicio ya
+arriba está `GET /health/db`.
 
 Ajustes pendientes antes de abrirlo al público:
 

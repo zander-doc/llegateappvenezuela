@@ -31,8 +31,39 @@ function originList(value) {
     .filter(Boolean);
 }
 
+// Un valor pegado con su etiqueta, entre comillas o incompleto deja arrancar el
+// servicio y falla en cada consulta; conviene detenerse aquí con un mensaje
+// claro, sin imprimir nunca el contenido ni la contraseña.
+export function validarDatabaseUrl(valor) {
+  const largo = valor.length;
+
+  if (!/^postgres(ql)?:\/\//i.test(valor)) {
+    const pista = valor.includes("://")
+      ? "El texto tiene un esquema de conexión, pero no al inicio: se pegó algo delante."
+      : "No se encontró el esquema postgresql://.";
+    throw new Error(
+      `DATABASE_URL debe empezar por postgresql:// (el valor guardado tiene ${largo} caracteres). ${pista}`,
+    );
+  }
+
+  let url;
+  try {
+    url = new URL(valor);
+  } catch {
+    throw new Error(
+      `DATABASE_URL no es una URL válida (${largo} caracteres). Copia la cadena completa desde Neon.`,
+    );
+  }
+
+  if (!url.hostname) {
+    throw new Error("DATABASE_URL no incluye el servidor de la base (falta el host).");
+  }
+
+  return valor;
+}
+
 const port = Number(process.env.PORT ?? 3000);
-const databaseUrl = required("DATABASE_URL");
+const databaseUrl = validarDatabaseUrl(required("DATABASE_URL"));
 const jwtSecret = required("AUTH_JWT_SECRET");
 
 export const config = {
