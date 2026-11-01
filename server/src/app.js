@@ -44,9 +44,12 @@ function destinoBase() {
 
 app.get("/health/db", async (_req, res) => {
   const inicio = Date.now();
+  // La longitud del valor (no su contenido) distingue una cadena truncada de
+  // una completa, que suele rondar los 150–200 caracteres.
+  const caracteres = config.databaseUrl.length;
   try {
     await pool.query({ text: "select 1", query_timeout: 5_000 });
-    res.json({ ok: true, base: destinoBase(), latencia_ms: Date.now() - inicio });
+    res.json({ ok: true, base: destinoBase(), caracteres, latencia_ms: Date.now() - inicio });
   } catch (error) {
     // node-postgres agrupa los fallos de conexión en un AggregateError cuyo
     // mensaje viene vacío; el detalle útil está en `errors`.
@@ -54,6 +57,7 @@ app.get("/health/db", async (_req, res) => {
     res.status(503).json({
       ok: false,
       base: destinoBase(),
+      caracteres,
       latencia_ms: Date.now() - inicio,
       codigo: error.code ?? error.errors?.[0]?.code ?? null,
       mensaje: detalles

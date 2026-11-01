@@ -177,6 +177,7 @@ test("GET /health/db confirma la conexión con la base", async () => {
   assert.equal(respuesta.status, 200);
   assert.equal(respuesta.cuerpo.ok, true);
   assert.equal(respuesta.cuerpo.base, `localhost:${PUERTO_PG}/${BASE}`);
+  assert.equal(typeof respuesta.cuerpo.caracteres, "number");
   assert.equal(typeof respuesta.cuerpo.latencia_ms, "number");
 });
 

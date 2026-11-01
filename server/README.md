@@ -127,7 +127,7 @@ vuelve a ejecutar `npm run build`.
 | Método | Ruta | Quién | Descripción |
 | --- | --- | --- | --- |
 | GET | `/health` | público | Vida del proceso, sin tocar la base |
-| GET | `/health/db` | público | Prueba la conexión a la base; si falla devuelve `codigo` y `mensaje` sin credenciales |
+| GET | `/health/db` | público | Prueba la conexión a la base; si falla devuelve `codigo`, `mensaje` (sin credenciales) y cuántos caracteres tiene `DATABASE_URL` |
 | POST | `/auth/otp` | público | Envía el código OTP (`telefono`, `rol`, `nombre` opcional) |
 | POST | `/auth/verify` | público | Verifica el código y entrega la sesión |
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
