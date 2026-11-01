@@ -14,6 +14,9 @@ import { webhooksRouter } from "./routes/webhooks.js";
 export const app = express();
 
 app.disable("x-powered-by");
+// Render y otros proxys añaden X-Forwarded-For; sin esto los límites por IP
+// contarían a todos los clientes como uno solo.
+app.set("trust proxy", 1);
 app.use(cors({ origin: config.corsOrigins }));
 
 // Los webhooks verifican la firma sobre el cuerpo crudo, antes del parser JSON.

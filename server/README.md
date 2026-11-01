@@ -781,3 +781,38 @@ Formato uniforme:
   solicitar un viaje con un precio arbitrario.
 - La web real solo guarda tokens de sesión en `localStorage`; nunca contraseña ni
   cédula. En modo demo no se almacena ni transmite ningún dato personal.
+
+## Despliegue en Render
+
+`render.yaml` (en la raíz del repositorio) describe los dos servicios:
+`llegate-app-api` (Node, plan free) y `llegate-app-web` (sitio estático con
+reescritura a `index.html` para las rutas de React).
+
+1. En <https://dashboard.render.com> entra con GitHub y elige **New → Blueprint**.
+2. Conecta el repositorio `zander-doc/llegateappvenezuela`.
+3. Render pide el valor de `DATABASE_URL`: pega la cadena **directa** de Neon
+   (sin `-pooler`, con `sslmode=require`), la misma que está en `server/.env`.
+4. Aplica el blueprint y espera el primer despliegue. La web queda en
+   `https://llegate-app-web.onrender.com` y la API en
+   `https://llegate-app-api.onrender.com`.
+
+`VITE_API_URL` se toma del servicio de la API, así que la web queda conectada
+sin editar nada. Los secretos de sesión y OTP los genera Render
+(`generateValue`). `DATABASE_URL` no se guarda en el repositorio.
+
+Ajustes pendientes antes de abrirlo al público:
+
+- **Código OTP:** con `OTP_LOG_EN_DESARROLLO=1` el código aparece en los logs
+  del servicio (`[otp] +58...: 123456`). Configura `WHATSAPP_TOKEN` +
+  `WHATSAPP_PHONE_ID` o `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` +
+  `TWILIO_FROM` y borra esa variable para enviar códigos de verdad.
+- **Documentos:** `STORAGE_DRIVER=local` no sobrevive a un reinicio en Render.
+  Configura `R2_*` y cambia a `r2` para que las fotos de los pilotos no se
+  pierdan.
+- **Pago Móvil:** reemplaza los valores de prueba `PAGO_MOVIL_*` por los datos
+  reales del negocio.
+- **Migraciones:** el despliegue no las ejecuta. Cuando cambie `db/migrations`,
+  corre `npm run db:migrate` desde `server/` con la `DATABASE_URL` de Neon.
+- **Subdominios:** si Render asigna otro nombre porque `llegate-app-api` o
+  `llegate-app-web` ya están tomados, actualiza `CORS_ORIGIN` y
+  `PUBLIC_API_URL` con las URLs reales y vuelve a desplegar.
