@@ -21,6 +21,7 @@ transacción y traduce errores.
 cd server
 npm install
 cp .env.example .env   # completa DATABASE_URL y AUTH_JWT_SECRET
+npm run db:migrate     # aplica ../db/migrations (se puede repetir)
 npm run dev
 ```
 

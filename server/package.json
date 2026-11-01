@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
+    "db:migrate": "node scripts/migrate.mjs",
     "test": "node --import ./tests/setup.mjs --test",
-    "check": "node --check src/index.js && node --check src/app.js && node --check src/config.js && node --check src/db.js && node --check src/storage.js && node --check src/schemas.js && node --check src/http.js && node --check src/middleware.js && node --check src/routes/auth.js && node --check src/routes/drivers.js && node --check src/routes/files.js && node --check src/routes/wallet.js && node --check src/routes/payments.js && node --check src/routes/webhooks.js && node --check src/routes/admin.js && node --check src/routes/trips.js && node --check src/auth/tokens.js && node --check src/auth/cuentas.js && node --check src/payments/pagoMovil.js && node --check src/payments/binance.js && node --check src/security/rateLimit.js && node --check src/security/whatsapp.js && node --check src/security/otp-delivery.js && node --check src/verification/documents.js && node --check src/verification/ocr.js"
+    "check": "node --check src/index.js && node --check src/app.js && node --check src/config.js && node --check src/db.js && node --check src/storage.js && node --check src/schemas.js && node --check src/http.js && node --check src/middleware.js && node --check src/routes/auth.js && node --check src/routes/drivers.js && node --check src/routes/files.js && node --check src/routes/wallet.js && node --check src/routes/payments.js && node --check src/routes/webhooks.js && node --check src/routes/admin.js && node --check src/routes/trips.js && node --check src/auth/tokens.js && node --check src/auth/cuentas.js && node --check src/payments/pagoMovil.js && node --check src/payments/binance.js && node --check src/security/rateLimit.js && node --check src/security/whatsapp.js && node --check src/security/otp-delivery.js && node --check src/verification/documents.js && node --check src/verification/ocr.js && node --check scripts/migrate.mjs"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",

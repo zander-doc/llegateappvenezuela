@@ -22,7 +22,19 @@ esta aplicación.
 | `20261031120000_llegate_pagos.sql` | Intenciones de recarga (`pagos`), confirmación con clave de servidor y acreditación idempotente |
 | `20261031160000_llegate_verificacion_antifraude.sql` | Documentos con hash único, OCR, puntaje de riesgo explicable, eventos de seguridad y RPC de envío de verificación |
 
-Se aplican **en orden**. Con `psql` y la cadena de conexión en `DATABASE_URL`:
+Se aplican **en orden**. La forma recomendada es el aplicador del API, que no
+necesita `psql` (lee `DATABASE_URL` de `server/.env`):
+
+```bash
+cd server
+npm run db:migrate
+```
+
+Registra cada archivo en `public.migraciones_aplicadas` y salta lo ya aplicado,
+así que se puede repetir sin duplicar tablas. Usa una conexión **directa** (sin
+`-pooler`) para el DDL.
+
+Alternativas: con `psql` y la cadena en `DATABASE_URL`:
 
 ```bash
 for archivo in db/migrations/*.sql; do
@@ -30,9 +42,9 @@ for archivo in db/migrations/*.sql; do
 done
 ```
 
-También puedes pegar cada archivo en el SQL Editor de Neon, en orden por nombre.
-La primera migración crea los roles del clúster; es idempotente, así que puede
-correrse en un proyecto donde ya existan.
+O pega cada archivo en el SQL Editor de Neon, en orden por nombre. La primera
+migración crea los roles del clúster; es idempotente, así que puede correrse en
+un proyecto donde ya existan.
 
 Las migraciones que crean tipos (`...130000` y `...140000`) están separadas de
 las que los usan (`...130100` y `...140100`) a propósito: PostgreSQL no permite
