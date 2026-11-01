@@ -11,6 +11,8 @@ import { paymentsRouter } from "./routes/payments.js";
 import { tripsRouter } from "./routes/trips.js";
 import { walletRouter } from "./routes/wallet.js";
 import { webhooksRouter } from "./routes/webhooks.js";
+import { canalOtp, smsDisponible } from "./security/otp-delivery.js";
+import { whatsappDisponible } from "./security/whatsapp.js";
 
 export const app = express();
 
@@ -58,6 +60,21 @@ app.get("/health/db", async (_req, res) => {
         .replace(/postgres(?:ql)?:\/\/\S+/gi, "[url oculta]"),
     });
   }
+});
+
+// Diagnóstico del OTP: qué canal usará el próximo envío, sin exponer credenciales.
+app.get("/health/otp", (_req, res) => {
+  res.json({
+    ok: true,
+    canal: canalOtp(),
+    whatsapp: {
+      configurado: whatsappDisponible(),
+      plantilla: config.otp.whatsapp.template,
+      idioma: config.otp.whatsapp.language,
+    },
+    sms: { configurado: smsDisponible() },
+    log: { activo: config.otp.registrarEnLog },
+  });
 });
 
 app.use("/auth", authRouter);

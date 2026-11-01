@@ -128,6 +128,7 @@ vuelve a ejecutar `npm run build`.
 | --- | --- | --- | --- |
 | GET | `/health` | público | Vida del proceso, sin tocar la base |
 | GET | `/health/db` | público | Prueba la conexión a la base y, si falla, devuelve `codigo` y `mensaje` sin credenciales |
+| GET | `/health/otp` | público | Canal que usará el próximo OTP y si WhatsApp/SMS están configurados (sin credenciales) |
 | POST | `/auth/otp` | público | Envía el código OTP (`telefono`, `rol`, `nombre` opcional) |
 | POST | `/auth/verify` | público | Verifica el código y entrega la sesión |
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
@@ -372,6 +373,9 @@ TWILIO_FROM=+1...
 - Sin ninguno de los dos, `OTP_LOG_EN_DESARROLLO=1` imprime
   `[otp] +584141234567: 123456` en el log. En producción, sin canal configurado,
   la ruta responde `503 otp_no_configurado` en vez de fingir un envío.
+- `GET /health/otp` responde `canal` (`whatsapp`, `sms`, `log` o `null`), si cada
+  proveedor está configurado y la plantilla e idioma que se enviarán a Meta. Sirve
+  para confirmar en producción qué canal se usará sin leer los logs.
 
 El código vence a los 10 minutos, admite 5 intentos y se guarda como HMAC con
 `OTP_SECRET` (o `AUTH_JWT_SECRET` si no se define). Además hay una ventana

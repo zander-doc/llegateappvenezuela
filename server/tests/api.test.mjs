@@ -180,6 +180,22 @@ test("GET /health/db confirma la conexión con la base", async () => {
   assert.equal(typeof respuesta.cuerpo.latencia_ms, "number");
 });
 
+test("GET /health/otp informa el canal y la plantilla de WhatsApp", async () => {
+  const respuesta = await pedir("GET", "/health/otp");
+  assert.equal(respuesta.status, 200);
+  const cuerpo = respuesta.cuerpo;
+  assert.equal(cuerpo.ok, true);
+  assert.equal(cuerpo.whatsapp.plantilla, "llegate_otp");
+  assert.equal(cuerpo.whatsapp.idioma, "es");
+  assert.equal(typeof cuerpo.whatsapp.configurado, "boolean");
+  assert.equal(typeof cuerpo.sms.configurado, "boolean");
+  assert.equal(cuerpo.log.activo, true);
+  // Sin proveedores configurados el próximo envío cae al log.
+  if (!cuerpo.whatsapp.configurado && !cuerpo.sms.configurado) {
+    assert.equal(cuerpo.canal, "log");
+  }
+});
+
 test("el registro por SMS crea la cuenta y entrega tokens propios", async () => {
   const codigo = await pedirCodigo(ASPIRANTE.telefono, { rol: "conductor", nombre: "Nuevo Piloto" });
   assert.match(codigo, /^\d{6}$/);
