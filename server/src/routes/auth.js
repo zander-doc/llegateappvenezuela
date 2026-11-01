@@ -123,7 +123,11 @@ authRouter.post(
 
     res.status(202).json({
       ok: true,
-      mensaje: canal === "whatsapp" ? "Código enviado por WhatsApp o SMS" : "Código enviado por SMS",
+      mensaje: {
+        whatsapp: "Código enviado por WhatsApp",
+        sms: "Código enviado por SMS",
+        log: "Código generado; revisa el registro del servidor",
+      }[canal],
     });
   }),
 );
