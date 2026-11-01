@@ -712,9 +712,11 @@ programar-respaldo.cmd 03:00
 ```
 
 Crea la tarea diaria «Llegate respaldo» que ejecuta `respaldo-diario.cmd` y
-escribe `backups/respaldo.log`. La tarea corre con tu usuario cuando la sesión
-está iniciada; si el equipo estaba apagado, se ejecuta al siguiente día a la
-misma hora. Para quitarla: `schtasks /Delete /TN "Llegate respaldo" /F`.
+escribe `backups/respaldo.log`. Después ajusta la tarea con
+`ajustar-respaldo.ps1` para que corra con batería y, si el equipo estaba apagado
+a esa hora, se ejecute en cuanto vuelva a encenderse (no espera al día
+siguiente). Corre con tu usuario cuando la sesión está iniciada. Para quitarla:
+`schtasks /Delete /TN "Llegate respaldo" /F`.
 
 **Linux/VPS** (cron):
 

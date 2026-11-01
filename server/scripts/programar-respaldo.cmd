@@ -12,6 +12,9 @@ if errorlevel 1 (
   exit /b 1
 )
 
+rem Si el PC estaba apagado a esa hora, corre el respaldo al encender.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0ajustar-respaldo.ps1" >nul 2>&1
+
 echo.
 echo Tarea "Llegate respaldo" programada todos los dias a las %HORA%.
 echo Revisar:  schtasks /Query /TN "Llegate respaldo"
