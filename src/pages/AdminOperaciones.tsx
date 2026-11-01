@@ -622,9 +622,14 @@ export function AdminOperacionesPage() {
         title={<>Cola de pilotos.</>}
         description="Revisa documentos, señales de riesgo y auditoría. La aprobación desbloquea viajes; el rechazo exige un motivo que el piloto verá."
         actions={
-          <Button variant="secondary" to="/conductores/verificacion">
-            Ver como piloto <ArrowRight className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="secondary" to="/admin/cobros">
+              Cobros pendientes <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button variant="secondary" to="/conductores/verificacion">
+              Ver como piloto <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
         }
       />
 

@@ -911,6 +911,140 @@ export async function verifyDriver(
   };
 }
 
+export type EstadoRecarga = "pendiente" | "aprobada" | "rechazada" | "cancelada";
+
+export interface PagoAdmin {
+  id: string;
+  codigo: string;
+  usuarioId: string;
+  usuarioNombre: string | null;
+  usuarioTelefono: string | null;
+  metodo: MetodoPago;
+  estado: EstadoPago;
+  montoUSD: number;
+  montoBs: number | null;
+  referenciaReportada: string | null;
+  expiraEn: string | null;
+  createdAt: string | null;
+}
+
+export interface RecargaAdmin {
+  id: string;
+  usuarioId: string;
+  usuarioNombre: string | null;
+  usuarioTelefono: string | null;
+  metodo: string | null;
+  montoUSD: number;
+  banco: string | null;
+  referencia: string | null;
+  billetera: "piloto" | "pasajero" | null;
+  estado: EstadoRecarga;
+  createdAt: string | null;
+}
+
+interface AdminPagoRow {
+  id: string;
+  codigo: string;
+  usuario_id: string;
+  usuario_nombre: string | null;
+  usuario_telefono: string | null;
+  metodo: MetodoPago;
+  estado: EstadoPago;
+  monto_usd: number | string;
+  monto_bs: number | string | null;
+  referencia_reportada: string | null;
+  expira_en: string | null;
+  created_at: string | null;
+}
+
+interface AdminRecargaRow {
+  id: string;
+  usuario_id: string;
+  usuario_nombre: string | null;
+  usuario_telefono: string | null;
+  metodo: string | null;
+  monto_usd: number | string;
+  banco: string | null;
+  referencia: string | null;
+  billetera: "piloto" | "pasajero" | null;
+  estado: EstadoRecarga;
+  created_at: string | null;
+}
+
+export async function listAdminPayments(estado: EstadoPago = "en_revision"): Promise<PagoAdmin[]> {
+  const token = await accessToken();
+  const data = await request<{ ok: boolean; pagos: AdminPagoRow[] | null }>(
+    `/admin/pagos?estado=${encodeURIComponent(estado)}`,
+    { token },
+  );
+
+  return (data.pagos ?? []).map((row) => ({
+    id: row.id,
+    codigo: row.codigo,
+    usuarioId: row.usuario_id,
+    usuarioNombre: row.usuario_nombre ?? null,
+    usuarioTelefono: row.usuario_telefono ?? null,
+    metodo: row.metodo,
+    estado: row.estado,
+    montoUSD: num(row.monto_usd),
+    montoBs: row.monto_bs === null || row.monto_bs === undefined ? null : num(row.monto_bs),
+    referenciaReportada: row.referencia_reportada ?? null,
+    expiraEn: row.expira_en ?? null,
+    createdAt: row.created_at ?? null,
+  }));
+}
+
+export async function listAdminRecharges(estado: EstadoRecarga = "pendiente"): Promise<RecargaAdmin[]> {
+  const token = await accessToken();
+  const data = await request<{ ok: boolean; recargas: AdminRecargaRow[] | null }>(
+    `/admin/recargas?estado=${encodeURIComponent(estado)}`,
+    { token },
+  );
+
+  return (data.recargas ?? []).map((row) => ({
+    id: row.id,
+    usuarioId: row.usuario_id,
+    usuarioNombre: row.usuario_nombre ?? null,
+    usuarioTelefono: row.usuario_telefono ?? null,
+    metodo: row.metodo ?? null,
+    montoUSD: num(row.monto_usd),
+    banco: row.banco ?? null,
+    referencia: row.referencia ?? null,
+    billetera: row.billetera ?? null,
+    estado: row.estado,
+    createdAt: row.created_at ?? null,
+  }));
+}
+
+async function accionAdmin<T extends { ok?: boolean; motivo?: string }>(ruta: string, body?: unknown): Promise<T> {
+  const token = await accessToken();
+  return request<T>(ruta, { method: "POST", token, body });
+}
+
+export function confirmAdminPayment(id: string) {
+  return accionAdmin<{ ok: boolean; motivo?: string; estado?: EstadoPago; saldo?: number }>(
+    `/admin/pagos/${encodeURIComponent(id)}/confirmar`,
+  );
+}
+
+export function rejectAdminPayment(id: string, motivo: string) {
+  return accionAdmin<{ ok: boolean; motivo?: string }>(`/admin/pagos/${encodeURIComponent(id)}/rechazar`, {
+    motivo: motivo.trim(),
+  });
+}
+
+export function approveAdminRecharge(id: string) {
+  return accionAdmin<{ ok: boolean; motivo?: string; saldo?: number }>(
+    `/admin/recargas/${encodeURIComponent(id)}/aprobar`,
+  );
+}
+
+export function rejectAdminRecharge(id: string, motivo: string) {
+  return accionAdmin<{ ok: boolean; motivo?: string }>(`/admin/recargas/${encodeURIComponent(id)}/rechazar`, {
+    motivo: motivo.trim(),
+  });
+}
+
 const VERIFICATION_ERROR_COPY: Array<[RegExp, string]> = [
   [/DOCUMENTO_DUPLICADO|23505/, "Ese documento ya está vinculado a otra cuenta. Revisa que sea tuyo y vuelve a intentarlo."],
   [/CONDUCTOR_YA_APROBADO/, "Tu cuenta ya está aprobada; los documentos no se pueden reemplazar."],

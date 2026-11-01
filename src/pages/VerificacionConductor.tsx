@@ -550,7 +550,7 @@ export function VerificacionConductorPage() {
                           )}
                           {enviando
                             ? "Enviando…"
-                            : conductor?.verificacion === "pendiente"
+                            : conductor?.enviadoEn
                               ? "Reenviar a revisión"
                               : "Enviar a revisión"}
                         </button>
@@ -644,7 +644,7 @@ function DatosVehiculo({
     setError("");
 
     if (!/^[VE][0-9]{6,9}$/i.test(cedula.trim())) {
-      setError("Escribe la cédula como V-12345678.");
+      setError("Escribe la cédula sin guiones: V12345678.");
       return;
     }
     if (!/^[A-Z0-9-]{5,10}$/i.test(placa.trim())) {
@@ -688,8 +688,8 @@ function DatosVehiculo({
             id={cedulaId}
             className="field mono"
             value={cedula}
-            onChange={(event) => setCedula(event.target.value.toUpperCase())}
-            placeholder="V-12345678"
+            onChange={(event) => setCedula(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+            placeholder="V12345678"
             autoComplete="off"
           />
         </div>

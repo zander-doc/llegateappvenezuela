@@ -261,6 +261,11 @@ begin
        and detalle ->> 'verificado_por' = v_admin
   ) then raise exception 'no auditó la aprobación'; end if;
 
+  -- Aprobar cambia el rol: el piloto deja de figurar como pasajero.
+  if not exists (
+    select 1 from public.usuarios where id = v_uid and rol = 'conductor'
+  ) then raise exception 'la aprobación no cambió el rol a conductor'; end if;
+
   -- Un aprobado no vuelve a enviar verificación.
   perform set_config('request.jwt.claim.sub', v_uid::text, true);
   begin

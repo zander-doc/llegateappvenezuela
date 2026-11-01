@@ -17,11 +17,13 @@ adminRouter.get(
   asyncHandler(async (req, res) => {
     const estado = req.query.estado ?? "pendiente";
     const recargas = await filas(
-      `select id, usuario_id, metodo, monto_usd, banco, referencia, comprobante_url,
-              billetera, estado, motivo_rechazo, created_at
-         from public.transacciones_billetera
-        where tipo = 'recarga' and estado = $1::public.estado_transaccion
-        order by created_at asc
+      `select t.id, t.usuario_id, t.metodo, t.monto_usd, t.banco, t.referencia, t.comprobante_url,
+              t.billetera, t.estado, t.motivo_rechazo, t.created_at,
+              u.nombre as usuario_nombre, u.telefono as usuario_telefono
+         from public.transacciones_billetera t
+         left join public.usuarios u on u.id = t.usuario_id
+        where t.tipo = 'recarga' and t.estado = $1::public.estado_transaccion
+        order by t.created_at asc
         limit 100`,
       [estado],
     );
@@ -60,12 +62,14 @@ adminRouter.get(
   asyncHandler(async (req, res) => {
     const estado = req.query.estado ?? "en_revision";
     const pagos = await filas(
-      `select id, usuario_id, metodo, proveedor, estado, monto_usd, monto_bs, tasa_bs,
-              codigo, referencia_reportada, comprobante_url, checkout_url, expira_en,
-              confirmado_en, motivo_rechazo, created_at
-         from public.pagos
-        where estado = $1::public.estado_pago
-        order by created_at asc
+      `select p.id, p.usuario_id, p.metodo, p.proveedor, p.estado, p.monto_usd, p.monto_bs, p.tasa_bs,
+              p.codigo, p.referencia_reportada, p.comprobante_url, p.checkout_url, p.expira_en,
+              p.confirmado_en, p.motivo_rechazo, p.created_at,
+              u.nombre as usuario_nombre, u.telefono as usuario_telefono
+         from public.pagos p
+         left join public.usuarios u on u.id = p.usuario_id
+        where p.estado = $1::public.estado_pago
+        order by p.created_at asc
         limit 100`,
       [estado],
     );
