@@ -42,6 +42,17 @@ function destinoBase() {
   }
 }
 
+// Solo se responden señales de forma; nunca el valor ni la contraseña.
+function pistaFormato(valor) {
+  return {
+    empieza_con_postgresql: /^postgres(ql)?:\/\//.test(valor),
+    tiene_arroba: valor.includes("@"),
+    tiene_espacios: /\s/.test(valor),
+    entre_comillas: /^["'“‘]/.test(valor) || /["'”’]$/.test(valor),
+    solo_ascii: /^[\x20-\x7e]+$/.test(valor),
+  };
+}
+
 app.get("/health/db", async (_req, res) => {
   const inicio = Date.now();
   // La longitud del valor (no su contenido) distingue una cadena truncada de
@@ -59,6 +70,7 @@ app.get("/health/db", async (_req, res) => {
       base: destinoBase(),
       caracteres,
       latencia_ms: Date.now() - inicio,
+      formato: pistaFormato(config.databaseUrl),
       codigo: error.code ?? error.errors?.[0]?.code ?? null,
       mensaje: detalles
         .filter(Boolean)
