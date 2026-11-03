@@ -153,8 +153,8 @@ export function Footer() {
 
         <p className="mt-6 max-w-4xl text-[11.5px] leading-relaxed text-ink-500">
           Prototipo de rediseño con fines de demostración. Las tarifas, fichas de negocios, saldos y datos de
-          cobertura son ejemplos y no representan una oferta comercial vigente. Este sitio no procesa viajes,
-          pagos ni registros reales. Ningún dato que escribas aquí se envía a un servidor.
+          cobertura son ejemplos y no representan una oferta comercial vigente. El acceso con tu teléfono y la
+          billetera sí guardan datos reales para probar el piloto; este sitio todavía no procesa viajes ni pagos.
         </p>
       </div>
 

@@ -29,13 +29,13 @@ const DOCS: Doc[] = [
         title: "1. Qué es Llégate",
         paragraphs: [
           "Llégate es una plataforma tecnológica que conecta pasajeros con conductores y vehículos, y a usuarios con negocios del sector automotor a través del Mercado Motor. Llégate no presta directamente el servicio de transporte: facilita la solicitud, la asignación y el registro del viaje.",
-          "La aplicación móvil se encuentra en etapa de lanzamiento. Este sitio es un prototipo de rediseño y no procesa viajes, pagos ni registros reales.",
+          "La aplicación móvil se encuentra en etapa de lanzamiento. El acceso con tu teléfono y la billetera ya funcionan con datos reales para probar el piloto; los viajes y los pagos todavía no se procesan.",
         ],
       },
       {
         title: "2. Uso de la web y de la app",
         paragraphs: [
-          "La web es informativa y de demostración. Los estimadores, calculadoras y formularios muestran cómo funcionaría el servicio, pero no generan solicitudes reales ni reservas.",
+          "La web es de demostración. Los estimadores, calculadoras y formularios muestran cómo funcionaría el servicio; el acceso con tu teléfono, la billetera y la verificación de conductores sí envían datos a nuestra API para el piloto.",
           "Al usar la app, en su versión de producción, te comprometes a entregar información veraz, usar tu propia cuenta y no solicitar viajes para fines distintos al traslado de personas o bienes permitidos.",
         ],
       },
