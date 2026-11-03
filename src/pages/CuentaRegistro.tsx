@@ -36,9 +36,24 @@ import { RealAuth } from "../components/RealAuth";
 import { realAuthEnabled } from "../lib/api";
 import { saveDemoLead } from "../lib/demoStorage";
 import { isCedula, isEmail, isPersonName, isVenezuelanPhone } from "../lib/validation";
-import { HUBS } from "../data/site";
+import { VENEZUELA_LOCATIONS } from "../data/locations";
 
-type FieldKey = "name" | "email" | "phone" | "idCard" | "city" | "password" | "confirm" | "consent";
+const ESTADOS = VENEZUELA_LOCATIONS.map((state) => ({
+  id: state.id,
+  name: state.name.replace(/\s*\(.*\)$/, ""),
+  cities: state.cities,
+}));
+
+type FieldKey =
+  | "name"
+  | "email"
+  | "phone"
+  | "idCard"
+  | "state"
+  | "city"
+  | "password"
+  | "confirm"
+  | "consent";
 type Errors = Partial<Record<FieldKey, string>>;
 
 type FormValues = {
@@ -46,6 +61,7 @@ type FormValues = {
   email: string;
   phone: string;
   idCard: string;
+  state: string;
   city: string;
   password: string;
   confirm: string;
@@ -53,7 +69,17 @@ type FormValues = {
   newsletter: boolean;
 };
 
-const FIELD_ORDER: FieldKey[] = ["name", "email", "phone", "idCard", "password", "confirm", "city", "consent"];
+const FIELD_ORDER: FieldKey[] = [
+  "name",
+  "email",
+  "phone",
+  "idCard",
+  "password",
+  "confirm",
+  "state",
+  "city",
+  "consent",
+];
 
 function validate(field: FieldKey, form: FormValues): string | undefined {
   switch (field) {
@@ -77,6 +103,9 @@ function validate(field: FieldKey, form: FormValues): string | undefined {
       if (!isCedula(form.idCard)) return "Usa el formato V-12345678 o E-12345678.";
       return undefined;
     }
+    case "state":
+      if (!form.state.trim()) return "Elige tu estado.";
+      return undefined;
     case "city":
       if (!form.city) return "Elige la ciudad donde vas a usar Llégate.";
       return undefined;
@@ -221,7 +250,8 @@ export function CuentaRegistroPage() {
     email: "",
     phone: "",
     idCard: "",
-    city: HUBS[0].city,
+    state: ESTADOS[0].name,
+    city: ESTADOS[0].cities[0],
     password: "",
     confirm: "",
     consent: false,
@@ -240,6 +270,7 @@ export function CuentaRegistroPage() {
   const emailId = useId();
   const phoneId = useId();
   const idCardId = useId();
+  const stateId = useId();
   const cityId = useId();
   const passwordId = useId();
   const confirmId = useId();
@@ -251,6 +282,10 @@ export function CuentaRegistroPage() {
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     const next = { ...form, [key]: value };
+    // Al cambiar de estado la ciudad anterior deja de existir en la lista.
+    if (key === "state") {
+      next.city = ESTADOS.find((estado) => estado.name === value)?.cities[0] ?? "";
+    }
     setForm(next);
     setErrors((prev) => {
       if (!prev[key as FieldKey] && !(key === "password" && prev.confirm)) return prev;
@@ -304,6 +339,7 @@ export function CuentaRegistroPage() {
         email: emailId,
         phone: phoneId,
         idCard: idCardId,
+        state: stateId,
         city: cityId,
         password: passwordId,
         confirm: confirmId,
@@ -320,6 +356,7 @@ export function CuentaRegistroPage() {
         intent: "register",
         name: form.name.trim(),
         contact: form.email.trim(),
+        state: form.state,
         city: form.city,
       });
       setLoading(false);
@@ -463,7 +500,9 @@ export function CuentaRegistroPage() {
                     </div>
                     <div className="rounded-xl border border-asphalt-800 bg-asphalt-950/70 p-3">
                       <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500">Ciudad</dt>
-                      <dd className="mt-1 text-[13px] text-ink-200">{form.city}</dd>
+                      <dd className="mt-1 text-[13px] text-ink-200">
+                        {form.city}, {form.state}
+                      </dd>
                     </div>
                   </dl>
 
@@ -579,6 +618,40 @@ export function CuentaRegistroPage() {
                           onBlur={() => handleBlur("idCard")}
                         />
                         <div>
+                          <label htmlFor={stateId} className="label">
+                            Estado
+                          </label>
+                          <div className="relative">
+                            <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                            <select
+                              id={stateId}
+                              name="state"
+                              required
+                              autoComplete="address-level1"
+                              aria-invalid={Boolean(errors.state)}
+                              aria-describedby={errors.state ? `${stateId}-error` : undefined}
+                              value={form.state}
+                              onChange={(e) => update("state", e.target.value)}
+                              onBlur={() => handleBlur("state")}
+                              className={`field appearance-none pl-10 pr-10 ${
+                                errors.state ? "border-red-500/60 focus:border-red-400" : ""
+                              }`}
+                            >
+                              {ESTADOS.map((estado) => (
+                                <option key={estado.id} value={estado.name}>
+                                  {estado.name}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                          </div>
+                          {errors.state && (
+                            <span id={`${stateId}-error`} className="mt-1.5 block text-[11.5px] text-red-300">
+                              {errors.state}
+                            </span>
+                          )}
+                        </div>
+                        <div className="sm:col-span-2">
                           <label htmlFor={cityId} className="label">
                             Ciudad
                           </label>
@@ -598,9 +671,9 @@ export function CuentaRegistroPage() {
                                 errors.city ? "border-red-500/60 focus:border-red-400" : ""
                               }`}
                             >
-                              {HUBS.map((hub) => (
-                                <option key={hub.city} value={hub.city}>
-                                  {hub.city}
+                              {(ESTADOS.find((estado) => estado.name === form.state)?.cities ?? []).map((city) => (
+                                <option key={city} value={city}>
+                                  {city}
                                 </option>
                               ))}
                             </select>
