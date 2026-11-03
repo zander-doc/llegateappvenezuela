@@ -23,7 +23,7 @@ const DOCS: Doc[] = [
     title: "Términos y condiciones",
     description:
       "Las reglas de uso de la plataforma Llégate: qué ofrece el servicio, cómo funciona la cuenta, cómo se cobran los viajes y qué puedes esperar de nosotros.",
-    updated: "Versión de demostración · octubre de 2026",
+    updated: "Versión piloto · noviembre de 2026",
     sections: [
       {
         title: "1. Qué es Llégate",
@@ -35,7 +35,7 @@ const DOCS: Doc[] = [
       {
         title: "2. Uso de la web y de la app",
         paragraphs: [
-          "La web es de demostración. Los estimadores, calculadoras y formularios muestran cómo funcionaría el servicio; el acceso con tu teléfono, la billetera y la verificación de conductores sí envían datos a nuestra API para el piloto.",
+          "La web es la versión piloto. Los estimadores, calculadoras y el simulador de viajes muestran cómo funcionaría el servicio; el acceso con tu teléfono, la billetera y la verificación de conductores sí envían datos a nuestra API para el piloto.",
           "Al usar la app, en su versión de producción, te comprometes a entregar información veraz, usar tu propia cuenta y no solicitar viajes para fines distintos al traslado de personas o bienes permitidos.",
         ],
       },
@@ -100,34 +100,35 @@ const DOCS: Doc[] = [
     kicker: "Legal",
     title: "Política de privacidad",
     description:
-      "Qué datos usaría Llégate, para qué, con quién se comparten y cómo puedes ejercer tus derechos. En este prototipo no se envía información a ningún servidor.",
-    updated: "Versión de demostración · octubre de 2026",
+      "Qué datos trata Llégate en este piloto, para qué, con quién se comparten y cómo puedes ejercer tus derechos.",
+    updated: "Versión piloto · noviembre de 2026",
     sections: [
       {
-        title: "1. Qué datos usaríamos",
+        title: "1. Qué datos tratamos",
         paragraphs: [
-          "Para operar el servicio, Llégate usaría datos de identificación (nombre, cédula, teléfono y correo), datos del vehículo para conductores, y datos del viaje (origen, destino, ruta, hora y monto).",
-          "La ubicación se usaría únicamente durante el viaje activo y para funciones de seguridad, como compartir la ruta o activar una emergencia.",
+          "Para crear tu cuenta y operar el piloto, Llégate trata datos de identificación (nombre, teléfono y, para conductores, cédula y correo) y datos de ubicación que indiques al registrarte, como estado y ciudad.",
+          "Si te registras como conductor, también tratamos los documentos de identidad, licencia y vehículo que subes para la verificación.",
         ],
       },
       {
-        title: "2. Para qué los usaríamos",
+        title: "2. Para qué los tratamos",
         paragraphs: [
-          "Para conectar pasajeros y conductores, calcular tarifas, procesar pagos, verificar identidades, prevenir fraudes, atender reclamos y cumplir obligaciones legales.",
+          "Para autenticarte con un código de un solo uso, administrar tu billetera prepago, verificar identidades, prevenir fraudes, atender reclamos y cumplir obligaciones legales.",
           "Con tu consentimiento, también para enviarte novedades del lanzamiento o información de tu interés. Puedes retirar ese consentimiento en cualquier momento.",
         ],
       },
       {
         title: "3. Con quién se comparten",
         paragraphs: [
-          "Los datos necesarios para el viaje se comparten entre el pasajero y el conductor asignado. También pueden compartirse con proveedores que prestan servicios de pago, verificación o infraestructura, bajo acuerdos de confidencialidad.",
+          "Para entregarte el código de acceso compartimos tu número de teléfono con el proveedor de mensajería que corresponda: Meta (WhatsApp Cloud API) o Twilio cuando el canal sea SMS. Esos proveedores lo tratan según sus propias políticas.",
+          "La base de datos y los archivos viven en proveedores de infraestructura (Neon y Render) bajo acuerdos de confidencialidad. Los documentos se guardan en almacenamiento privado y se consultan con enlaces firmados que vencen.",
           "Llégate no vende datos personales. No entregamos tu contacto a negocios del Mercado Motor sin tu autorización.",
         ],
       },
       {
         title: "4. Seguridad y conservación",
         paragraphs: [
-          "Aplicaríamos medidas técnicas y organizativas para proteger la información: cifrado en tránsito, control de acceso por roles y registros de auditoría.",
+          "Aplicamos medidas técnicas y organizativas para proteger la información: cifrado en tránsito, códigos de acceso con vencimiento y límite de intentos, control de acceso por roles y registros de auditoría.",
           "Los datos se conservan mientras la cuenta esté activa y durante los plazos exigidos por la ley. Luego se eliminan o anonimizan.",
         ],
       },
@@ -137,9 +138,9 @@ const DOCS: Doc[] = [
           "Puedes solicitar acceso, rectificación, actualización o eliminación de tus datos, así como oponerte a determinados tratamientos. Escríbenos a hola@llegate.app para ejercerlos.",
         ],
         bullets: [
-          "Escribe desde el correo asociado a tu cuenta.",
+          "Escribe desde el teléfono o correo asociado a tu cuenta.",
           "Indica el derecho que quieres ejercer y los datos afectados.",
-          "Responderíamos en un plazo razonable, verificando tu identidad.",
+          "Respondemos en un plazo razonable, verificando tu identidad.",
         ],
       },
       {
@@ -149,16 +150,18 @@ const DOCS: Doc[] = [
         ],
       },
       {
-        title: "7. Sobre este prototipo",
+        title: "7. Qué es real en este piloto",
         paragraphs: [
-          "Este sitio de demostración no envía datos a un servidor. Los formularios guardan la información solo en el almacenamiento del navegador (localStorage) para simular el flujo. Puedes borrarla limpiando los datos del sitio.",
-          "No uses este prototipo para ingresar información personal real.",
+          "El acceso con tu teléfono, la billetera prepago y la verificación de conductores funcionan con datos reales y se guardan en nuestra API y base de datos para probar el piloto.",
+          "Los viajes, las tarifas mostradas y los pagos son simulados: no despachamos vehículos ni cobramos dinero. Las fichas del Mercado Motor son ejemplos.",
+          "Puedes pedir la eliminación de tu cuenta y sus datos escribiendo a hola@llegate.app.",
         ],
       },
       {
         title: "8. Contacto",
         paragraphs: [
-          `Para consultas de privacidad, escribe a ${SITE.email}. En producción, esta política indicaría además la dirección del responsable del tratamiento y el canal formal de reclamos.`,
+          `Para consultas de privacidad, escribe a ${SITE.email}.`,
+          "Si el tratamiento cambia al abrir la operación al público, actualizaremos esta política e indicaremos la dirección del responsable del tratamiento y el canal formal de reclamos.",
         ],
       },
     ],
@@ -170,7 +173,7 @@ const DOCS: Doc[] = [
     title: "Política de cookies",
     description:
       "Cómo se usan cookies y almacenamiento local en la web de Llégate, para qué sirven y cómo puedes controlarlas desde tu navegador.",
-    updated: "Versión de demostración · octubre de 2026",
+    updated: "Versión piloto · noviembre de 2026",
     sections: [
       {
         title: "1. Qué son las cookies",
@@ -180,14 +183,15 @@ const DOCS: Doc[] = [
         ],
       },
       {
-        title: "2. Qué usa este prototipo",
+        title: "2. Qué usa este sitio",
         paragraphs: [
-          "Este sitio de demostración no usa cookies publicitarias ni herramientas de analítica de terceros. Usa almacenamiento local del navegador para guardar los formularios que completas en la simulación y la preferencia de ocultar la barra de instalación.",
+          "Este sitio no usa cookies publicitarias ni herramientas de analítica de terceros. Usa almacenamiento local del navegador para mantener tu sesión y recordar preferencias de la interfaz.",
         ],
         bullets: [
-          "llegate_sim_waitlist: contacto y ciudad del formulario de aviso.",
-          "llegate_sim_driver, llegate_sim_empresa, llegate_sim_aliado, llegate_sim_contacto: formularios de la demo.",
+          "llegate_sesion_v1: tokens de tu sesión real, para no pedirte el código en cada visita. Se borra al cerrar sesión.",
           "llegate_sim_install_bar: recuerda que cerraste la barra de instalación.",
+          "llegate_sim_contacto, llegate_sim_drivers, llegate_sim_cap: datos de los formularios de la demo y del simulador.",
+          "llegate_sim_draft:*: borradores del simulador de viaje.",
         ],
       },
       {
@@ -300,7 +304,8 @@ export function LegalPage() {
           <div className="mt-5 rounded-xl border border-white/8 bg-white/[0.025] p-4">
             <ShieldCheck className="h-4.5 w-4.5 text-emerald-400" />
             <p className="mt-2 text-[12px] leading-relaxed text-ink-400">
-              Ningún formulario de este prototipo envía datos a un servidor.
+              Tus datos de cuenta se guardan en nuestra API para el piloto; los viajes y los pagos son
+              simulados.
             </p>
             <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={() => openModal({ type: "lead", intent: "contacto" })}>
               <Mail className="h-3.5 w-3.5" /> Consultar
@@ -310,8 +315,9 @@ export function LegalPage() {
 
         <article className="prose-llegate max-w-2xl">
           <div className="rounded-xl border border-racing-500/20 bg-racing-500/[0.06] px-4 py-3 text-[12.5px] leading-relaxed text-ink-300">
-            <span className="font-semibold text-racing-400">Simulación:</span> este documento forma parte de un
-            prototipo de rediseño. No reemplaza los términos legales de la app en producción.
+            <span className="font-semibold text-racing-400">Piloto:</span> este documento describe cómo operaría
+            Llégate. La cuenta y la billetera ya usan datos reales; los viajes y los pagos siguen simulados y este
+            texto no reemplaza los términos legales de la app en producción.
           </div>
 
           {current.sections.map((section) => (
