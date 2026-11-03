@@ -425,7 +425,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
               value={telefono}
               onChange={(event) => setTelefono(event.target.value)}
               className="field pl-10"
-              placeholder="0414 1234567"
+              placeholder="+58 414 1234567"
             />
           </div>
           <span className="mt-1.5 block text-[11.5px] text-ink-500">
