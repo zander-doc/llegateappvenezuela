@@ -370,7 +370,11 @@ TWILIO_FROM=+1...
 ```
 
 - WhatsApp se usa cuando están `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_ID`. La
-  plantilla debe estar aprobada en Meta y recibe el código como parámetro.
+  plantilla debe ser de categoría **autenticación** con botón **Copiar código**;
+  el envío manda el código dos veces (cuerpo y botón), como exige Meta.
+- Si WhatsApp falla (token vencido, destinatario no verificado en el número de
+  prueba), se intenta Twilio y luego el log si está activo. La respuesta 202
+  nombra el canal que realmente entregó el código.
 - Si falta WhatsApp, se usa Twilio cuando están sus tres variables.
 - Sin ninguno de los dos, `OTP_LOG_EN_DESARROLLO=1` imprime
   `[otp] +584141234567: 123456` en el log. En producción, sin canal configurado,

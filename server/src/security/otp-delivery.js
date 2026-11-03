@@ -43,28 +43,56 @@ export async function enviarCodigoSms({
 
 // Orden de preferencia: WhatsApp (gratis en el plan de Meta para Venezuela),
 // SMS por Twilio y, solo fuera de producción, el log del servidor.
-export function canalOtp() {
-  if (whatsappDisponible()) return "whatsapp";
-  if (smsDisponible()) return "sms";
-  if (config.otp.registrarEnLog) return "log";
+export function canalOtp(
+  whatsapp = config.otp.whatsapp,
+  sms = config.otp.sms,
+  registrarEnLog = config.otp.registrarEnLog,
+) {
+  if (whatsappDisponible(whatsapp)) return "whatsapp";
+  if (smsDisponible(sms)) return "sms";
+  if (registrarEnLog) return "log";
   return null;
 }
 
-export async function enviarCodigoOtp({ telefono, codigo }) {
-  const canal = canalOtp();
+// El número de prueba de Meta solo entrega a los destinatarios verificados.
+// Si el proveedor falla, se intenta el siguiente canal para que el registro no
+// quede bloqueado; el canal real se devuelve para decir la verdad al cliente.
+export async function enviarCodigoOtp({
+  telefono,
+  codigo,
+  whatsapp = config.otp.whatsapp,
+  sms = config.otp.sms,
+  registrarEnLog = config.otp.registrarEnLog,
+  fetchImpl = globalThis.fetch,
+  log = (mensaje) => console.log(mensaje),
+}) {
+  const fallos = [];
 
-  if (canal === "whatsapp") {
-    await enviarCodigoWhatsApp({ telefono, codigo });
-    return "whatsapp";
+  if (whatsappDisponible(whatsapp)) {
+    try {
+      await enviarCodigoWhatsApp({ telefono, codigo, whatsapp, fetchImpl });
+      return "whatsapp";
+    } catch (error) {
+      fallos.push(`whatsapp: ${error.message}`);
+    }
   }
-  if (canal === "sms") {
-    await enviarCodigoSms({ telefono, codigo });
-    return "sms";
+
+  if (smsDisponible(sms)) {
+    try {
+      await enviarCodigoSms({ telefono, codigo, sms, fetchImpl });
+      return "sms";
+    } catch (error) {
+      fallos.push(`sms: ${error.message}`);
+    }
   }
-  if (canal === "log") {
-    console.log(`[otp] ${telefono}: ${codigo}`);
+
+  if (registrarEnLog) {
+    log(`[otp] ${telefono}: ${codigo}`);
     return "log";
   }
 
+  if (fallos.length) {
+    throw new Error(`otp_envio_error (${fallos.join("; ")})`);
+  }
   throw new Error("otp_no_configurado");
 }

@@ -34,6 +34,14 @@ export async function enviarCodigoWhatsApp({
           type: "body",
           parameters: [{ type: "text", text: String(codigo) }],
         },
+        // Meta exige el botón "Copiar código" en las plantillas de
+        // autenticación y que el código viaje también en ese componente.
+        {
+          type: "button",
+          sub_type: "url",
+          index: "0",
+          parameters: [{ type: "text", text: String(codigo) }],
+        },
       ],
     },
   };

@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import "./setup.mjs";
 
-const { enviarCodigoSms, smsDisponible } = await import("../src/security/otp-delivery.js");
+const { enviarCodigoOtp, enviarCodigoSms, smsDisponible } = await import(
+  "../src/security/otp-delivery.js"
+);
 const { enviarCodigoWhatsApp, whatsappDisponible } = await import("../src/security/whatsapp.js");
 
 test("WhatsApp arma la plantilla de OTP con el número normalizado", async () => {
@@ -35,7 +37,79 @@ test("WhatsApp arma la plantilla de OTP con el número normalizado", async () =>
   assert.equal(cuerpo.to, "584141234567");
   assert.equal(cuerpo.template.name, "llegate_otp");
   assert.deepEqual(cuerpo.template.language, { code: "es" });
-  assert.deepEqual(cuerpo.template.components[0].parameters, [{ type: "text", text: "123456" }]);
+  assert.deepEqual(cuerpo.template.components[0], {
+    type: "body",
+    parameters: [{ type: "text", text: "123456" }],
+  });
+  // La plantilla de autenticación copia el código desde el botón "Copiar código".
+  assert.deepEqual(cuerpo.template.components[1], {
+    type: "button",
+    sub_type: "url",
+    index: "0",
+    parameters: [{ type: "text", text: "123456" }],
+  });
+});
+
+test("si WhatsApp falla, el código cae al log en vez de bloquear el registro", async () => {
+  const lineas = [];
+  const fetchImpl = async () => new Response("destinatario no permitido", { status: 400 });
+
+  const canal = await enviarCodigoOtp({
+    telefono: "+584141234567",
+    codigo: "123456",
+    whatsapp: {
+      token: "token-meta",
+      phoneId: "123456789",
+      template: "llegate_otp",
+      language: "es",
+      apiVersion: "v21.0",
+    },
+    sms: { accountSid: "", authToken: "", from: "" },
+    registrarEnLog: true,
+    fetchImpl,
+    log: (linea) => lineas.push(linea),
+  });
+
+  assert.equal(canal, "log");
+  assert.deepEqual(lineas, ["[otp] +584141234567: 123456"]);
+});
+
+test("si WhatsApp falla y hay Twilio, el código sale por SMS", async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes("graph.facebook.com")) return new Response("no", { status: 400 });
+    return new Response("{}", { status: 201 });
+  };
+
+  const canal = await enviarCodigoOtp({
+    telefono: "+584141234567",
+    codigo: "123456",
+    whatsapp: {
+      token: "token-meta",
+      phoneId: "123456789",
+      template: "llegate_otp",
+      language: "es",
+      apiVersion: "v21.0",
+    },
+    sms: { accountSid: "AC1", authToken: "t", from: "+15551234567" },
+    registrarEnLog: false,
+    fetchImpl,
+  });
+
+  assert.equal(canal, "sms");
+});
+
+test("sin ningún canal disponible el envío falla", async () => {
+  await assert.rejects(
+    () =>
+      enviarCodigoOtp({
+        telefono: "+584141234567",
+        codigo: "123456",
+        whatsapp: { token: "", phoneId: "" },
+        sms: { accountSid: "", authToken: "", from: "" },
+        registrarEnLog: false,
+      }),
+    /otp_no_configurado/,
+  );
 });
 
 test("sin credenciales de Meta no se intenta enviar", async () => {

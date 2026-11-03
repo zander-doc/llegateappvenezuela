@@ -99,8 +99,7 @@ authRouter.post(
     const body = parse(otpRequestSchema, req.body);
     limitarEnvioOtp(req, res, body.telefono);
 
-    const canal = canalOtp();
-    if (!canal) {
+    if (!canalOtp()) {
       throw new HttpError(
         503,
         "otp_no_configurado",
@@ -116,8 +115,9 @@ authRouter.post(
     const codigo = generarCodigo();
     await guardarCodigo(body.telefono, hashCodigo(body.telefono, codigo));
 
+    let canal;
     try {
-      await enviarCodigoOtp({ telefono: body.telefono, codigo });
+      canal = await enviarCodigoOtp({ telefono: body.telefono, codigo });
     } catch (error) {
       console.error("[otp] no se pudo enviar el código:", error.message);
       throw new HttpError(502, "otp_envio_error", "No pudimos enviarte el código. Intenta de nuevo.");
