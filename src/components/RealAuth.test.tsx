@@ -82,7 +82,7 @@ function renderAuth(mode: "login" | "register" = "login") {
 beforeEach(() => {
   vi.mocked(api.loadSession).mockReturnValue(null);
   vi.mocked(api.getCuenta).mockResolvedValue(CUENTA);
-  vi.mocked(api.requestOtp).mockResolvedValue("Código enviado por SMS");
+  vi.mocked(api.requestOtp).mockResolvedValue("Código enviado por WhatsApp");
   vi.mocked(api.verifyOtp).mockResolvedValue(CUENTA);
   vi.mocked(api.logout).mockResolvedValue();
   vi.mocked(api.getWallet).mockResolvedValue(BILLETERA);
@@ -119,7 +119,7 @@ describe("RealAuth", () => {
     expect(api.requestOtp).not.toHaveBeenCalled();
   });
 
-  it("envía el código E.164 y pasa al paso del SMS", async () => {
+  it("envía el código E.164 y pasa al paso del código", async () => {
     renderAuth();
     fireEvent.change(await screen.findByLabelText("Teléfono"), { target: { value: "0414 1234567" } });
     fireEvent.click(screen.getByRole("button", { name: /enviar código/i }));
@@ -150,7 +150,7 @@ describe("RealAuth", () => {
     fireEvent.click(screen.getByRole("button", { name: /enviar código/i }));
     await screen.findByRole("heading", { name: "Escribe el código." });
 
-    fireEvent.change(screen.getByLabelText("Código SMS"), { target: { value: "123456" } });
+    fireEvent.change(screen.getByLabelText("Código de acceso"), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /entrar/i }));
 
     expect(await screen.findByRole("heading", { name: "Listo, María." })).toBeInTheDocument();

@@ -388,7 +388,7 @@ export function CuentaRegistroPage() {
                     n: "02",
                     title: realAuthEnabled ? "Verifica tu teléfono" : "Protege tu cuenta",
                     text: realAuthEnabled
-                      ? "Recibes un código SMS y confirmas tu número."
+                      ? "Recibes un código por WhatsApp o SMS y confirmas tu número."
                       : "Creas tu contraseña y aceptas las condiciones.",
                   },
                   { n: "03", title: "Empieza a moverte", text: "Elige tu servicio y pide tu primer viaje." },

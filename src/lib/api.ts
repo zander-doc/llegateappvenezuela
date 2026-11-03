@@ -258,7 +258,7 @@ export async function requestOtp(input: { telefono: string; nombre?: string; rol
     method: "POST",
     body: { telefono: input.telefono, nombre: input.nombre, rol: input.rol ?? "cliente" },
   });
-  return data.mensaje ?? "Código enviado por SMS";
+  return data.mensaje ?? "Código enviado";
 }
 
 export async function refreshSession(refreshToken?: string): Promise<string> {

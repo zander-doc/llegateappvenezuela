@@ -318,7 +318,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
         </button>
         <h2 className="heading mt-3 text-3xl font-extrabold text-white sm:text-[34px]">Escribe el código.</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-ink-300">
-          Enviamos 6 dígitos por SMS a <span className="font-semibold text-white">{maskPhone(e164)}</span>.
+          Enviamos 6 dígitos a <span className="font-semibold text-white">{maskPhone(e164)}</span> por WhatsApp o SMS.
         </p>
         {aviso && (
           <p className="mt-3 flex items-center gap-1.5 text-[12px] text-emerald-300">
@@ -329,7 +329,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
         <form className="mt-5 grid gap-4" onSubmit={confirmarCodigo} noValidate>
           <div>
             <label htmlFor={codigoId} className="label">
-              Código SMS
+              Código de acceso
             </label>
             <input
               id={codigoId}
@@ -386,7 +386,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
         {mode === "register" ? "Crea tu cuenta real." : "Entra con tu teléfono."}
       </h2>
       <p className="mt-2 text-[14px] leading-relaxed text-ink-300">
-        Sin contraseñas: te enviamos un código SMS. La misma cuenta funciona en la web y en la app.
+        Sin contraseñas: te enviamos un código por WhatsApp o SMS. La misma cuenta funciona en la web y en la app.
       </p>
 
       <form className="mt-5 grid gap-4" onSubmit={enviarCodigo} noValidate>
