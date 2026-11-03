@@ -128,7 +128,7 @@ authRouter.post(
       mensaje: {
         whatsapp: "Código enviado por WhatsApp",
         sms: "Código enviado por SMS",
-        log: "Código generado; revisa el registro del servidor",
+        log: "No pudimos enviarte el código. Intenta de nuevo en unos minutos.",
       }[canal],
     });
   }),

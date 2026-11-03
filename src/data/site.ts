@@ -91,7 +91,7 @@ export const STATS = [
     detail: "Mototaxi, taxi y delivery; el resto llega por fases",
   },
   { value: "2", label: "monedas de pago", detail: "Bolívares a tasa BCV o dólares en efectivo" },
-  { value: "0%", label: "de comisión con plan Pro", detail: "Pagas el plan, no un porcentaje por viaje" },
+  { value: "10%", label: "de comisión por viaje", detail: "Sin mensualidad: sale de tu saldo al completar" },
   { value: "3", label: "pasos para pedir", detail: "Elige, confirma y muévete" },
 ];
 

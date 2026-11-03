@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /conductores/verificacion
+
+Sitemap: https://llegate-app-web.onrender.com/sitemap.xml

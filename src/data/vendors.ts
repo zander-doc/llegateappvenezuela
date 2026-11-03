@@ -48,7 +48,7 @@ export const VENDORS: Vendor[] = [
     zone: "Los Pinos",
     description:
       "Mecánica general, frenos, suspensión y diagnóstico computarizado. Presupuesto cerrado antes de intervenir el vehículo.",
-    offer: "Diagnóstico computarizado sin costo para conductores Pro.",
+    offer: "Diagnóstico computarizado sin costo para conductores Llégate con cuenta verificada.",
     priceLabel: "Diagnóstico $15",
     hours: "Lun a Vie · 7:30 a 16:30",
     verified: true,

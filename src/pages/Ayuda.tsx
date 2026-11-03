@@ -121,7 +121,7 @@ export function AyudaPage() {
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-[11px] uppercase tracking-wider text-ink-500">Búsquedas frecuentes</span>
-            {["cancelar", "BCV", "plan Pro", "seguridad"].map((term) => (
+            {["cancelar", "BCV", "prepago", "seguridad"].map((term) => (
               <button
                 key={term}
                 type="button"

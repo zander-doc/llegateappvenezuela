@@ -59,10 +59,10 @@ const DOCS: Doc[] = [
         ],
       },
       {
-        title: "5. Conductores y planes",
+        title: "5. Conductores y prepago",
         paragraphs: [
-          "Los conductores pueden elegir entre pagar una comisión por viaje o contratar un plan Pro con comisión cero. Las condiciones, precios y beneficios se muestran en la sección de planes antes de activar cualquier opción.",
-          "Los planes son personales, no transferibles, y su activación se realiza desde la app en la versión de producción.",
+          "Los conductores trabajan con saldo prepago: cada viaje completado descuenta una comisión del 10% de la tarifa, con un mínimo de $0,10, desde el saldo disponible. No existe mensualidad, cuota de inscripción ni saldo negativo.",
+          "La cuenta es personal y no transferible. La recarga y el consumo de saldo se realizan desde la app en la versión de producción.",
         ],
       },
       {
