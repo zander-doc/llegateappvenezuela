@@ -25,6 +25,8 @@ export const uuidSchema = z.string().uuid("Identificador inválido");
 export const otpRequestSchema = z.object({
   telefono,
   nombre: z.string().trim().min(2).max(120).optional(),
+  estado: z.string().trim().min(2).max(60).optional(),
+  ciudad: z.string().trim().min(2).max(120).optional(),
   rol: z.enum(["cliente", "conductor"]).default("cliente"),
 });
 

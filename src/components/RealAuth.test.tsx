@@ -80,6 +80,7 @@ function renderAuth(mode: "login" | "register" = "login") {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(api.loadSession).mockReturnValue(null);
   vi.mocked(api.getCuenta).mockResolvedValue(CUENTA);
   vi.mocked(api.requestOtp).mockResolvedValue("Código enviado por WhatsApp");
@@ -102,12 +103,31 @@ describe("RealAuth", () => {
     expect(screen.getByRole("button", { name: /enviar código/i })).toBeInTheDocument();
   });
 
-  it("pide nombre y aceptación de términos al registrarse", async () => {
+  it("pide nombre, estado y ciudad al registrarse", async () => {
     renderAuth("register");
 
     expect(await screen.findByRole("heading", { name: "Crea tu cuenta real." })).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre y apellido")).toBeInTheDocument();
     expect(screen.getByRole("checkbox")).toBeInTheDocument();
+
+    const estado = screen.getByLabelText("Estado") as HTMLSelectElement;
+    expect(estado.options).toHaveLength(24);
+
+    fireEvent.change(screen.getByLabelText("Nombre y apellido"), { target: { value: "María Rodríguez" } });
+    fireEvent.change(estado, { target: { value: "Zulia" } });
+    expect((screen.getByLabelText("Ciudad") as HTMLSelectElement).value).toBe("Maracaibo");
+    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "0414 1234567" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /crear cuenta y enviar código/i }));
+
+    expect(await screen.findByRole("heading", { name: "Escribe el código." })).toBeInTheDocument();
+    expect(api.requestOtp).toHaveBeenCalledWith({
+      telefono: "+584141234567",
+      nombre: "María Rodríguez",
+      estado: "Zulia",
+      ciudad: "Maracaibo",
+      rol: "cliente",
+    });
   });
 
   it("rechaza teléfonos inválidos sin llamar a la API", async () => {
@@ -128,6 +148,8 @@ describe("RealAuth", () => {
     expect(api.requestOtp).toHaveBeenCalledWith({
       telefono: "+584141234567",
       nombre: undefined,
+      estado: undefined,
+      ciudad: undefined,
       rol: "cliente",
     });
     expect(screen.getByText("+58 ••• 4567")).toBeInTheDocument();

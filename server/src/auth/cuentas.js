@@ -8,10 +8,10 @@ import {
   venceRefresh,
 } from "./tokens.js";
 
-export async function crearOActualizarCuenta({ telefono, rol, nombre }) {
+export async function crearOActualizarCuenta({ telefono, rol, nombre, estado, ciudad }) {
   const metadata = { rol: rol ?? "cliente", ...(nombre ? { nombre } : {}) };
 
-  return fila(
+  const cuenta = await fila(
     `insert into auth.users (phone, raw_user_meta_data)
      values ($1, $2::jsonb)
      on conflict (phone) do update
@@ -19,6 +19,20 @@ export async function crearOActualizarCuenta({ telefono, rol, nombre }) {
      returning id, phone, phone_confirmed_at`,
     [telefono, JSON.stringify(metadata)],
   );
+
+  // El trigger solo crea el perfil al insertar; en un registro repetido la
+  // ciudad se actualiza aquí.
+  if (cuenta && (estado || ciudad)) {
+    await filas(
+      `update public.usuarios
+          set estado = coalesce($2, estado),
+              ciudad = coalesce($3, ciudad)
+        where id = $1`,
+      [cuenta.id, estado ?? null, ciudad ?? null],
+    );
+  }
+
+  return cuenta;
 }
 
 export async function guardarCodigo(telefono, hash) {

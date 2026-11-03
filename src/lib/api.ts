@@ -253,10 +253,22 @@ export function clearSession() {
   }
 }
 
-export async function requestOtp(input: { telefono: string; nombre?: string; rol?: "cliente" | "conductor" }) {
+export async function requestOtp(input: {
+  telefono: string;
+  nombre?: string;
+  estado?: string;
+  ciudad?: string;
+  rol?: "cliente" | "conductor";
+}) {
   const data = await request<OtpResponse>("/auth/otp", {
     method: "POST",
-    body: { telefono: input.telefono, nombre: input.nombre, rol: input.rol ?? "cliente" },
+    body: {
+      telefono: input.telefono,
+      nombre: input.nombre,
+      estado: input.estado,
+      ciudad: input.ciudad,
+      rol: input.rol ?? "cliente",
+    },
   });
   return data.mensaje ?? "Código enviado";
 }

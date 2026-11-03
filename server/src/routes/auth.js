@@ -79,6 +79,8 @@ const PERFIL_COLUMNS = [
   "telefono_verificado",
   "email",
   "whatsapp",
+  "estado",
+  "ciudad",
   "saldo_billetera",
   "es_conductor",
   "tipo_vehiculo",

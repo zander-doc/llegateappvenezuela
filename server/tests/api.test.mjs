@@ -82,7 +82,7 @@ async function pedir(metodo, ruta, { cuerpo, token, headers = {} } = {}) {
 
 // El canal de OTP en pruebas es el log del servidor: se intercepta para leer
 // el código, igual que haría un SMS real.
-async function pedirCodigo(telefono, { rol = "cliente", nombre } = {}) {
+async function pedirCodigo(telefono, { rol = "cliente", nombre, estado, ciudad } = {}) {
   let codigo = null;
   const original = console.log;
 
@@ -97,7 +97,7 @@ async function pedirCodigo(telefono, { rol = "cliente", nombre } = {}) {
   };
 
   try {
-    const respuesta = await pedir("POST", "/auth/otp", { cuerpo: { telefono, rol, nombre } });
+    const respuesta = await pedir("POST", "/auth/otp", { cuerpo: { telefono, rol, nombre, estado, ciudad } });
     assert.equal(respuesta.status, 202, JSON.stringify(respuesta.cuerpo));
   } finally {
     console.log = original;
@@ -242,6 +242,24 @@ test("el registro por SMS crea la cuenta y entrega tokens propios", async () => 
   assert.ok(!perfil.cuerpo.capacidades.puede_conducir);
 
   sesiones.aspirante = verificado.cuerpo;
+});
+
+test("el registro guarda el estado y la ciudad del pasajero", async () => {
+  const telefono = "+584147777777";
+  const codigo = await pedirCodigo(telefono, {
+    nombre: "Luisa Marcano",
+    estado: "Zulia",
+    ciudad: "Maracaibo",
+  });
+  const verificado = await pedir("POST", "/auth/verify", {
+    cuerpo: { telefono, token: codigo },
+  });
+  assert.equal(verificado.status, 200);
+
+  const perfil = await pedir("GET", "/auth/me", { token: verificado.cuerpo.access_token });
+  assert.equal(perfil.status, 200);
+  assert.equal(perfil.cuerpo.usuario.estado, "Zulia");
+  assert.equal(perfil.cuerpo.usuario.ciudad, "Maracaibo");
 });
 
 test("refresh rota el token y logout revoca solo esa sesión", async () => {

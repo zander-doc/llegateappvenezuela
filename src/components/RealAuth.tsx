@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
   Loader2,
   LogOut,
+  MapPin,
   MessageSquareText,
   Phone,
   ShieldCheck,
@@ -14,6 +16,7 @@ import {
 import { Badge, Button } from "./ui";
 import { RealWallet } from "./RealWallet";
 import { formatUSD } from "../lib/format";
+import { VENEZUELA_LOCATIONS } from "../data/locations";
 import { isPersonName, isVenezuelanPhone, toVenezuelanE164 } from "../lib/validation";
 import {
   ApiError,
@@ -37,6 +40,11 @@ const ROL_LABEL: Record<Rol, string> = {
 };
 
 const RESEND_SECONDS = 30;
+
+const ESTADOS = VENEZUELA_LOCATIONS.map((state) => ({
+  name: state.name.replace(/\s*\(.*\)$/, ""),
+  cities: state.cities,
+}));
 
 function ErrorBox({ children }: { children: string }) {
   return (
@@ -62,6 +70,8 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
   const [paso, setPaso] = useState<Paso>("datos");
   const [telefono, setTelefono] = useState("");
   const [nombre, setNombre] = useState("");
+  const [estado, setEstado] = useState(ESTADOS[0].name);
+  const [ciudad, setCiudad] = useState(ESTADOS[0].cities[0]);
   const [consent, setConsent] = useState(false);
   const [codigo, setCodigo] = useState("");
   const [error, setError] = useState("");
@@ -73,6 +83,8 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
 
   const telefonoId = useId();
   const nombreId = useId();
+  const estadoId = useId();
+  const ciudadId = useId();
   const consentId = useId();
   const codigoId = useId();
 
@@ -118,6 +130,10 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
       setError("Escribe tu nombre y apellido como aparecen en tu cédula.");
       return;
     }
+    if (mode === "register" && (!estado || !ciudad)) {
+      setError("Elige tu estado y tu ciudad.");
+      return;
+    }
     if (mode === "register" && !consent) {
       setError("Acepta los términos para crear tu cuenta.");
       return;
@@ -128,6 +144,8 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
       const mensaje = await requestOtp({
         telefono: e164,
         nombre: mode === "register" ? nombre.trim() : undefined,
+        estado: mode === "register" ? estado : undefined,
+        ciudad: mode === "register" ? ciudad : undefined,
         rol: "cliente",
       });
       setAviso(mensaje);
@@ -175,6 +193,8 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
       const mensaje = await requestOtp({
         telefono: e164,
         nombre: mode === "register" ? nombre.trim() : undefined,
+        estado: mode === "register" ? estado : undefined,
+        ciudad: mode === "register" ? ciudad : undefined,
         rol: "cliente",
       });
       setAviso(mensaje);
@@ -406,6 +426,61 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
                 className="field pl-10"
                 placeholder="María Rodríguez"
               />
+            </div>
+          </div>
+        )}
+
+        {mode === "register" && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor={estadoId} className="label">
+                Estado
+              </label>
+              <div className="relative">
+                <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                <select
+                  id={estadoId}
+                  name="estado"
+                  autoComplete="address-level1"
+                  value={estado}
+                  onChange={(event) => {
+                    const elegido = event.target.value;
+                    setEstado(elegido);
+                    setCiudad(ESTADOS.find((item) => item.name === elegido)?.cities[0] ?? "");
+                  }}
+                  className="field appearance-none pl-10 pr-10"
+                >
+                  {ESTADOS.map((item) => (
+                    <option key={item.name} value={item.name}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+              </div>
+            </div>
+            <div>
+              <label htmlFor={ciudadId} className="label">
+                Ciudad
+              </label>
+              <div className="relative">
+                <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                <select
+                  id={ciudadId}
+                  name="ciudad"
+                  autoComplete="address-level2"
+                  value={ciudad}
+                  onChange={(event) => setCiudad(event.target.value)}
+                  className="field appearance-none pl-10 pr-10"
+                >
+                  {(ESTADOS.find((item) => item.name === estado)?.cities ?? []).map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+              </div>
             </div>
           </div>
         )}

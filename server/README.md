@@ -74,6 +74,8 @@ El saldo, el rol y el estado del piloto son los mismos en ambos clientes.
     "telefono_verificado": true,
     "email": "ana@example.com",
     "whatsapp": null,
+    "estado": "Zulia",
+    "ciudad": "Maracaibo",
     "saldo_billetera": 20
   },
   "conductor": {
@@ -129,7 +131,7 @@ vuelve a ejecutar `npm run build`.
 | GET | `/health` | público | Vida del proceso, sin tocar la base |
 | GET | `/health/db` | público | Prueba la conexión a la base y, si falla, devuelve `codigo` y `mensaje` sin credenciales |
 | GET | `/health/otp` | público | Canal que usará el próximo OTP y si WhatsApp/SMS están configurados (sin credenciales) |
-| POST | `/auth/otp` | público | Envía el código OTP (`telefono`, `rol`, `nombre` opcional) |
+| POST | `/auth/otp` | público | Envía el código OTP (`telefono`, `rol`, `nombre`, `estado` y `ciudad` opcionales) |
 | POST | `/auth/verify` | público | Verifica el código y entrega la sesión |
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
 | POST | `/auth/logout` | autenticado | Cierra la sesión de este dispositivo |
