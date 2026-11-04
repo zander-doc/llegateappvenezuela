@@ -6,6 +6,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -16,11 +17,16 @@ object ApiConfig {
   internal val JSON: okhttp3.MediaType = "application/json; charset=utf-8".toMediaType()
 }
 
-/** `code` es el `error` que publica la API; `httpStatus` vale 0 cuando no hubo conexión. */
+/**
+ * `code` es el `error` que publica la API; las acciones que fallan por el estado del
+ * recurso responden `motivo`, así que también se usa como código. `httpStatus` vale
+ * 0 cuando no hubo conexión y `body` conserva el JSON completo de la respuesta.
+ */
 class ApiException(
   val httpStatus: Int,
   val code: String,
-  override val message: String
+  override val message: String,
+  val body: JSONObject = JSONObject()
 ) : Exception(message)
 
 class ApiClient(
@@ -56,8 +62,11 @@ class ApiClient(
         if (!response.isSuccessful) {
           throw ApiException(
             httpStatus = response.code,
-            code = json.optString("error", if (response.code >= 500) "servidor_no_disponible" else "error"),
-            message = json.optString("mensaje", mensajeSegunEstado(response.code))
+            code = json.stringOrNull("error")
+              ?: json.stringOrNull("motivo")
+              ?: if (response.code >= 500) "servidor_no_disponible" else "error",
+            message = json.optString("mensaje", mensajeSegunEstado(response.code)),
+            body = json
           )
         }
         json
@@ -82,10 +91,14 @@ class ApiClient(
 private const val NO_HAY_CONEXION: String =
   "No pudimos conectar con Llégate. Revisa tu internet e inténtalo de nuevo."
 
-// La API manda los numeric de Postgres como texto ("2.00"), así que todo número
-// puede llegar como número o como cadena.
+// Los `numeric(12,2)` de Postgres pueden llegar como número o como texto ("2.00")
+// según la ruta, así que todo número se lee convirtiendo su representación.
 internal fun JSONObject?.doubleOr(key: String, fallback: Double = 0.0): Double =
   this?.opt(key)?.toString()?.toDoubleOrNull() ?: fallback
+
+/** Para las columnas nullable (`distancia_km`, `comision_usd`): null solo si la API no manda valor. */
+internal fun JSONObject?.doubleOrNull(key: String): Double? =
+  if (this == null || isNull(key)) null else opt(key)?.toString()?.toDoubleOrNull()
 
 internal fun JSONObject?.intOr(key: String, fallback: Int = 0): Int =
   this?.opt(key)?.toString()?.toIntOrNull() ?: fallback
@@ -107,3 +120,6 @@ internal fun JSONObject?.stringOrNull(key: String): String? {
 
 internal fun JSONObject?.stringOr(key: String, fallback: String = ""): String =
   stringOrNull(key) ?: fallback
+
+internal inline fun <T> JSONArray?.listar(transformar: (JSONObject) -> T): List<T> =
+  if (this == null) emptyList() else List(length()) { transformar(getJSONObject(it)) }

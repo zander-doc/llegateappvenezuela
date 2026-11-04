@@ -15,10 +15,16 @@ tarifas se leen de `/config/app` y se calculan con la misma fórmula que la web
 (`model/Models.kt::tarifaUsd`).
 
 Sigue simulado: los pilotos cercanos, la búsqueda y el seguimiento del viaje y el
-historial, porque la app todavía no tiene viajes reales en la API. También falta
-la billetera con recargas y la verificación de documentos del piloto. La vitrina
-de concesionarios (`automotivePartners`) lista beneficios comerciales que aún no
-están firmados: hay que confirmarlos o retirarlos antes de publicar.
+historial. La capa de datos de viajes y billetera ya está escrita y probada contra
+los JSON reales de la API (`network/AuthorizedClient.kt` renueva el token y
+reintenta ante un 401; `TripRepository.kt` traduce los `409 + motivo` de los RPC a
+frases entendibles; `WalletRepository.kt` lee saldo, reserva y límites de
+`/wallet/billetera`), pero todavía no está conectada a ninguna pantalla. Lo que
+sigue es eso: pedir y seguir el viaje con `/trips`, y las recargas con el mismo
+flujo de la web (`/payments/intents` + reporte). También falta la verificación de
+documentos del piloto. La vitrina de concesionarios (`automotivePartners`) lista
+beneficios comerciales que aún no están firmados: hay que confirmarlos o retirarlos
+antes de publicar.
 
 ## Requisitos
 

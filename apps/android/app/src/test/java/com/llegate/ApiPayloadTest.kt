@@ -86,7 +86,7 @@ class ApiPayloadTest {
 
   @Test
   fun `me separa pasajero piloto y saldo`() {
-    // saldo_billetera llega numeric(12,2) y Postgres lo serializa como texto.
+    // saldo_billetera es numeric(12,2): la app lo acepta número o como texto ("7.50").
     val pasajero = usuarioFrom(
       JSONObject(
         """

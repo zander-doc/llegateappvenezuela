@@ -1,6 +1,5 @@
 package com.llegate.network
 
-import org.json.JSONArray
 import org.json.JSONObject
 
 data class Servicio(
@@ -97,9 +96,6 @@ private fun servicioFrom(json: JSONObject): Servicio = Servicio(
   estaEnLanzamiento = json.optString("status") == "launch",
   fase = json.stringOrNull("phase")
 )
-
-private inline fun <T> JSONArray?.listar(transformar: (JSONObject) -> T): List<T> =
-  if (this == null) emptyList() else List(length()) { transformar(getJSONObject(it)) }
 
 class ConfigRepository(private val api: ApiClient = ApiClient()) {
   /** `/config/app` es la única fuente de precios y reglas: la app no los trae fijados. */

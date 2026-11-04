@@ -117,6 +117,7 @@ data class PriceEstimate(
 enum class PaymentMethod(
     val title: String,
     val subtitle: String,
+    /** Valor de `public.metodo_pago` que se le envía a la API al crear el viaje. */
     val identifier: String
 ) {
     PAGO_MOVIL(
@@ -127,12 +128,12 @@ enum class PaymentMethod(
     EFECTIVO_USD(
         title = "Efectivo $",
         subtitle = "Divisas en mano (cambio verificado)",
-        identifier = "efectivo_usd"
+        identifier = "efectivo"
     ),
     SALDO_LLEGATE(
         title = "Saldo Llégate",
         subtitle = "Billetera prepaga de la cuenta",
-        identifier = "saldo_llegate"
+        identifier = "saldo"
     )
 }
 

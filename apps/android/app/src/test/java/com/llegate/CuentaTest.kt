@@ -49,7 +49,7 @@ class CuentaTest {
   @Test
   fun `los metodos de pago son los mismos que ofrece la web`() {
     assertEquals(
-      listOf("pago_movil", "efectivo_usd", "saldo_llegate"),
+      listOf("pago_movil", "efectivo", "saldo"),
       PaymentMethod.entries.map(PaymentMethod::identifier)
     )
   }

@@ -72,6 +72,8 @@ class AuthRepository(
   private val store: SessionStore
 ) {
 
+  private val http = AuthorizedClient(api, store)
+
   val tieneSesion: Boolean get() = store.tieneSesion
 
   /** Devuelve el mensaje que la API manda mostrar (WhatsApp, SMS o el aviso de fallback). */
@@ -88,16 +90,7 @@ class AuthRepository(
     return session
   }
 
-  suspend fun perfil(): Usuario {
-    val token = store.accessTokenVigente() ?: renovar()?.accessToken ?: throw sinSesion()
-    return try {
-      usuarioFrom(api.get("/auth/me", token))
-    } catch (e: ApiException) {
-      if (e.httpStatus != 401) throw e
-      val renovada = renovar() ?: throw e
-      usuarioFrom(api.get("/auth/me", renovada.accessToken))
-    }
-  }
+  suspend fun perfil(): Usuario = usuarioFrom(http.get("/auth/me"))
 
   suspend fun cerrarSesion() {
     val token = store.accessToken()
@@ -110,19 +103,4 @@ class AuthRepository(
       }
     }
   }
-
-  private suspend fun renovar(): Session? = try {
-    val refresh = store.refreshToken() ?: return null
-    val session = sessionFrom(
-      api.post("/auth/refresh", JSONObject().put("refresh_token", refresh))
-    )
-    store.save(session)
-    session
-  } catch (e: ApiException) {
-    if (e.httpStatus == 401) store.clear()
-    null
-  }
-
-  private fun sinSesion() =
-    ApiException(401, "sin_sesion", "Inicia sesión con tu código para continuar.")
 }
