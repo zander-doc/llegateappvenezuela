@@ -1,12 +1,17 @@
 # Despliegue en Render: un servicio para la API y otro para la web.
 # La base de datos sigue en Neon; Render solo ejecuta el código.
+#
+# El monorepo vive en esta raíz, así que cada servicio apunta a su subdirectorio:
+# la web se construye desde lllegate-sim y la API desde lllegate-sim/server.
+# Cada uno instala con SU propio package-lock.json; si cambias un package.json
+# sin regenerar su lockfile, `npm ci` de Render falla.
 services:
   - type: web
     name: llegate-app-api
     runtime: node
     plan: free
     region: ohio
-    rootDir: server
+    rootDir: lllegate-sim/server
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /health
@@ -37,6 +42,7 @@ services:
   - type: web
     name: llegate-app-web
     runtime: static
+    rootDir: lllegate-sim
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     routes:
