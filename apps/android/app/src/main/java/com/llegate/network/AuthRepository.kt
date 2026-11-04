@@ -89,7 +89,7 @@ class AuthRepository(
   }
 
   suspend fun perfil(): Usuario {
-    val token = store.accessToken() ?: throw sinSesion()
+    val token = store.accessTokenVigente() ?: renovar()?.accessToken ?: throw sinSesion()
     return try {
       usuarioFrom(api.get("/auth/me", token))
     } catch (e: ApiException) {
@@ -102,7 +102,13 @@ class AuthRepository(
   suspend fun cerrarSesion() {
     val token = store.accessToken()
     store.clear()
-    if (token != null) runCatching { api.post("/auth/logout", JSONObject(), token) }
+    if (token != null) {
+      try {
+        api.post("/auth/logout", JSONObject(), token)
+      } catch (fallo: ApiException) {
+        // La sesión local ya se cerró; si la API no responde, el access_token muere solo.
+      }
+    }
   }
 
   private suspend fun renovar(): Session? = try {

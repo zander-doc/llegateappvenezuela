@@ -2,10 +2,12 @@ package com.llegate
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.llegate.data.SessionStore
 import com.llegate.model.CommunityAlertType
 import com.llegate.model.LocationPoint
 import com.llegate.model.MapDisplayMode
 import com.llegate.model.ServiceType
+import com.llegate.network.AuthRepository
 import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
 import org.junit.Assert.assertEquals
@@ -20,6 +22,11 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class LlegateViewModelTest {
 
+  private fun nuevoViewModel(): LlegateViewModel {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    return LlegateViewModel(AuthRepository(store = SessionStore(context)))
+  }
+
   @Test
   fun `read string from context`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
@@ -29,7 +36,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify initial viewmodel state and navigation`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     val initialState = viewModel.uiState.value
 
     assertEquals(AppScreen.HOME, initialState.currentScreen)
@@ -60,7 +67,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify city selector and aragua default launch hub`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     val state = viewModel.uiState.value
 
     // Aragua is default launch hub
@@ -81,7 +88,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify trip history and single-tap repeat trip`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     val state = viewModel.uiState.value
 
     // Check pre-seeded trips
@@ -105,7 +112,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify dynamic gps telemetry and map mode switching`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     val state = viewModel.uiState.value
 
     // GPS Telemetry initial checks
@@ -130,7 +137,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify community alerts reporting and upvoting`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     val state = viewModel.uiState.value
 
     assertTrue(state.communityAlerts.isNotEmpty())
@@ -157,7 +164,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify smart location suggestions and 1-tap route selection`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     val state = viewModel.uiState.value
 
     assertTrue(state.currentSuggestions.isNotEmpty())
@@ -172,7 +179,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify safe meeting points delivery estimates and driver toggle`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     val state = viewModel.uiState.value
 
     // Check delivery estimate exists
@@ -205,7 +212,7 @@ class LlegateViewModelTest {
 
   @Test
   fun `verify request ride screen origin destination swap and send request to nearby drivers`() {
-    val viewModel = LlegateViewModel()
+    val viewModel = nuevoViewModel()
     viewModel.openBooking(ServiceType.MOTO)
 
     val bookingState = viewModel.uiState.value

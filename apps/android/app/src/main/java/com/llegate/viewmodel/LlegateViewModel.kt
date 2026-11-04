@@ -27,8 +27,14 @@ import com.llegate.model.SubscriptionPlan
 import com.llegate.model.TripHistoryItem
 import com.llegate.model.TripStep
 import com.llegate.model.UpcomingService
+import com.llegate.network.ApiException
+import com.llegate.network.AuthRepository
 import com.llegate.network.BcvRateService
+import com.llegate.network.Usuario
+import com.llegate.util.aE164Venezuela
+import com.llegate.util.esNombrePersona
 import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +54,11 @@ enum class AppScreen {
     BOOKING_DETAILS,
     TRIP_ACTIVE,
     TRIP_HISTORY
+}
+
+enum class PasoInicio {
+    DATOS,
+    CODIGO
 }
 
 data class LlegateUiState(
@@ -400,6 +411,16 @@ data class LlegateUiState(
     val showTripRatingSheet: Boolean = false,
     val tripRating: Int = 5,
     val selectedTipUsd: Double = 0.0,
+    val cuenta: Usuario? = null,
+    val pasoInicio: PasoInicio = PasoInicio.DATOS,
+    val telefono: String = "",
+    val nombre: String = "",
+    val codigo: String = "",
+    val aceptaTerminos: Boolean = false,
+    val revisandoSesion: Boolean = false,
+    val enviandoCodigo: Boolean = false,
+    val verificandoCodigo: Boolean = false,
+    val reenvioEn: Int = 0,
     val statusMessage: String? = null,
     // MODERN DYNAMIC GPS, TELEMETRY & COMMUNITY
     val mapDisplayMode: MapDisplayMode = MapDisplayMode.LIVE_TRAFFIC,
@@ -529,17 +550,158 @@ data class LlegateUiState(
         }
 }
 
-class LlegateViewModel : ViewModel() {
+class LlegateViewModel(private val auth: AuthRepository) : ViewModel() {
 
     private val bcvRateService = BcvRateService()
-    private val _uiState = MutableStateFlow(LlegateUiState())
+    private val _uiState = MutableStateFlow(
+        LlegateUiState(revisandoSesion = auth.tieneSesion)
+    )
     val uiState: StateFlow<LlegateUiState> = _uiState.asStateFlow()
 
     private var tripSimulationJob: Job? = null
+    private var reenvioJob: Job? = null
 
     init {
         recalculateEstimates()
         fetchBcvExchangeRate(showToast = false)
+        revisarSesion()
+    }
+
+    fun revisarSesion() {
+        if (!auth.tieneSesion) return
+        viewModelScope.launch {
+            val perfil = try {
+                auth.perfil()
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                null
+            }
+            _uiState.update { it.copy(cuenta = perfil, revisandoSesion = false) }
+        }
+    }
+
+    fun onTelefono(valor: String) {
+        _uiState.update { it.copy(telefono = valor) }
+    }
+
+    fun onNombre(valor: String) {
+        _uiState.update { it.copy(nombre = valor) }
+    }
+
+    fun onCodigo(valor: String) {
+        _uiState.update { it.copy(codigo = valor.filter(Char::isDigit).take(6)) }
+    }
+
+    fun setAceptaTerminos(valor: Boolean) {
+        _uiState.update { it.copy(aceptaTerminos = valor) }
+    }
+
+    fun volverAEditarTelefono() {
+        _uiState.update { it.copy(pasoInicio = PasoInicio.DATOS, codigo = "") }
+    }
+
+    fun enviarCodigo() {
+        val state = _uiState.value
+        val e164 = aE164Venezuela(state.telefono)
+        when {
+            e164 == null -> avisar("Escribe un número venezolano, por ejemplo 0414 1234567.")
+            state.nombre.isNotBlank() && !esNombrePersona(state.nombre) ->
+                avisar("Escribe tu nombre y apellido como aparecen en tu cédula.")
+            !state.aceptaTerminos ->
+                avisar("Debes aceptar los términos para usar Llégate.")
+            else -> viewModelScope.launch {
+                _uiState.update { it.copy(enviandoCodigo = true) }
+                try {
+                    val mensaje = auth.pedirCodigo(e164, nombre = state.nombre.trim().ifBlank { null })
+                    _uiState.update {
+                        it.copy(
+                            pasoInicio = PasoInicio.CODIGO,
+                            codigo = "",
+                            telefono = e164,
+                            reenvioEn = SEGUNDOS_REENVIO,
+                            statusMessage = mensaje
+                        )
+                    }
+                    iniciarContadorReenvio()
+                } catch (fallo: ApiException) {
+                    _uiState.update { it.copy(statusMessage = fallo.message) }
+                } catch (fallo: Exception) {
+                    if (fallo is CancellationException) throw fallo
+                    _uiState.update { it.copy(statusMessage = FALLA_GENERICO) }
+                } finally {
+                    _uiState.update { it.copy(enviandoCodigo = false) }
+                }
+            }
+        }
+    }
+
+    fun verificarCodigo() {
+        val state = _uiState.value
+        val e164 = aE164Venezuela(state.telefono)
+        when {
+            e164 == null -> avisar("Escribe un número venezolano, por ejemplo 0414 1234567.")
+            state.codigo.length != 6 -> avisar("El código tiene 6 dígitos.")
+            else -> viewModelScope.launch {
+                _uiState.update { it.copy(verificandoCodigo = true) }
+                try {
+                    auth.verificarCodigo(e164, state.codigo)
+                    val perfil = auth.perfil()
+                    _uiState.update {
+                        it.copy(
+                            cuenta = perfil,
+                            revisandoSesion = false,
+                            pasoInicio = PasoInicio.DATOS,
+                            codigo = "",
+                            statusMessage = "Listo, ${perfil.nombre?.substringBefore(' ') ?: "pana"}. Tu cuenta está activa."
+                        )
+                    }
+                } catch (fallo: ApiException) {
+                    _uiState.update { it.copy(statusMessage = fallo.message) }
+                } catch (fallo: Exception) {
+                    if (fallo is CancellationException) throw fallo
+                    _uiState.update { it.copy(statusMessage = FALLA_GENERICO) }
+                } finally {
+                    _uiState.update { it.copy(verificandoCodigo = false) }
+                }
+            }
+        }
+    }
+
+    fun cerrarSesion() {
+        viewModelScope.launch {
+            auth.cerrarSesion()
+            tripSimulationJob?.cancel()
+            _uiState.update {
+                it.copy(
+                    cuenta = null,
+                    currentScreen = AppScreen.HOME,
+                    activeTrip = null,
+                    pasoInicio = PasoInicio.DATOS,
+                    codigo = "",
+                    nombre = "",
+                    statusMessage = "Sesión cerrada."
+                )
+            }
+        }
+    }
+
+    private fun iniciarContadorReenvio() {
+        reenvioJob?.cancel()
+        reenvioJob = viewModelScope.launch {
+            while (_uiState.value.reenvioEn > 0) {
+                delay(1000)
+                _uiState.update { it.copy(reenvioEn = (it.reenvioEn - 1).coerceAtLeast(0)) }
+            }
+        }
+    }
+
+    private fun avisar(mensaje: String) {
+        _uiState.update { it.copy(statusMessage = mensaje) }
+    }
+
+    private companion object {
+        const val SEGUNDOS_REENVIO = 30
+        const val FALLA_GENERICO = "No pudimos comunicarte con Llégate. Intenta de nuevo."
     }
 
     fun selectState(stateId: String) {
