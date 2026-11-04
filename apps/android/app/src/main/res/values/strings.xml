@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Llégate</string>
+    <string name="greeting_title">¡Epa, mi pana!</string>
+    <string name="greeting_subtitle">¿A dónde nos vamos hoy?</string>
+    <string name="service_moto_title">Llégate en Moto</string>
+    <string name="service_moto_desc">Rápido en la cola • Casco garantizado</string>
+    <string name="service_car_title">Llégate en Carro</string>
+    <string name="service_car_desc">Cómodo con aire • Maletas y hasta 4 panas</string>
+    <string name="btn_confirm_ride">¡Llégate ya!</string>
+    <string name="btn_my_cola">Pedir mi cola</string>
+    <string name="cancel_trip">Cancelar Viaje</string>
+    <string name="tag_coming_soon">Próximamente</string>
+</resources>
