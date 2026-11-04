@@ -7,12 +7,18 @@ compartidos: una cuenta, dos clientes.
 
 ## Estado
 
-La capa de red ya existe (`network/ApiClient.kt`, `AuthRepository`,
-`ConfigRepository` y `data/SessionStore`), pero ninguna pantalla la usa todavía:
-la UI sigue funcionando con datos sembrados en `LlegateViewModel`, y el viaje es
-un temporizador simulado. El siguiente paso es la pantalla de ingreso por código
-y, después, que las tarifas se lean de `/config/app` en lugar de los `enum`
-fijos de `model/Models.kt`.
+El ingreso ya es real: `ui/screens/LoginScreen.kt` pide el código en `/auth/otp`,
+verifica en `/auth/verify` y guarda la sesión en `data/SessionStore`. La hoja de
+cuenta del icono de persona muestra el nombre, el teléfono enmascarado y el saldo
+que devuelve `/auth/me`, y su botón de cerrar sesión invalida el token. Las
+tarifas se leen de `/config/app` y se calculan con la misma fórmula que la web
+(`model/Models.kt::tarifaUsd`).
+
+Sigue simulado: los pilotos cercanos, la búsqueda y el seguimiento del viaje y el
+historial, porque la app todavía no tiene viajes reales en la API. También falta
+la billetera con recargas y la verificación de documentos del piloto. La vitrina
+de concesionarios (`automotivePartners`) lista beneficios comerciales que aún no
+están firmados: hay que confirmarlos o retirarlos antes de publicar.
 
 ## Requisitos
 

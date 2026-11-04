@@ -23,7 +23,6 @@ import com.llegate.model.PriceEstimate
 import com.llegate.model.SafeMeetingPoint
 import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
-import com.llegate.model.SubscriptionPlan
 import com.llegate.model.tarifaUsd
 import com.llegate.model.TripHistoryItem
 import com.llegate.model.TripStep
@@ -327,48 +326,6 @@ data class LlegateUiState(
             highlightPerk = "Eje Industrial Aragua-Carabobo"
         )
     ),
-    val subscriptionPlans: List<SubscriptionPlan> = listOf(
-        SubscriptionPlan(
-            id = "conductor_cero",
-            title = "Plan Conductor 0% Comisión (Aragua Hub)",
-            subtitle = "Quédate con el 100% de lo que cobras en cada carrera",
-            price = "$15 / mes o semanal en Bs.",
-            badge = "100% Ganancia Neta",
-            benefits = listOf(
-                "0% de comisión en Maracay, Cagua, Turmero y la ARC",
-                "Asignación prioritaria en horas pico",
-                "15% de descuento en repuestos y baterías aliadas",
-                "Soporte local en Maracay 24/7 de pana a pana"
-            ),
-            isHighlighted = true
-        ),
-        SubscriptionPlan(
-            id = "llegate_rosa",
-            title = "Llégate Rosa Aragua",
-            subtitle = "Exclusivo para conductoras y mototaxistas mujeres",
-            price = "Cuota solidaria",
-            badge = "Seguridad Femenina",
-            benefits = listOf(
-                "Transporte exclusivo para clientas y familias aragüeñas",
-                "Botón de pánico con enlace a cuadrantes de paz",
-                "Verificación prioritaria de pasajeras",
-                "Comunidad solidaria de conductoras en Aragua y Carabobo"
-            )
-        ),
-        SubscriptionPlan(
-            id = "pasajero_vip",
-            title = "Club Pasajero VIP Llégate",
-            subtitle = "Para quien se mueve a diario en Aragua, Carabobo o Guárico",
-            price = "$9.99 / mes",
-            badge = "Sin Tarifa Dinámica",
-            benefits = listOf(
-                "Prioridad de asignación en lluvia y horas pico",
-                "Sin recargo por tarifas dinámicas imprevistas",
-                "Cancelaciones gratuitas hasta 5 min después del pedido",
-                "Atención preferencial de pana a pana"
-            )
-        )
-    ),
     val automotivePartners: List<AutomotivePartner> = listOf(
         AutomotivePartner(
             name = "Bera Motors Maracay - Concesionario Central",
@@ -403,12 +360,10 @@ data class LlegateUiState(
     val driverNote: String = "",
     val activeTrip: ActiveTrip? = null,
     val bcvExchangeRate: Double = 889.26,
-    val bcvLastUpdated: String = "Hoy",
     val isFetchingBcvRate: Boolean = false,
     val isFetchingGps: Boolean = false,
     val selectedUpcomingService: UpcomingService? = null,
-    val selectedSubscriptionPlan: SubscriptionPlan? = null,
-    val showSubscriptionsModal: Boolean = false,
+    val showCuentaModal: Boolean = false,
     val showVitrinaModal: Boolean = false,
     val showCancelDialog: Boolean = false,
     val showTripRatingSheet: Boolean = false,
@@ -698,6 +653,7 @@ class LlegateViewModel(
                     cuenta = null,
                     currentScreen = AppScreen.HOME,
                     activeTrip = null,
+                    showCuentaModal = false,
                     pasoInicio = PasoInicio.DATOS,
                     codigo = "",
                     nombre = "",
@@ -789,14 +745,24 @@ class LlegateViewModel(
     fun fetchBcvExchangeRate(showToast: Boolean = true) {
         viewModelScope.launch {
             _uiState.update { it.copy(isFetchingBcvRate = true) }
-            val result = bcvRateService.fetchOfficialRate()
+            val tasa = bcvRateService.fetchOfficialRate()
             _uiState.update {
-                it.copy(
-                    bcvExchangeRate = (result.rate * 100).roundToInt() / 100.0,
-                    bcvLastUpdated = result.lastUpdate,
-                    isFetchingBcvRate = false,
-                    statusMessage = if (showToast) "Tasa BCV actualizada: ${String.format(Locale.US, "%.2f", result.rate)} Bs/$" else it.statusMessage
-                )
+                if (tasa == null) {
+                    it.copy(
+                        isFetchingBcvRate = false,
+                        statusMessage = if (showToast)
+                            "No pudimos traer la tasa BCV; seguimos con ${String.format(Locale.US, "%.2f", it.bcvExchangeRate)} Bs/$."
+                        else it.statusMessage
+                    )
+                } else {
+                    it.copy(
+                        bcvExchangeRate = (tasa * 100).roundToInt() / 100.0,
+                        isFetchingBcvRate = false,
+                        statusMessage = if (showToast)
+                            "Tasa BCV actualizada: ${String.format(Locale.US, "%.2f", tasa)} Bs/$"
+                        else it.statusMessage
+                    )
+                }
             }
             recalculateEstimates()
         }
@@ -840,16 +806,12 @@ class LlegateViewModel(
         _uiState.update { it.copy(selectedUpcomingService = service) }
     }
 
-    fun showSubscriptions(show: Boolean) {
-        _uiState.update { it.copy(showSubscriptionsModal = show) }
+    fun mostrarCuenta(show: Boolean) {
+        _uiState.update { it.copy(showCuentaModal = show) }
     }
 
     fun showVitrina(show: Boolean) {
         _uiState.update { it.copy(showVitrinaModal = show) }
-    }
-
-    fun selectSubscriptionPlan(plan: SubscriptionPlan?) {
-        _uiState.update { it.copy(selectedSubscriptionPlan = plan) }
     }
 
     fun showCancelPrompt(show: Boolean) {

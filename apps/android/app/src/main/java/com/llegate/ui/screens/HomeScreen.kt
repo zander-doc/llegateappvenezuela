@@ -36,7 +36,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AirportShuttle
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CardMembership
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -110,6 +109,8 @@ import com.llegate.ui.theme.Stone200
 import com.llegate.ui.theme.Stone300
 import com.llegate.ui.theme.Stone400
 import com.llegate.ui.theme.Stone50
+import com.llegate.util.enmascararTelefono
+import com.llegate.util.usd
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
 
@@ -306,13 +307,13 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Ingresar Button (From screenshot)
+                // Botón de cuenta: abre la hoja con el saldo real y el cierre de sesión
                 Surface(
-                    onClick = { viewModel.showSubscriptions(true) },
+                    onClick = { viewModel.mostrarCuenta(true) },
                     shape = RoundedCornerShape(16.dp),
                     color = Asphalt950.copy(alpha = 0.90f),
                     border = BorderStroke(1.dp, Asphalt700),
-                    modifier = Modifier.testTag("btn_ingresar_perfil")
+                    modifier = Modifier.testTag("btn_abrir_cuenta")
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -320,13 +321,14 @@ fun HomeScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Person,
-                            contentDescription = "Ingresar",
+                            contentDescription = "Mi cuenta",
                             tint = Stone100,
                             modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Ingresar",
+                            text = uiState.cuenta?.nombre?.trim()?.substringBefore(' ')?.takeIf { it.isNotBlank() }
+                                ?: "Mi cuenta",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = Stone100
@@ -1291,87 +1293,85 @@ fun HomeScreen(
         )
     }
 
-    // MODAL: SUSCRIPCIONES (CONDUCTORES Y CLUB VIP)
-    if (uiState.showSubscriptionsModal) {
+    // HOJA DE CUENTA: datos reales de /auth/me (saldo, teléfono y estado del piloto)
+    if (uiState.showCuentaModal) {
+        val cuenta = uiState.cuenta
+        val piloto = cuenta?.conductor
         AlertDialog(
-            onDismissRequest = { viewModel.showSubscriptions(false) },
+            onDismissRequest = { viewModel.mostrarCuenta(false) },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.showSubscriptions(false) },
-                    colors = ButtonDefaults.buttonColors(containerColor = RacingYellow500)
+                    onClick = { viewModel.cerrarSesion() },
+                    colors = ButtonDefaults.buttonColors(containerColor = RacingRed500),
+                    modifier = Modifier.testTag("btn_cerrar_sesion")
                 ) {
-                    Text("Cerrar", color = Asphalt950, fontWeight = FontWeight.Black)
+                    Text("Cerrar sesión", color = Stone100, fontWeight = FontWeight.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.mostrarCuenta(false) }) {
+                    Text("Volver", color = Stone400)
                 }
             },
             containerColor = Asphalt900,
             title = {
                 Column {
                     Text(
-                        text = "Club Llégate & Pilotos",
+                        text = cuenta?.nombre?.takeIf { it.isNotBlank() } ?: "Mi cuenta",
                         fontWeight = FontWeight.Black,
                         fontSize = 18.sp,
                         color = Stone100
                     )
                     Text(
-                        text = "0% comisión para conductores y beneficios VIP",
+                        text = if (cuenta?.rol == "conductor") "Piloto Llégate" else "Pasajero Llégate",
                         fontSize = 12.sp,
                         color = NeonOrange400
                     )
                 }
             },
             text = {
-                LazyColumn(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(uiState.subscriptionPlans) { plan ->
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Asphalt800),
-                            border = BorderStroke(1.dp, if (plan.isHighlighted) RacingYellow500 else Asphalt700),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = plan.title,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = Stone100
-                                    )
-                                    Surface(
-                                        color = if (plan.isHighlighted) RacingYellow500 else Asphalt700,
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
-                                        Text(
-                                            text = plan.badge,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = if (plan.isHighlighted) Asphalt950 else Stone100,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = plan.subtitle,
-                                    fontSize = 11.sp,
-                                    color = Stone400
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = plan.price,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = RacingYellow500
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                plan.benefits.forEach { b ->
-                                    Text(text = "• $b", fontSize = 11.sp, color = Stone400)
-                                }
-                            }
+                    FilaCuenta(
+                        etiqueta = "Saldo Llégate",
+                        valor = usd(cuenta?.saldoBilletera ?: 0.0),
+                        destacado = true
+                    )
+                    Text(
+                        text = "La comisión del 10% se descuenta del saldo al completar cada viaje. " +
+                            "No hay mensualidad. Las recargas empiezan en $5 y se aprueban en unos 15 minutos.",
+                        fontSize = 11.sp,
+                        color = Stone400
+                    )
+                    HorizontalDivider(color = Asphalt700)
+                    FilaCuenta(
+                        etiqueta = "Teléfono",
+                        valor = enmascararTelefono(cuenta?.telefono)
+                    )
+                    if (piloto != null) {
+                        val estadoPiloto = when (piloto.verificacion) {
+                            "aprobado" -> "Aprobado y activo"
+                            "rechazado" -> "Rechazado"
+                            else -> "Por revisar"
+                        }
+                        FilaCuenta(
+                            etiqueta = "Verificación piloto",
+                            valor = if (piloto.aprobado) estadoPiloto else "$estadoPiloto • envía tus documentos para conducir"
+                        )
+                        val vehiculo = listOf(piloto.tipoVehiculo, piloto.placa)
+                            .filter { !it.isNullOrBlank() }
+                            .joinToString(" • ")
+                        if (vehiculo.isNotBlank()) {
+                            FilaCuenta(etiqueta = "Vehículo", valor = vehiculo)
+                        }
+                        if (!piloto.aprobado && !piloto.motivoRechazo.isNullOrBlank()) {
+                            Text(
+                                text = "Motivo: ${piloto.motivoRechazo}",
+                                fontSize = 11.sp,
+                                color = RacingRed500
+                            )
                         }
                     }
                 }
@@ -1658,5 +1658,35 @@ fun UpcomingServiceItem(
                 maxLines = 2
             )
         }
+    }
+}
+
+@Composable
+private fun FilaCuenta(
+    etiqueta: String,
+    valor: String,
+    destacado: Boolean = false
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = etiqueta,
+            fontSize = 12.sp,
+            color = Stone400
+        )
+        Text(
+            text = valor,
+            fontSize = if (destacado) 18.sp else 12.sp,
+            fontWeight = if (destacado) FontWeight.Black else FontWeight.Bold,
+            color = when {
+                destacado -> RacingYellow500
+                else -> Stone100
+            },
+            textAlign = TextAlign.End,
+            modifier = Modifier.padding(start = 12.dp)
+        )
     }
 }

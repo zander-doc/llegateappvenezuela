@@ -196,7 +196,8 @@ fun LeafletDarkMapView(
                         destLng = destination.lng,
                         destTitle = destination.title
                     )
-                    loadDataWithBaseURL("https://llegate.app", htmlContent, "text/html", "UTF-8", null)
+                    // El HTML es propio y todos sus recursos usan URL absolutas, así que no necesita dominio base.
+                    loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
                     webViewInstance = this
                 }
             },

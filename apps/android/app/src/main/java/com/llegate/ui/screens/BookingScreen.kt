@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocationOn
@@ -98,6 +97,7 @@ import com.llegate.ui.theme.RacingYellow500
 import com.llegate.ui.theme.Stone100
 import com.llegate.ui.theme.Stone300
 import com.llegate.ui.theme.Stone400
+import com.llegate.util.usd
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
 import java.util.Locale
@@ -736,15 +736,9 @@ fun RequestRideScreen(
                         )
 
                         PaymentMethodRow(
-                            method = PaymentMethod.PUNTO_YA,
-                            icon = Icons.Default.CreditCard,
-                            isSelected = uiState.selectedPaymentMethod == PaymentMethod.PUNTO_YA,
-                            onSelect = { viewModel.selectPaymentMethod(PaymentMethod.PUNTO_YA) }
-                        )
-
-                        PaymentMethodRow(
                             method = PaymentMethod.SALDO_LLEGATE,
                             icon = Icons.Default.AccountBalanceWallet,
+                            subtitle = "Billetera prepaga (${usd(uiState.cuenta?.saldoBilletera ?: 0.0)} disponible)",
                             isSelected = uiState.selectedPaymentMethod == PaymentMethod.SALDO_LLEGATE,
                             onSelect = { viewModel.selectPaymentMethod(PaymentMethod.SALDO_LLEGATE) }
                         )
@@ -838,6 +832,7 @@ fun PaymentMethodRow(
     method: PaymentMethod,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     isSelected: Boolean,
+    subtitle: String = method.subtitle,
     onSelect: () -> Unit
 ) {
     Surface(
@@ -869,7 +864,7 @@ fun PaymentMethodRow(
                     color = if (isSelected) Stone100 else Stone300
                 )
                 Text(
-                    text = method.subtitle,
+                    text = subtitle,
                     fontSize = 11.sp,
                     color = Stone400
                 )

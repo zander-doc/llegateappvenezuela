@@ -96,16 +96,6 @@ data class AutomotivePartner(
     val description: String
 )
 
-data class SubscriptionPlan(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-    val price: String,
-    val badge: String,
-    val benefits: List<String>,
-    val isHighlighted: Boolean = false
-)
-
 data class LocationPoint(
     val title: String,
     val subtitle: String,
@@ -131,7 +121,7 @@ enum class PaymentMethod(
 ) {
     PAGO_MOVIL(
         title = "Pago Móvil",
-        subtitle = "Banesco / BDV / Mercantil al instante",
+        subtitle = "Transferencia en Bs. a la tasa BCV del día",
         identifier = "pago_movil"
     ),
     EFECTIVO_USD(
@@ -139,14 +129,9 @@ enum class PaymentMethod(
         subtitle = "Divisas en mano (cambio verificado)",
         identifier = "efectivo_usd"
     ),
-    PUNTO_YA(
-        title = "Punto de Venta / Tarjeta",
-        subtitle = "Paga directo al conductor con tarjeta",
-        identifier = "punto_ya"
-    ),
     SALDO_LLEGATE(
         title = "Saldo Llégate",
-        subtitle = "Billetera digital ($15.00 disponible)",
+        subtitle = "Billetera prepaga de la cuenta",
         identifier = "saldo_llegate"
     )
 }
