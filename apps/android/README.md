@@ -16,7 +16,9 @@ tarifas se leen de `/config/app` y se calculan con la misma fórmula que la web
 
 Sigue simulado: los pilotos cercanos, la búsqueda y el seguimiento del viaje y el
 historial. La billetera ya es real: la hoja de cuenta lee `/wallet/billetera` (saldo
-disponible, reserva y estado) y el botón «Recargar» abre `RecargaSheet`, que recorre
+disponible, reserva y estado) y `/wallet/movimientos` (los tres últimos movimientos, con
+su signo y su estado — una recarga `en_revision` se ve amarilla hasta que un admin la
+confirma). El botón «Recargar» abre `RecargaSheet`, que recorre
 el mismo flujo de la web — monto y método, `/payments/intents`, los datos del comercio
 para Pago Móvil o el checkout de Binance Pay, y el reporte de la referencia que deja la
 recarga `en_revision` hasta que un admin la confirma (`network/PagoRepository.kt`

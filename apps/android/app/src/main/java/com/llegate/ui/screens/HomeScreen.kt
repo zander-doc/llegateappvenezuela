@@ -94,6 +94,7 @@ import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
 import com.llegate.model.UpcomingService
 import com.llegate.network.EstadoPago
+import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
 import com.llegate.ui.components.CommunityReportDialog
@@ -122,6 +123,7 @@ import com.llegate.ui.theme.Stone50
 import com.llegate.util.bs
 import com.llegate.util.enmascararTelefono
 import com.llegate.util.usd
+import com.llegate.util.usdConSigno
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.PasoRecarga
@@ -1385,6 +1387,17 @@ fun HomeScreen(
                         color = Stone400
                     )
                     HorizontalDivider(color = Asphalt700)
+                    if (billetera != null) {
+                        val recientes = uiState.movimientos.take(3)
+                        Text(
+                            text = if (recientes.isEmpty()) "Aún no hay movimientos." else "Últimos movimientos",
+                            fontSize = 11.sp,
+                            fontFamily = LlegateBody,
+                            color = Stone400
+                        )
+                        recientes.forEach { FilaMovimiento(it) }
+                        HorizontalDivider(color = Asphalt700)
+                    }
                     FilaCuenta(
                         etiqueta = "Teléfono",
                         valor = enmascararTelefono(cuenta?.telefono),
@@ -1703,6 +1716,41 @@ fun UpcomingServiceItem(
                 maxLines = 2
             )
         }
+    }
+}
+
+@Composable
+private fun FilaMovimiento(movimiento: Movimiento) {
+    val detalle = listOfNotNull(movimiento.fechaTexto.ifBlank { null }, movimiento.estadoTexto)
+        .joinToString(" · ")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.padding(end = 12.dp)) {
+            Text(
+                text = movimiento.etiqueta,
+                fontSize = 12.sp,
+                fontFamily = LlegateBody,
+                fontWeight = FontWeight.Bold,
+                color = Stone100
+            )
+            if (detalle.isNotBlank()) {
+                Text(text = detalle, fontSize = 11.sp, fontFamily = LlegateBody, color = Stone400)
+            }
+        }
+        Text(
+            text = usdConSigno(movimiento.montoUsd),
+            fontSize = 13.sp,
+            fontFamily = LlegateMono,
+            fontWeight = FontWeight.Bold,
+            color = when {
+                movimiento.estadoTexto != null -> RacingYellow500
+                movimiento.montoUsd < 0 -> Stone300
+                else -> Emerald500
+            }
+        )
     }
 }
 

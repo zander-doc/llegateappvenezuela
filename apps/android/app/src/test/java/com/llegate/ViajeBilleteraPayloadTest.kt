@@ -129,6 +129,39 @@ class ViajeBilleteraPayloadTest {
     assertNotNull(rechazada.motivoRechazo)
   }
 
+  @Test
+  fun `los movimientos se traducen al español de la billetera`() {
+    val pendiente = movimientoFrom(
+      JSONObject(
+        """{"id":"a1","tipo":"recarga","estado":"en_revision","monto_usd":10,
+           "created_at":"2026-11-03T18:04:00Z"}"""
+      )
+    )
+    assertEquals("Recarga", pendiente.etiqueta)
+    assertEquals("en revisión", pendiente.estadoTexto)
+    assertEquals("03/11/2026", pendiente.fechaTexto)
+
+    val rechazada = movimientoFrom(
+      JSONObject(
+        """{"id":"a2","tipo":"recarga","estado":"rechazada","monto_usd":5,
+           "motivo_rechazo":"La referencia no coincide"}"""
+      )
+    )
+    assertEquals("rechazada: La referencia no coincide", rechazada.estadoTexto)
+
+    val comision = movimientoFrom(
+      JSONObject("""{"id":"a3","tipo":"comision","estado":"aprobada","monto_usd":-0.3}""")
+    )
+    assertEquals("Comisión del viaje", comision.etiqueta)
+    assertNull(comision.estadoTexto)
+    assertEquals("", comision.fechaTexto)
+
+    val rara = movimientoFrom(
+      JSONObject("""{"id":"a4","tipo":"propina","estado":"aprobada","monto_usd":1}""")
+    )
+    assertEquals("propina", rara.etiqueta)
+  }
+
   private companion object {
     val VIAJE_RECIEN = """
       {"ok":true,"viaje":{"id":"3f2a0000-0000-0000-0000-000000000000",

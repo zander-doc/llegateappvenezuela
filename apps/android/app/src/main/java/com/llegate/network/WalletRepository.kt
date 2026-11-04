@@ -1,5 +1,6 @@
 package com.llegate.network
 
+import com.llegate.util.fechaCorta
 import org.json.JSONObject
 
 data class LimitesBilletera(
@@ -33,7 +34,32 @@ data class Movimiento(
   val referencia: String?,
   val motivoRechazo: String?,
   val creadoEn: String?
-)
+) {
+  /** El `tipo_transaccion` en el mismo español que usa el panel de la web. */
+  val etiqueta: String
+    get() = when (tipo) {
+      "recarga" -> "Recarga"
+      "bienvenida" -> "Saldo de bienvenida"
+      "comision" -> "Comisión del viaje"
+      "pago" -> "Viaje pagado con saldo"
+      "abono" -> "Abono"
+      "devolucion" -> "Devolución"
+      "ajuste" -> "Ajuste de Llégate"
+      else -> tipo
+    }
+
+  /** Una recarga pendiente o rechazada todavía no mueve el saldo: hay que decirlo. */
+  val estadoTexto: String?
+    get() = when (estado) {
+      "aprobada" -> null
+      "pendiente", "en_revision" -> "en revisión"
+      "rechazada" -> motivoRechazo?.let { "rechazada: $it" } ?: "rechazada"
+      else -> estado
+    }
+
+  val fechaTexto: String
+    get() = fechaCorta(creadoEn)
+}
 
 internal fun billeteraFrom(json: JSONObject): Billetera {
   val limites = json.optJSONObject("limites")
