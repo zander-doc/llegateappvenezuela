@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.llegate.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -55,25 +55,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.CommunityAlert
-import com.example.model.CommunityAlertType
-import com.example.model.LocationSuggestion
-import com.example.ui.theme.Asphalt600
-import com.example.ui.theme.Asphalt700
-import com.example.ui.theme.Asphalt800
-import com.example.ui.theme.Asphalt900
-import com.example.ui.theme.Asphalt950
-import com.example.ui.theme.CyanGlow
-import com.example.ui.theme.Emerald500
-import com.example.ui.theme.NeonOrange400
-import com.example.ui.theme.NeonOrange500
-import com.example.ui.theme.RacingRed500
-import com.example.ui.theme.RacingYellow500
-import com.example.ui.theme.Stone100
-import com.example.ui.theme.Stone300
-import com.example.ui.theme.Stone400
-import com.example.viewmodel.LlegateUiState
-import com.example.viewmodel.LlegateViewModel
+import com.llegate.model.CommunityAlert
+import com.llegate.model.CommunityAlertType
+import com.llegate.model.LocationSuggestion
+import com.llegate.ui.theme.Asphalt600
+import com.llegate.ui.theme.Asphalt700
+import com.llegate.ui.theme.Asphalt800
+import com.llegate.ui.theme.Asphalt900
+import com.llegate.ui.theme.Asphalt950
+import com.llegate.ui.theme.CyanGlow
+import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.NeonOrange400
+import com.llegate.ui.theme.NeonOrange500
+import com.llegate.ui.theme.RacingRed500
+import com.llegate.ui.theme.RacingYellow500
+import com.llegate.ui.theme.Stone100
+import com.llegate.ui.theme.Stone300
+import com.llegate.ui.theme.Stone400
+import com.llegate.viewmodel.LlegateUiState
+import com.llegate.viewmodel.LlegateViewModel
 
 @Composable
 fun SmartLocationSuggestionsSection(

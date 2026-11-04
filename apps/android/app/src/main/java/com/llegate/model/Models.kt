@@ -1,4 +1,4 @@
-package com.example.model
+package com.llegate.model
 
 enum class ServiceType(
     val title: String,

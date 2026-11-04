@@ -1,4 +1,4 @@
-package com.example.network
+package com.llegate.network
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

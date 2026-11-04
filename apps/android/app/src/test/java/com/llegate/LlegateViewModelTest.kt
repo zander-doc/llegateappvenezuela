@@ -1,13 +1,13 @@
-package com.example
+package com.llegate
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import com.example.model.CommunityAlertType
-import com.example.model.LocationPoint
-import com.example.model.MapDisplayMode
-import com.example.model.ServiceType
-import com.example.viewmodel.AppScreen
-import com.example.viewmodel.LlegateViewModel
+import com.llegate.model.CommunityAlertType
+import com.llegate.model.LocationPoint
+import com.llegate.model.MapDisplayMode
+import com.llegate.model.ServiceType
+import com.llegate.viewmodel.AppScreen
+import com.llegate.viewmodel.LlegateViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -18,7 +18,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class ExampleRobolectricTest {
+class LlegateViewModelTest {
 
   @Test
   fun `read string from context`() {

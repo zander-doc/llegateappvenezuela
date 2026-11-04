@@ -1,4 +1,4 @@
-package com.example
+package com.llegate
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,13 +20,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.screens.BookingScreen
-import com.example.ui.screens.HomeScreen
-import com.example.ui.screens.TripActiveScreen
-import com.example.ui.screens.TripHistoryScreen
-import com.example.ui.theme.MyApplicationTheme
-import com.example.viewmodel.AppScreen
-import com.example.viewmodel.LlegateViewModel
+import com.llegate.ui.screens.BookingScreen
+import com.llegate.ui.screens.HomeScreen
+import com.llegate.ui.screens.TripActiveScreen
+import com.llegate.ui.screens.TripHistoryScreen
+import com.llegate.ui.theme.MyApplicationTheme
+import com.llegate.viewmodel.AppScreen
+import com.llegate.viewmodel.LlegateViewModel
 
 class MainActivity : ComponentActivity() {
 
