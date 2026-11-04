@@ -29,7 +29,8 @@ class ApiException(
   val body: JSONObject = JSONObject()
 ) : Exception(message)
 
-class ApiClient(
+/** Abierto para que las pruebas monten un doble sin tocar la red. */
+open class ApiClient(
   private val baseUrl: String = ApiConfig.BASE_URL,
   private val client: OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(10, TimeUnit.SECONDS)
@@ -37,10 +38,10 @@ class ApiClient(
     .build()
 ) {
 
-  suspend fun get(path: String, accessToken: String? = null): JSONObject =
+  open suspend fun get(path: String, accessToken: String? = null): JSONObject =
     request(path, null, accessToken)
 
-  suspend fun post(path: String, body: JSONObject, accessToken: String? = null): JSONObject =
+  open suspend fun post(path: String, body: JSONObject, accessToken: String? = null): JSONObject =
     request(path, body, accessToken)
 
   private suspend fun request(

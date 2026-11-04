@@ -30,11 +30,21 @@ import com.llegate.model.UpcomingService
 import com.llegate.network.ApiException
 import com.llegate.network.AuthRepository
 import com.llegate.network.BcvRateService
+import com.llegate.network.Billetera
 import com.llegate.network.ConfigApp
 import com.llegate.network.ConfigRepository
+import com.llegate.network.EstadoPago
+import com.llegate.network.MetodoPagoDisponible
+import com.llegate.network.Movimiento
+import com.llegate.network.Pago
+import com.llegate.network.PagoRepository
 import com.llegate.network.Usuario
+import com.llegate.network.WalletRepository
 import com.llegate.util.aE164Venezuela
+import com.llegate.util.digitos
 import com.llegate.util.esNombrePersona
+import com.llegate.util.esReferenciaPagoMovil
+import com.llegate.util.usd
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -61,6 +71,13 @@ enum class AppScreen {
 enum class PasoInicio {
     DATOS,
     CODIGO
+}
+
+/** Los pasos de una recarga: elegir monto, pagar en el banco y reportar la referencia. */
+enum class PasoRecarga {
+    MONTO,
+    INSTRUCCIONES,
+    REPORTAR
 }
 
 data class LlegateUiState(
@@ -371,6 +388,18 @@ data class LlegateUiState(
     val selectedTipUsd: Double = 0.0,
     val config: ConfigApp? = null,
     val cuenta: Usuario? = null,
+    val billetera: Billetera? = null,
+    val movimientos: List<Movimiento> = emptyList(),
+    val pagos: List<Pago> = emptyList(),
+    val metodosRecarga: List<MetodoPagoDisponible> = emptyList(),
+    val cargandoBilletera: Boolean = false,
+    val showRecargaModal: Boolean = false,
+    val pasoRecarga: PasoRecarga = PasoRecarga.MONTO,
+    val recargaMontoUsd: Double = 10.0,
+    val recargaMetodo: String = "pago_movil",
+    val recargaReferencia: String = "",
+    val pagoEnCurso: Pago? = null,
+    val enviandoRecarga: Boolean = false,
     val pasoInicio: PasoInicio = PasoInicio.DATOS,
     val telefono: String = "",
     val nombre: String = "",
@@ -511,7 +540,9 @@ data class LlegateUiState(
 
 class LlegateViewModel(
     private val auth: AuthRepository,
-    private val configRepo: ConfigRepository = ConfigRepository()
+    private val configRepo: ConfigRepository = ConfigRepository(),
+    private val walletRepo: WalletRepository = WalletRepository(auth.http),
+    private val pagoRepo: PagoRepository = PagoRepository(auth.http)
 ) : ViewModel() {
 
     private val bcvRateService = BcvRateService()
@@ -554,6 +585,7 @@ class LlegateViewModel(
                 null
             }
             _uiState.update { it.copy(cuenta = perfil, revisandoSesion = false) }
+            if (perfil != null) refrescarBilletera(silencioso = true)
         }
     }
 
@@ -632,6 +664,7 @@ class LlegateViewModel(
                             statusMessage = "Listo, ${perfil.nombre?.substringBefore(' ') ?: "pana"}. Tu cuenta está activa."
                         )
                     }
+                    refrescarBilletera(silencioso = true)
                 } catch (fallo: ApiException) {
                     _uiState.update { it.copy(statusMessage = fallo.message) }
                 } catch (fallo: Exception) {
@@ -651,13 +684,184 @@ class LlegateViewModel(
             _uiState.update {
                 it.copy(
                     cuenta = null,
+                    billetera = null,
+                    movimientos = emptyList(),
+                    pagos = emptyList(),
+                    showCuentaModal = false,
+                    showRecargaModal = false,
+                    pagoEnCurso = null,
                     currentScreen = AppScreen.HOME,
                     activeTrip = null,
-                    showCuentaModal = false,
                     pasoInicio = PasoInicio.DATOS,
                     codigo = "",
                     nombre = "",
                     statusMessage = "Sesión cerrada."
+                )
+            }
+        }
+    }
+
+    // BILLETERA Y RECARGAS: /wallet y /payments, el mismo saldo que ve la web
+
+    fun cargarBilletera() {
+        viewModelScope.launch { refrescarBilletera() }
+    }
+
+    /** Lee saldo, movimientos, pagos e intenciones abiertas en un solo paso. */
+    private suspend fun refrescarBilletera(silencioso: Boolean = false) {
+        if (!auth.tieneSesion) return
+        _uiState.update { it.copy(cargandoBilletera = true) }
+        try {
+            val billetera = walletRepo.billetera()
+            val movimientos = walletRepo.movimientos()
+            val pagos = pagoRepo.listar()
+            val metodos = pagoRepo.metodos()
+            _uiState.update {
+                it.copy(
+                    billetera = billetera,
+                    movimientos = movimientos,
+                    pagos = pagos,
+                    metodosRecarga = metodos,
+                    cargandoBilletera = false
+                )
+            }
+        } catch (fallo: Exception) {
+            if (fallo is CancellationException) throw fallo
+            _uiState.update { it.copy(cargandoBilletera = false) }
+            if (!silencioso) avisar(fallo.message ?: FALLA_GENERICO)
+        }
+    }
+
+    /** La hoja de recarga siempre devuelve a la de cuenta: son dos pasos del mismo viaje. */
+    fun mostrarRecarga(show: Boolean) {
+        val pendiente = if (show) {
+            _uiState.value.pagoEnCurso
+                ?: _uiState.value.pagos.firstOrNull { it.estado == EstadoPago.PENDIENTE }
+        } else {
+            null
+        }
+        _uiState.update {
+            it.copy(
+                showRecargaModal = show,
+                showCuentaModal = !show && it.cuenta != null,
+                recargaMontoUsd = pendiente?.montoUsd ?: it.recargaMontoUsd,
+                recargaMetodo = pendiente?.metodo ?: it.recargaMetodo,
+                pasoRecarga = when {
+                    !show -> PasoRecarga.MONTO
+                    pendiente == null -> PasoRecarga.MONTO
+                    !pendiente.referenciaReportada.isNullOrBlank() -> PasoRecarga.REPORTAR
+                    else -> PasoRecarga.INSTRUCCIONES
+                },
+                recargaReferencia = "",
+                pagoEnCurso = pendiente,
+                enviandoRecarga = false
+            )
+        }
+        if (show && _uiState.value.metodosRecarga.isEmpty()) cargarBilletera()
+    }
+
+    fun seleccionarMontoRecarga(montoUsd: Double) {
+        _uiState.update { it.copy(recargaMontoUsd = montoUsd) }
+    }
+
+    fun seleccionarMetodoRecarga(metodoId: String) {
+        _uiState.update { it.copy(recargaMetodo = metodoId) }
+    }
+
+    fun onRecargaReferencia(valor: String) {
+        _uiState.update { it.copy(recargaReferencia = digitos(valor).take(12)) }
+    }
+
+    /** Crea la intención de pago real; Pago Móvil muestra los datos del comercio. */
+    fun iniciarRecarga() {
+        val state = _uiState.value
+        if (state.enviandoRecarga) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(enviandoRecarga = true) }
+            try {
+                val pago = pagoRepo.crearIntento(state.recargaMetodo, state.recargaMontoUsd)
+                _uiState.update {
+                    it.copy(
+                        pagoEnCurso = pago,
+                        pasoRecarga = PasoRecarga.INSTRUCCIONES,
+                        enviandoRecarga = false
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                _uiState.update { it.copy(enviandoRecarga = false) }
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
+    }
+
+    /** El pana ya pagó en su banco: pasamos a que escriba la referencia. */
+    fun irAReportarRecarga() {
+        _uiState.update { it.copy(pasoRecarga = PasoRecarga.REPORTAR) }
+    }
+
+    fun volverALosDatosDeRecarga() {
+        _uiState.update { it.copy(pasoRecarga = PasoRecarga.INSTRUCCIONES, recargaReferencia = "") }
+    }
+
+    fun abrirCheckout(context: Context) {
+        val url = _uiState.value.pagoEnCurso?.checkoutUrl ?: return
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            avisar("No pudimos abrir el pago de Binance Pay en este teléfono.")
+        }
+    }
+
+    /** Reporta la referencia del banco; el saldo entra cuando un admin aprueba la recarga. */
+    fun confirmarRecarga() {
+        val state = _uiState.value
+        val pago = state.pagoEnCurso ?: return
+        if (!esReferenciaPagoMovil(state.recargaReferencia)) {
+            avisar("La referencia del Pago Móvil son 6 a 12 dígitos, sin espacios.")
+            return
+        }
+        if (state.enviandoRecarga) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(enviandoRecarga = true) }
+            try {
+                pagoRepo.reportar(pago.id, state.recargaReferencia)
+                refrescarBilletera(silencioso = true)
+                val minutos = _uiState.value.billetera?.limites?.slaAprobacionMinutos ?: 15
+                _uiState.update {
+                    it.copy(
+                        enviandoRecarga = false,
+                        pagoEnCurso = null,
+                        recargaReferencia = "",
+                        showRecargaModal = false,
+                        showCuentaModal = it.cuenta != null,
+                        statusMessage = "Recarga de ${usd(pago.montoUsd)} reportada. " +
+                            "Queda en revisión y entra al saldo en unos $minutos minutos."
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                _uiState.update { it.copy(enviandoRecarga = false) }
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
+    }
+
+    /** Deja sin efecto una intención pendiente para no dejar pagos colgando. */
+    fun descartarRecarga() {
+        val pago = _uiState.value.pagoEnCurso ?: return
+        viewModelScope.launch {
+            try {
+                pagoRepo.cancelar(pago.id)
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+            }
+            _uiState.update {
+                it.copy(
+                    pagoEnCurso = null,
+                    pasoRecarga = PasoRecarga.MONTO,
+                    showRecargaModal = false,
+                    showCuentaModal = it.cuenta != null
                 )
             }
         }

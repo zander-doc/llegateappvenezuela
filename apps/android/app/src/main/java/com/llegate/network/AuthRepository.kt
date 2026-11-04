@@ -72,7 +72,11 @@ class AuthRepository(
   private val store: SessionStore
 ) {
 
-  private val http = AuthorizedClient(api, store)
+  /**
+   * El cliente autenticado de esta sesión. Viajes, billetera y pagos lo comparten
+   * para que el token y su renovación vivan en un solo lugar.
+   */
+  val http = AuthorizedClient(api, store)
 
   val tieneSesion: Boolean get() = store.tieneSesion
 

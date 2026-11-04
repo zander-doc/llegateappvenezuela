@@ -29,8 +29,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AirportShuttle
@@ -77,6 +80,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,6 +92,8 @@ import com.llegate.model.SafeMeetingPoint
 import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
 import com.llegate.model.UpcomingService
+import com.llegate.network.EstadoPago
+import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
 import com.llegate.ui.components.CommunityReportDialog
 import com.llegate.ui.components.LeafletDarkMapView
@@ -109,10 +115,13 @@ import com.llegate.ui.theme.Stone200
 import com.llegate.ui.theme.Stone300
 import com.llegate.ui.theme.Stone400
 import com.llegate.ui.theme.Stone50
+import com.llegate.util.bs
 import com.llegate.util.enmascararTelefono
 import com.llegate.util.usd
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
+import com.llegate.viewmodel.PasoRecarga
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1293,19 +1302,30 @@ fun HomeScreen(
         )
     }
 
-    // HOJA DE CUENTA: datos reales de /auth/me (saldo, teléfono y estado del piloto)
+    // HOJA DE CUENTA: datos reales de /auth/me y /wallet/billetera
     if (uiState.showCuentaModal) {
         val cuenta = uiState.cuenta
         val piloto = cuenta?.conductor
+        val billetera = uiState.billetera
+        val disponible = billetera?.disponibleUsd ?: cuenta?.saldoBilletera ?: 0.0
         AlertDialog(
             onDismissRequest = { viewModel.mostrarCuenta(false) },
             confirmButton = {
-                Button(
-                    onClick = { viewModel.cerrarSesion() },
-                    colors = ButtonDefaults.buttonColors(containerColor = RacingRed500),
-                    modifier = Modifier.testTag("btn_cerrar_sesion")
-                ) {
-                    Text("Cerrar sesión", color = Stone100, fontWeight = FontWeight.Black)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { viewModel.mostrarRecarga(true) },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonOrange500),
+                        modifier = Modifier.testTag("btn_abrir_recarga")
+                    ) {
+                        Text("Recargar", color = Asphalt950, fontWeight = FontWeight.Black)
+                    }
+                    Button(
+                        onClick = { viewModel.cerrarSesion() },
+                        colors = ButtonDefaults.buttonColors(containerColor = RacingRed500),
+                        modifier = Modifier.testTag("btn_cerrar_sesion")
+                    ) {
+                        Text("Cerrar sesión", color = Stone100, fontWeight = FontWeight.Black)
+                    }
                 }
             },
             dismissButton = {
@@ -1334,14 +1354,27 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    FilaCuenta(
-                        etiqueta = "Saldo Llégate",
-                        valor = usd(cuenta?.saldoBilletera ?: 0.0),
-                        destacado = true
-                    )
+                    FilaCuenta(etiqueta = "Saldo disponible", valor = usd(disponible), destacado = true)
+                    if (billetera != null && billetera.reservadoUsd > 0.0) {
+                        FilaCuenta(
+                            etiqueta = "Reservado por comisiones",
+                            valor = usd(billetera.reservadoUsd)
+                        )
+                    }
+                    if (billetera != null && billetera.estado != "activo") {
+                        Text(
+                            text = when (billetera.estado) {
+                                "saldo_bajo" -> "Te queda poco saldo: recarga antes de pedir un viaje con Saldo Llégate."
+                                else -> "Sin saldo disponible. Recarga para pagar viajes desde la app."
+                            },
+                            fontSize = 11.sp,
+                            color = RacingRed500
+                        )
+                    }
                     Text(
-                        text = "La comisión del 10% se descuenta del saldo al completar cada viaje. " +
-                            "No hay mensualidad. Las recargas empiezan en $5 y se aprueban en unos 15 minutos.",
+                        text = "La comisión del ${comisionTexto(uiState)} se descuenta del saldo al completar cada viaje. " +
+                            "No hay mensualidad. Las recargas empiezan en ${usd(recargaMinimaUi(uiState))} " +
+                            "y se aprueban en unos ${slaMinutosUi(uiState)} minutos.",
                         fontSize = 11.sp,
                         color = Stone400
                     )
@@ -1377,6 +1410,11 @@ fun HomeScreen(
                 }
             }
         )
+    }
+
+    // HOJA DE RECARGA: /payments/intents + reporte de referencia, igual que la web
+    if (uiState.showRecargaModal) {
+        RecargaSheet(uiState = uiState, viewModel = viewModel)
     }
 
     // MODAL: LOCATION SEARCH PICKER
@@ -1689,4 +1727,308 @@ private fun FilaCuenta(
             modifier = Modifier.padding(start = 12.dp)
         )
     }
+}
+
+/** Las reglas viven en `/config/app`; `/wallet/billetera` trae los mismos números. */
+private fun comisionTexto(uiState: LlegateUiState): String {
+    val ratio = uiState.config?.walletRules?.commissionRate
+        ?: uiState.billetera?.limites?.comisionPorcentaje
+        ?: 0.1
+    return "${(ratio * 100).roundToInt()}%"
+}
+
+private fun recargaMinimaUi(uiState: LlegateUiState): Double =
+    uiState.config?.walletRules?.minRechargeUsd
+        ?: uiState.billetera?.limites?.recargaMinimaUsd
+        ?: 5.0
+
+private fun recargaMaximaUi(uiState: LlegateUiState): Double =
+    uiState.config?.walletRules?.maxRechargeUsd
+        ?: uiState.billetera?.limites?.recargaMaximaUsd
+        ?: 50.0
+
+private fun slaMinutosUi(uiState: LlegateUiState): Int =
+    uiState.config?.walletRules?.approvalSlaMinutes
+        ?: uiState.billetera?.limites?.slaAprobacionMinutos
+        ?: 15
+
+/** Los paquetes los publica la API; si no llegan, se arman con los límites vigentes. */
+private fun paquetesDeRecarga(uiState: LlegateUiState): List<PaqueteRecarga> {
+    val deLaApi = uiState.config?.rechargePacks.orEmpty()
+    if (deLaApi.isNotEmpty()) return deLaApi
+    val minima = recargaMinimaUi(uiState)
+    return listOf(minima, minima * 2, minima * 4, recargaMaximaUi(uiState))
+        .distinct()
+        .sorted()
+        .map { monto -> PaqueteRecarga(amountUsd = monto, name = usd(monto), note = "", recomendado = false) }
+}
+
+@Composable
+private fun RecargaSheet(uiState: LlegateUiState, viewModel: LlegateViewModel) {
+    val contexto = LocalContext.current
+    val pago = uiState.pagoEnCurso
+    val paquetes = paquetesDeRecarga(uiState)
+    val metodos = uiState.metodosRecarga
+    val metodoElegido = metodos.firstOrNull { it.id == uiState.recargaMetodo }
+    val sePuedeSeguir = !uiState.enviandoRecarga &&
+        metodos.isNotEmpty() &&
+        (metodoElegido?.disponible ?: uiState.recargaMetodo == "pago_movil")
+
+    AlertDialog(
+        onDismissRequest = { viewModel.mostrarRecarga(false) },
+        confirmButton = {
+            when (uiState.pasoRecarga) {
+                PasoRecarga.MONTO -> Button(
+                    onClick = { viewModel.iniciarRecarga() },
+                    enabled = sePuedeSeguir,
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonOrange500),
+                    modifier = Modifier.testTag("btn_continuar_recarga")
+                ) {
+                    Text(
+                        text = when {
+                            uiState.enviandoRecarga -> "Creando el pago..."
+                            metodos.isEmpty() -> "Cargando métodos..."
+                            metodoElegido != null && !metodoElegido.disponible -> "Método no disponible"
+                            else -> "Continuar"
+                        },
+                        color = if (sePuedeSeguir) Asphalt950 else Stone400,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+
+                PasoRecarga.INSTRUCCIONES -> Button(
+                    onClick = { viewModel.irAReportarRecarga() },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonOrange500),
+                    modifier = Modifier.testTag("btn_ya_pague")
+                ) {
+                    Text("Ya pagé", color = Asphalt950, fontWeight = FontWeight.Black)
+                }
+
+                PasoRecarga.REPORTAR -> Button(
+                    onClick = { viewModel.confirmarRecarga() },
+                    enabled = !uiState.enviandoRecarga,
+                    colors = ButtonDefaults.buttonColors(containerColor = RacingYellow500),
+                    modifier = Modifier.testTag("btn_reportar_recarga")
+                ) {
+                    Text(
+                        text = if (uiState.enviandoRecarga) "Enviando..." else "Reportar recarga",
+                        color = Asphalt950,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { viewModel.mostrarRecarga(false) }) {
+                Text("Volver", color = Stone400)
+            }
+        },
+        containerColor = Asphalt900,
+        title = {
+            Column {
+                Text(
+                    text = "Recargar saldo Llégate",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp,
+                    color = Stone100
+                )
+                Text(
+                    text = when (uiState.pasoRecarga) {
+                        PasoRecarga.MONTO -> "De ${usd(recargaMinimaUi(uiState))} a ${usd(recargaMaximaUi(uiState))} por recarga"
+                        PasoRecarga.INSTRUCCIONES -> "Paga en tu banco y vuelve con la referencia"
+                        PasoRecarga.REPORTAR -> "Escribe la referencia que te dio tu banco"
+                    },
+                    fontSize = 12.sp,
+                    color = NeonOrange400
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                when (uiState.pasoRecarga) {
+                    PasoRecarga.MONTO -> {
+                        Text("Monto en dólares", fontSize = 12.sp, color = Stone400)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(paquetes, key = { it.amountUsd }) { paquete ->
+                                val elegido = paquete.amountUsd == uiState.recargaMontoUsd
+                                Surface(
+                                    onClick = { viewModel.seleccionarMontoRecarga(paquete.amountUsd) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (elegido) RacingYellow500 else Asphalt800,
+                                    border = BorderStroke(1.dp, if (elegido) RacingYellow500 else Asphalt700),
+                                    modifier = Modifier.testTag("paquete_${paquete.amountUsd.toInt()}")
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                        Text(
+                                            text = usd(paquete.amountUsd),
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 15.sp,
+                                            color = if (elegido) Asphalt950 else Stone100
+                                        )
+                                        Text(
+                                            text = paquete.name,
+                                            fontSize = 11.sp,
+                                            color = if (elegido) Asphalt600 else Stone400
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Text("Cómo vas a pagar", fontSize = 12.sp, color = Stone400)
+                        if (metodos.isEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(color = RacingYellow500, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Consultando los métodos de la API...", fontSize = 11.sp, color = Stone400)
+                            }
+                        }
+                        metodos.forEach { metodo ->
+                            val elegido = metodo.id == uiState.recargaMetodo
+                            Surface(
+                                onClick = { if (metodo.disponible) viewModel.seleccionarMetodoRecarga(metodo.id) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (elegido) Asphalt800 else Asphalt950,
+                                border = BorderStroke(1.dp, if (elegido) NeonOrange500 else Asphalt700),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("metodo_${metodo.id}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = when (metodo.id) {
+                                            "pago_movil" -> "Pago Móvil"
+                                            "binance_pay" -> "Binance Pay"
+                                            else -> metodo.id
+                                        },
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (metodo.disponible) Stone100 else Stone400
+                                    )
+                                    Text(
+                                        text = when {
+                                            !metodo.disponible -> "No disponible ahora"
+                                            metodo.revision == "automatica" -> "Se acredita solo"
+                                            else -> "Un pana lo revisa (~${slaMinutosUi(uiState)} min)"
+                                        },
+                                        fontSize = 11.sp,
+                                        color = if (metodo.disponible) NeonOrange400 else Stone400
+                                    )
+                                }
+                            }
+                        }
+
+                        val pendientes = uiState.pagos.count { it.estado == EstadoPago.PENDIENTE || it.estado == EstadoPago.EN_REVISION }
+                        if (pendientes > 0) {
+                            Text(
+                                text = "Tienes $pendientes recarga(s) en curso. Retomar la última te lleva a donde la dejaste.",
+                                fontSize = 11.sp,
+                                color = Stone400
+                            )
+                        }
+                    }
+
+                    PasoRecarga.INSTRUCCIONES -> {
+                        if (pago == null) {
+                            Text("No pudimos abrir la hoja. Toca Volver e inténtalo de nuevo.", fontSize = 12.sp, color = RacingRed500)
+                        } else {
+                            FilaCuenta(etiqueta = "Código del pago", valor = pago.codigo, destacado = true)
+                            FilaCuenta(etiqueta = "Monto en dólares", valor = usd(pago.montoUsd))
+                            if (pago.montoBs != null) {
+                                FilaCuenta(etiqueta = "Monto en bolívares", valor = bs(pago.montoBs))
+                            }
+                            if (pago.tasaBs != null) {
+                                FilaCuenta(etiqueta = "Tasa del día", valor = "${bs(pago.tasaBs)} por dólar")
+                            }
+                            HorizontalDivider(color = Asphalt700)
+
+                            if (!pago.checkoutUrl.isNullOrBlank()) {
+                                Button(
+                                    onClick = { viewModel.abrirCheckout(contexto) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = RacingYellow500),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("btn_abrir_checkout")
+                                ) {
+                                    Text("Abrir Binance Pay", color = Asphalt950, fontWeight = FontWeight.Black)
+                                }
+                                Text(
+                                    text = "Cuando el pago se confirme, el saldo entra solo. Si te sales, puedes volver a esta hoja.",
+                                    fontSize = 11.sp,
+                                    color = Stone400
+                                )
+                            } else {
+                                pago.instrucciones.banco?.let { FilaCuenta(etiqueta = "Banco", valor = it) }
+                                pago.instrucciones.telefono?.let { FilaCuenta(etiqueta = "Teléfono", valor = it) }
+                                pago.instrucciones.cedula?.let { FilaCuenta(etiqueta = "Cédula", valor = it) }
+                                pago.instrucciones.titular?.let { FilaCuenta(etiqueta = "Titular", valor = it) }
+                                Text(
+                                    text = pago.instrucciones.nota
+                                        ?: "Paga el monto exacto en bolívares y reporta la referencia que te da tu banco.",
+                                    fontSize = 11.sp,
+                                    color = Stone400
+                                )
+                            }
+
+                            Text(
+                                text = "Vence en unos minutos; si se pasa, pide la recarga de nuevo.",
+                                fontSize = 11.sp,
+                                color = Stone400
+                            )
+                            TextButton(
+                                onClick = { viewModel.descartarRecarga() },
+                                modifier = Modifier.testTag("btn_anular_pago")
+                            ) {
+                                Text("Anular este pago", color = RacingRed500, fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    PasoRecarga.REPORTAR -> {
+                        OutlinedTextField(
+                            value = uiState.recargaReferencia,
+                            onValueChange = { viewModel.onRecargaReferencia(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("campo_referencia"),
+                            label = { Text("Referencia del Pago Móvil", color = Stone400, fontSize = 12.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = RacingYellow500,
+                                unfocusedBorderColor = Asphalt700,
+                                focusedTextColor = Stone100,
+                                unfocusedTextColor = Stone100
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true
+                        )
+                        Text(
+                            text = "Son 6 a 12 dígitos. Con eso un pana de Llégate verifica el pago en el sistema del banco " +
+                                "y te monta el saldo en la billetera.",
+                            fontSize = 11.sp,
+                            color = Stone400
+                        )
+                        pago?.let {
+                            FilaCuenta(etiqueta = "Recarga", valor = "${usd(it.montoUsd)} • código ${it.codigo}")
+                        }
+                        TextButton(
+                            onClick = { viewModel.volverALosDatosDeRecarga() },
+                            modifier = Modifier.testTag("btn_volver_datos")
+                        ) {
+                            Text("Corregir los datos del pago", color = Stone400, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    )
 }

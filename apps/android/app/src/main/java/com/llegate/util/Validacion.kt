@@ -2,6 +2,7 @@ package com.llegate.util
 
 private val TELEFONO_VZLA = Regex("^(0\\d{10}|58\\d{10}|\\d{10})$")
 private val NOMBRE_PERSONA = Regex("^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{3,}$")
+private val REFERENCIA_PAGO_MOVIL = Regex("^\\d{6,12}$")
 
 fun digitos(valor: String): String = valor.filter { it.isDigit() }
 
@@ -19,6 +20,9 @@ fun aE164Venezuela(valor: String): String? {
 }
 
 fun esNombrePersona(valor: String): Boolean = NOMBRE_PERSONA.matches(valor.trim())
+
+/** La referencia que da el banco: la API la exige exacta, de 6 a 12 dígitos. */
+fun esReferenciaPagoMovil(valor: String): Boolean = REFERENCIA_PAGO_MOVIL.matches(valor.trim())
 
 fun enmascararTelefono(valor: String?): String {
   val limpio = digitos(valor.orEmpty())
