@@ -1,0 +1,258 @@
+=== SPANISH STRINGS ===
+(icono de cuadrado con flecha).
+,children:[(0,T.jsx)(De,{className:
+,icon:(0,T.jsx)(De,{className:
+0% COMISIÓN CONDUCTOR PRO
+0% de comisión durante los 7 días de vigencia
+0% de comisión por carrera (100% ganancia neta)
+0% por viaje
+15% de descuento directo en todos los viajes urbanos
+20% OFF para miembros Llégate
+23 de Enero
+24/7 EN TODAS LAS CIUDADES
+Acarigua (Páez)
+Acceso a viajes de turismo, vans y encomiendas
+Agencia de Autos
+Agencia de Motos
+Agregar a pantalla de inicio
+Ahorro Máximo Pasajeros
+Altagracia de Orituco (Monagas)
+Antímano / La Vega
+Anzoátegui
+App Móvil
+Aragua de Barcelona
+Aragua de Maturín (Piar)
+Araya (Cruz Salmerón)
+Aroa (Bolívar)
+Asignación prioritaria de viajes en horas pico
+Autobús Ejecutivo (Marcopolo 44 puestos)
+Autobús Interurbano & Frontera
+Av. Bolívar Norte, frente al CC Camoruco
+Av. Las Delicias, cruce con Calle Comercio
+Av. Principal de Bello Campo, Chacao
+Ayudante de carga y descarga opcional
+Bachaquero (Valmore Rodríguez)
+Bailadores (Rivas Dávila)
+Barinitas (Bolívar)
+Baruta / Las Mercedes
+Batería Duncan 800/1000 AMP con Instalación a Domicilio
+Baterías Originales
+Baterías y Cauchos
+Boca de Río (Macanao)
+Boconó
+Boconó (Jardín de Venezuela)
+Boconó (Trujillo)
+Bolívar
+Botón de pánico con enlace directo a cuadrantes de paz
+Buscando conductor
+CC Líder, La California
+CONDUCTOR VERIFICADO
+Caicara de Maturín (Cedeño)
+Caicara del Orinoco (Cedeño)
+Caja Automática
+Cajón térmico con aislamiento
+Camaguán
+Cancelaciones gratuitas hasta 5 minutos después del pedido
+Caracas ↔ Aeropuerto de Maiquetía
+Caracas ↔ San Cristóbal / Cúcuta
+Caripe (El Guácharo)
+Caripito (Bolívar)
+Carros de carga
+Carúpano (Bermúdez)
+Casanay (Andrés Eloy Blanco)
+Casco DOT Certificado de Regalo
+Certificado Médico Vial al día
+Chabasquén (Unda)
+Chacao, Av. Francisco de Miranda
+Chejendé (Candelaria)
+Chichiriviche (Monseñor Iturriza)
+Chiguará
+Choroní
+Churuguara (Federación)
+Ciudad Bolívar (Angostura)
+Club Pasajero VIP Llégate
+Cojedes / Las Vegas (Rómulo Gallegos)
+Comprobante digital de entrega inmediata
+Comunidad de apoyo y auxilio vial entre conductoras
+Conductor / Transportista
+Conductor PRO 100% Tuyo
+Conductor PRO 100% Tuyo (Mensual)
+Conductor PRO Semanal
+Conductor asignado
+Conexión directa entre estados venezolanos y fronteras con Colombia y Brasil
+Conversión rápida
+Cumaná
+Curiapo (Antonio Díaz)
+Descuento del 15% en repuestos y baterías en la red aliada Llégate
+Descuentos en cambio de aceite con talleres aliados
+Descuentos en repuestos y baterías aliadas
+Descuentos exclusivos en tiendas de repuestos y accesorios automotrices
+Distribuidores mayoristas y al detal para modelos Bera, Empire, Haojue y HJ. Envíos nacionales por MRW y Tealca.
+Duncan Baterías Express - Centro de Distribución
+Ejido (Campo Elías)
+El Baúl (Girardot)
+El Limón (Mario Briceño)
+El Pao (Pao de San Juan Bautista)
+El Pilar (Benítez)
+El Tigre (Simón Rodríguez)
+El Tocuyo (Morán)
+El Valle del Espíritu Santo (García)
+El Vigía (Alberto Adriani)
+Elorza (Rómulo Gallegos)
+Entrega rápida de comida, medicinas y documentos en moto
+Envíos de documentos confidenciales
+Envíos en menos de 45 minutos dentro del perímetro urbano. Cajón térmico impermeable y prueba de entrega digital con foto y firma.
+Especialistas en climatización vehicular para taxis y vans turísticas. Detección electrónica de fugas y cambio de filtro de cabina.
+Falcón
+Foto del Vehículo y Placa legible
+Garantía 1 año
+Garantía Motor y Caja
+Garantía Nacional 18 Meses
+Guasdualito (Páez)
+Guárico
+Guía de despacho rastreable
+Hasta 15 kg · Cajón hermético
+Instalación gratis y diagnóstico del alternador en cualquier punto de Caracas. Devolución de chatarra con crédito a tu favor.
+Isla Ratón (Autana)
+José Gregorio Lugo
+José Gregorio Villalobos
+Judibana (Los Taques)
+Katiuska Bermúdez
+Kit de Arrastre Reforzado + Pastillas de Freno
+Kits de Arrastre
+La Asunción (Arismendi)
+La Concepción (Jesús Enrique Lossada)
+La Fría (García de Hevia)
+La Grita (Jáuregui)
+La Vela de Coro (Colina)
+La membresía para quien se mueve a diario en Caracas, Valencia, Maracay o viaja entre estados con la mayor comodidad.
+Las Mercedes
+Las Mercedes ↔ Catia
+Las Mercedes, Calle París
+Lechería (Urbaneja)
+Licencia de Conducir (2da, 3ra o 5ta según tu vehículo)
+Logística
+Los Guayos
+Los Puertos de Altagracia (Miranda)
+Los Ruices Sur, Calle B con Av. Francisco de Miranda
+Los Teques (Altos Mirandinos)
+Machiques de Perijá
+Maiquetía (Aeropuerto)
+Mantecal (Muñoz)
+Marigüitar (Bolívar)
+Mariángel Colmenárez
+Maturín
+Mene de Mauroa
+Modelos de alta durabilidad para mototaxi y encomiendas. Servicio técnico especializado y repuestos originales disponibles.
+Monay (Pampán)
+Montalbán
+Morón (Juan José Mora)
+Motos 150cc con baúl térmico
+Motos de Trabajo
+Mucuchíes (Rangel)
+Multiservicios & Repuestos Los Teques - Valencia
+Más Rentable para Choferes
+Mérida
+Mérida (Libertador)
+Naiguatá
+Ocumare de la Costa
+PAGO MÓVIL DIRECTO
+Pagas semanalmente por Pago Móvil al instante
+Pago Móvil
+Pago Móvil (Tasa BCV)
+Palmira (Guásimos)
+Pampán
+Papelón
+Paradas turísticas y asistencia en carretera
+Pariaguán (Miranda)
+Pasajero VIP
+Piloto con casco extra higienizado
+Porlamar (Mariño)
+Prioridad de asignación incluso en días de lluvia y horas pico
+Pueblo Nuevo (Falcón)
+Puerto Píritu
+Punta de Mata (Ezequiel Zamora)
+Punta de Piedras (Tubores)
+Puntos de abordaje seguros y custodiados
+Píritu
+Píritu (Esteller)
+Quédate con el 100% de lo que cobras en cada carrera. Sin comisión por viaje, sólo una cuota mensual fija en Bolívares o Dólares.
+Quíbor (Jiménez)
+Revisión Legal INTT
+Roberto Gómez (Toyota HiAce)
+Rubio (Junín)
+Ruta directa sin trasbordos innecesarios
+Río Caribe (Arismendi)
+Río Chico
+Sabana de Mendoza (Sucre)
+San Antonio de Capayacuar (Acosta)
+San Antonio de los Altos
+San Antonio del Golfo (Mejía)
+San Antonio del Táchira (Frontera)
+San Carlos de Río Negro
+San Cristóbal
+San Cristóbal (Táchira)
+San Fernando de Apure
+San Fernando de Atabapo
+San Félix (Caroní)
+San Joaquín
+San José de Guanipa (El Tigrito)
+San Juan de Colón (Ayacucho)
+San Juan de Payara (Pedro Camejo)
+San Juan de los Morros (Roscio)
+San Mateo (Bolívar)
+San Pablo (Arístides Bastidas)
+San Pedro / Los Chaguaramos
+San Pedro de Coche (Villalba)
+San Rafael de Onoto
+San Sebastián de los Reyes
+Sanare (Andrés Eloy Blanco)
+Santa Ana (Gómez)
+Santa Ana del Táchira (Córdoba)
+Santa Bárbara (Zamora)
+Santa Bárbara del Zulia (Sur del Lago)
+Santa Cruz de Mora (Pinto Salinas)
+Santa Elena de Uairén (Gran Sabana)
+Santa María de Ipire
+Sarare (Simón Planas)
+Sedanes y hatchbacks modernos con conductores verificados con antecedentes y revisión mecánica al día.
+Seguro de viajero incluido
+Sin penalización por cancelación justificada
+Sin recargo por tarifas dinámicas imprevistas
+Socopó (Sucre)
+Soporte telefónico y WhatsApp 24/7
+Soporte técnico 24/7 y seguro de accidentes personales
+Suscribirme como Conductor PRO
+Taller & Mecánica
+Tarifa accesible en $ y Pago Móvil
+Tasa preferencial para flotas Taxi Pana
+Traslado de repuestos, electrodomésticos y cajas entre ciudades
+Traslado seguro con aire acondicionado y maleta espaciosa
+Turmero (Mariño)
+Táchira
+Táriba (Cárdenas)
+Tía Juana (Simón Bolívar)
+Unidades de 6 a 14 puestos equipadas para turismo hacia playas de Morrocoy, Colonia Tovar, Mérida o traslados corporativos privados.
+Ureña (Pedro María Ureña)
+VIAJE-701
+VIAJE-702
+Valle de Guanape
+Valle de la Pascua (Infante)
+Vans turísticas
+Vehículos inspeccionados con 120 puntos de control técnico. Aceptamos tu vehículo usado como parte de pago.
+Venta de Repuestos
+Viajes de bus
+Villa Bruzual (Turén)
+Villa de Cura (Zamora)
+Villa del Rosario (Rosario de Perijá)
+Válido para todas las ciudades, municipios y pueblos de Venezuela
+Wilmer Rondón (Bera SBR Azul)
+Yaritagua (Peña)
+Yorbis José Briceño
+Zona Industrial El Recreo, Galpón 4
+useLlégate must be used within a LlégateProvider
+}]]),De=O(
+}]]),de=O(
+
+=== PATH-LIKE STRINGS ===
+

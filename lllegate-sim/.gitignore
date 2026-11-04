@@ -1,0 +1,12 @@
+node_modules/
+dist/
+shots/
+*.local
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+!.env.example
+.pg-data*
+.storage*
+backups/

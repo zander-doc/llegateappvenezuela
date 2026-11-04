@@ -1,0 +1,31 @@
+# Dependencias y artefactos de build
+node_modules/
+dist/
+*.tsbuildinfo
+shots/
+
+# Android / Gradle
+.gradle/
+build/
+.kotlin/
+.cxx/
+captures/
+local.properties
+*.jks
+*.keystore
+.idea/
+*.iml
+
+# Entorno, datos locales y respaldo
+.env
+.env.*
+!.env.example
+.storage*
+.pg-data*
+backups/
+.tmp-pg/
+.tanstack/
+
+# Sistema
+.DS_Store
+Thumbs.db

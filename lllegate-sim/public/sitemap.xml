@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://llegate-app-web.onrender.com/</loc><priority>1.0</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/servicios</loc><priority>0.9</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/servicios/mototaxi</loc><priority>0.9</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/servicios/taxi-pana</loc><priority>0.9</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/servicios/delivery</loc><priority>0.9</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/servicios/minivan-vip</loc><priority>0.4</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/servicios/autobus-frontera</loc><priority>0.4</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/servicios/encomiendas-carga</loc><priority>0.4</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/tarifas</loc><priority>0.9</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/cobertura</loc><priority>0.8</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/conductores</loc><priority>0.9</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/conductores/planes</loc><priority>0.8</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/conductores/registro</loc><priority>0.7</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/pasajeros/club-vip</loc><priority>0.5</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/seguridad</loc><priority>0.7</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/mercado</loc><priority>0.7</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/mercado/negocio/repuestos-el-motor</loc><priority>0.5</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/mercado/negocio/taller-los-pinos</loc><priority>0.5</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/mercado/negocio/llantas-del-sur</loc><priority>0.5</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/mercado/publicar</loc><priority>0.6</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/app</loc><priority>0.6</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/registro</loc><priority>0.8</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/ingresar</loc><priority>0.6</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/empresas</loc><priority>0.6</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/ayuda</loc><priority>0.7</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/nosotros/aliados</loc><priority>0.5</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/legal/terminos</loc><priority>0.3</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/legal/privacidad</loc><priority>0.3</priority></url>
+  <url><loc>https://llegate-app-web.onrender.com/legal/cookies</loc><priority>0.3</priority></url>
+</urlset>

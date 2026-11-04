@@ -1,0 +1,53 @@
+# Despliegue en Render: un servicio para la API y otro para la web.
+# La base de datos sigue en Neon; Render solo ejecuta el código.
+services:
+  - type: web
+    name: llegate-app-api
+    runtime: node
+    plan: free
+    region: ohio
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "1"
+      - key: AUTH_JWT_SECRET
+        generateValue: true
+      - key: OTP_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://llegate-app-web.onrender.com,https://llegate.app,https://www.llegate.app
+      - key: PUBLIC_API_URL
+        value: https://llegate-app-api.onrender.com
+      # Mientras no haya WhatsApp o Twilio, el código OTP sale en los logs de
+      # Render. Quitar esta variable cuando esté configurado el envío real.
+      - key: OTP_LOG_EN_DESARROLLO
+        value: "1"
+      - key: STORAGE_DRIVER
+        value: local
+
+  - type: web
+    name: llegate-app-web
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: llegate-app-api
+          envVarKey: RENDER_EXTERNAL_URL
