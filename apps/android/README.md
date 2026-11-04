@@ -23,11 +23,11 @@ y `/wallet` es el trabajo en curso.
 ```bash
 cd apps/android
 ./gradlew assembleDebug          # APK de prueba
-./gradlew assembleRelease        # APK firmado para reparto
+./gradlew testDebugUnitTest      # pruebas del view model
 ```
 
-El APK queda en `app/build/outputs/apk/`. Para instalarlo en un dispositivo
-conectado por USB o en BlueStacks:
+El APK queda en `app/build/outputs/apk/debug/app-debug.apk`. Para instalarlo en un
+dispositivo conectado por USB o en BlueStacks:
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
