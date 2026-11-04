@@ -48,6 +48,13 @@ dispositivo conectado por USB o en BlueStacks:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Tipografías
+
+La app trae las cuatro familias de la marca que usa la web (Bebas Neue, Outfit,
+DM Sans y JetBrains Mono) empaquetadas en `app/src/main/res/font/`; `ui/theme/Type.kt`
+las expone como `LlegateDisplay`, `LlegateHeading`, `LlegateBody` y `LlegateMono`.
+Cómo se generan y bajo qué licencia están explicados en `fonts/README.md`.
+
 ## La API
 
 La app habla con `https://llegate-app-api.onrender.com`. La dirección se fija en

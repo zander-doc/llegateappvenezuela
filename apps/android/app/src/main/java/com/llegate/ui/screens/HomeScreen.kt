@@ -79,6 +79,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -105,6 +106,9 @@ import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.LlegateBody
+import com.llegate.ui.theme.LlegateHeading
+import com.llegate.ui.theme.LlegateMono
 import com.llegate.ui.theme.NeonOrange300
 import com.llegate.ui.theme.NeonOrange400
 import com.llegate.ui.theme.NeonOrange500
@@ -1339,6 +1343,7 @@ fun HomeScreen(
                     Text(
                         text = cuenta?.nombre?.takeIf { it.isNotBlank() } ?: "Mi cuenta",
                         fontWeight = FontWeight.Black,
+                        fontFamily = LlegateHeading,
                         fontSize = 18.sp,
                         color = Stone100
                     )
@@ -1354,11 +1359,12 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    FilaCuenta(etiqueta = "Saldo disponible", valor = usd(disponible), destacado = true)
+                    FilaCuenta(etiqueta = "Saldo disponible", valor = usd(disponible), destacado = true, numero = true)
                     if (billetera != null && billetera.reservadoUsd > 0.0) {
                         FilaCuenta(
                             etiqueta = "Reservado por comisiones",
-                            valor = usd(billetera.reservadoUsd)
+                            valor = usd(billetera.reservadoUsd),
+                            numero = true
                         )
                     }
                     if (billetera != null && billetera.estado != "activo") {
@@ -1381,7 +1387,8 @@ fun HomeScreen(
                     HorizontalDivider(color = Asphalt700)
                     FilaCuenta(
                         etiqueta = "Teléfono",
-                        valor = enmascararTelefono(cuenta?.telefono)
+                        valor = enmascararTelefono(cuenta?.telefono),
+                        numero = true
                     )
                     if (piloto != null) {
                         val estadoPiloto = when (piloto.verificacion) {
@@ -1703,7 +1710,8 @@ fun UpcomingServiceItem(
 private fun FilaCuenta(
     etiqueta: String,
     valor: String,
-    destacado: Boolean = false
+    destacado: Boolean = false,
+    numero: Boolean = false
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1713,10 +1721,12 @@ private fun FilaCuenta(
         Text(
             text = etiqueta,
             fontSize = 12.sp,
+            fontFamily = LlegateBody,
             color = Stone400
         )
         Text(
             text = valor,
+            fontFamily = if (numero) LlegateMono else LlegateBody,
             fontSize = if (destacado) 18.sp else 12.sp,
             fontWeight = if (destacado) FontWeight.Black else FontWeight.Bold,
             color = when {
@@ -1829,6 +1839,7 @@ private fun RecargaSheet(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                 Text(
                     text = "Recargar saldo Llégate",
                     fontWeight = FontWeight.Black,
+                    fontFamily = LlegateHeading,
                     fontSize = 18.sp,
                     color = Stone100
                 )
@@ -1866,7 +1877,8 @@ private fun RecargaSheet(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                                         Text(
                                             text = usd(paquete.amountUsd),
-                                            fontWeight = FontWeight.Black,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = LlegateMono,
                                             fontSize = 15.sp,
                                             color = if (elegido) Asphalt950 else Stone100
                                         )
@@ -1941,13 +1953,13 @@ private fun RecargaSheet(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                         if (pago == null) {
                             Text("No pudimos abrir la hoja. Toca Volver e inténtalo de nuevo.", fontSize = 12.sp, color = RacingRed500)
                         } else {
-                            FilaCuenta(etiqueta = "Código del pago", valor = pago.codigo, destacado = true)
-                            FilaCuenta(etiqueta = "Monto en dólares", valor = usd(pago.montoUsd))
+                            FilaCuenta(etiqueta = "Código del pago", valor = pago.codigo, destacado = true, numero = true)
+                            FilaCuenta(etiqueta = "Monto en dólares", valor = usd(pago.montoUsd), numero = true)
                             if (pago.montoBs != null) {
-                                FilaCuenta(etiqueta = "Monto en bolívares", valor = bs(pago.montoBs))
+                                FilaCuenta(etiqueta = "Monto en bolívares", valor = bs(pago.montoBs), numero = true)
                             }
                             if (pago.tasaBs != null) {
-                                FilaCuenta(etiqueta = "Tasa del día", valor = "${bs(pago.tasaBs)} por dólar")
+                                FilaCuenta(etiqueta = "Tasa del día", valor = "${bs(pago.tasaBs)} por dólar", numero = true)
                             }
                             HorizontalDivider(color = Asphalt700)
 
@@ -1968,8 +1980,8 @@ private fun RecargaSheet(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                                 )
                             } else {
                                 pago.instrucciones.banco?.let { FilaCuenta(etiqueta = "Banco", valor = it) }
-                                pago.instrucciones.telefono?.let { FilaCuenta(etiqueta = "Teléfono", valor = it) }
-                                pago.instrucciones.cedula?.let { FilaCuenta(etiqueta = "Cédula", valor = it) }
+                                pago.instrucciones.telefono?.let { FilaCuenta(etiqueta = "Teléfono", valor = it, numero = true) }
+                                pago.instrucciones.cedula?.let { FilaCuenta(etiqueta = "Cédula", valor = it, numero = true) }
                                 pago.instrucciones.titular?.let { FilaCuenta(etiqueta = "Titular", valor = it) }
                                 Text(
                                     text = pago.instrucciones.nota
@@ -2001,6 +2013,11 @@ private fun RecargaSheet(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                                 .fillMaxWidth()
                                 .testTag("campo_referencia"),
                             label = { Text("Referencia del Pago Móvil", color = Stone400, fontSize = 12.sp) },
+                            textStyle = TextStyle(
+                                fontFamily = LlegateMono,
+                                fontSize = 18.sp,
+                                letterSpacing = 3.sp
+                            ),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = RacingYellow500,
@@ -2018,7 +2035,7 @@ private fun RecargaSheet(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                             color = Stone400
                         )
                         pago?.let {
-                            FilaCuenta(etiqueta = "Recarga", valor = "${usd(it.montoUsd)} • código ${it.codigo}")
+                            FilaCuenta(etiqueta = "Recarga", valor = "${usd(it.montoUsd)} • código ${it.codigo}", numero = true)
                         }
                         TextButton(
                             onClick = { viewModel.volverALosDatosDeRecarga() },

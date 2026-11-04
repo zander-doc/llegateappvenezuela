@@ -41,7 +41,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +51,8 @@ import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.CyanGlow
 import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.LlegateHeading
+import com.llegate.ui.theme.LlegateMono
 import com.llegate.ui.theme.NeonOrange400
 import com.llegate.ui.theme.NeonOrange500
 import com.llegate.ui.theme.RacingRed500
@@ -151,8 +152,8 @@ fun VenezuelanPlateBadge(
             Text(
                 text = plate,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontFamily = LlegateMono,
                 color = Color(0xFF0F172A),
                 letterSpacing = 2.sp
             )
@@ -184,6 +185,7 @@ fun DriverAvatarBadge(
                 text = initials,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Black,
+                fontFamily = LlegateHeading,
                 color = Asphalt950
             )
         }

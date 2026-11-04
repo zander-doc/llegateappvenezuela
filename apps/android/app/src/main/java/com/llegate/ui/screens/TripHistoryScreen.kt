@@ -59,6 +59,7 @@ import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.LlegateHeading
 import com.llegate.ui.theme.NeonOrange400
 import com.llegate.ui.theme.NeonOrange500
 import com.llegate.ui.theme.RacingYellow500
@@ -124,6 +125,7 @@ fun TripHistoryScreen(
                                 text = "Mi Historial",
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Black,
+                                fontFamily = LlegateHeading,
                                 color = Stone100
                             )
                             Spacer(modifier = Modifier.width(8.dp))

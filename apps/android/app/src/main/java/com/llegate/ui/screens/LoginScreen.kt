@@ -25,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -33,6 +34,8 @@ import com.llegate.ui.components.LlegateOfficialBrandHeader
 import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.LlegateHeading
+import com.llegate.ui.theme.LlegateMono
 import com.llegate.ui.theme.NeonOrange500
 import com.llegate.ui.theme.Stone100
 import com.llegate.ui.theme.Stone400
@@ -58,7 +61,8 @@ fun LoginScreen(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                 text = if (uiState.pasoInicio == PasoInicio.DATOS) "Entra con tu número" else "Revisa tu WhatsApp",
                 color = Stone100,
                 fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                fontFamily = LlegateHeading
             )
             Text(
                 text = if (uiState.pasoInicio == PasoInicio.DATOS)
@@ -117,7 +121,13 @@ private fun PasoCodigo(uiState: LlegateUiState, viewModel: LlegateViewModel) {
             etiqueta = "Código de 6 dígitos",
             supporto = "Si no te llegó, revisa Spam o pide otro",
             tipoTeclado = KeyboardType.NumberPassword,
-            habilitado = !uiState.verificandoCodigo
+            habilitado = !uiState.verificandoCodigo,
+            textStyle = TextStyle(
+                fontFamily = LlegateMono,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 6.sp
+            )
         )
         Spacer(modifier = Modifier.height(14.dp))
         BotonPrimario(
@@ -155,11 +165,13 @@ private fun Campo(
     etiqueta: String,
     supporto: String,
     habilitado: Boolean,
-    tipoTeclado: KeyboardType = KeyboardType.Text
+    tipoTeclado: KeyboardType = KeyboardType.Text,
+    textStyle: TextStyle = TextStyle.Default
 ) {
     OutlinedTextField(
         value = valor,
         onValueChange = alCambiar,
+        textStyle = textStyle,
         modifier = Modifier.fillMaxWidth(),
         label = { Text(etiqueta, fontSize = 13.sp) },
         supportingText = { Text(supporto, fontSize = 11.5.sp, color = Stone400) },

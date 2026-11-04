@@ -89,6 +89,7 @@ import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.CyanGlow
 import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.LlegateMono
 import com.llegate.ui.theme.NeonOrange300
 import com.llegate.ui.theme.NeonOrange400
 import com.llegate.ui.theme.NeonOrange500
@@ -231,7 +232,8 @@ fun RequestRideScreen(
                                 Text(
                                     text = "$${String.format(Locale.US, "%.2f", currentEstimate.priceUsd).replace('.', ',')}",
                                     fontSize = 22.sp,
-                                    fontWeight = FontWeight.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = LlegateMono,
                                     color = RacingYellow500
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))

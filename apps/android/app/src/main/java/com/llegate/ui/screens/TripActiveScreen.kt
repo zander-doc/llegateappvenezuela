@@ -88,6 +88,7 @@ import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.LlegateHeading
 import com.llegate.ui.theme.Emerald900
 import com.llegate.ui.theme.NeonOrange300
 import com.llegate.ui.theme.NeonOrange400
@@ -292,6 +293,7 @@ fun TripActiveScreen(
                                     text = "Llega en aprox. 2 minutos",
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Black,
+                                    fontFamily = LlegateHeading,
                                     color = Stone100
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
