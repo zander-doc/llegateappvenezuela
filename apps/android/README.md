@@ -7,10 +7,12 @@ compartidos: una cuenta, dos clientes.
 
 ## Estado
 
-Hoy la pantalla funciona con datos sembrados en `LlegateViewModel`: muestra el
-servicio, calcula la tarifa y simula el viaje, pero todavía no inicia sesión ni
-lee la base de datos. La conexión real con `/auth/otp`, `/config/app`, `/trips`
-y `/wallet` es el trabajo en curso.
+La capa de red ya existe (`network/ApiClient.kt`, `AuthRepository`,
+`ConfigRepository` y `data/SessionStore`), pero ninguna pantalla la usa todavía:
+la UI sigue funcionando con datos sembrados en `LlegateViewModel`, y el viaje es
+un temporizador simulado. El siguiente paso es la pantalla de ingreso por código
+y, después, que las tarifas se lean de `/config/app` en lugar de los `enum`
+fijos de `model/Models.kt`.
 
 ## Requisitos
 
@@ -23,7 +25,7 @@ y `/wallet` es el trabajo en curso.
 ```bash
 cd apps/android
 ./gradlew assembleDebug          # APK de prueba
-./gradlew testDebugUnitTest      # pruebas del view model
+./gradlew testDebugUnitTest      # pruebas de la pantalla y de los JSON de la API
 ```
 
 El APK queda en `app/build/outputs/apk/debug/app-debug.apk`. Para instalarlo en un
@@ -36,5 +38,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ## La API
 
 La app habla con `https://llegate-app-api.onrender.com`. La dirección se fija en
-`ApiConfig` (se añade cuando exista la capa de red); no hay claves ni tokens
-empaquetados en el APK: el acceso es por código enviado al teléfono.
+`ApiConfig`; no hay claves ni tokens empaquetados en el APK: el acceso es por
+código enviado al teléfono y la sesión de este dispositivo se guarda sola, junto
+con el `refresh_token` que la API rota en cada renovación.
