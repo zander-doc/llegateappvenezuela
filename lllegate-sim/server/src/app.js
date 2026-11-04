@@ -5,6 +5,7 @@ import { pool } from "./db.js";
 import { errorHandler } from "./http.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
+import { configRouter } from "./routes/config.js";
 import { driverDocumentsRouter, driversRouter } from "./routes/drivers.js";
 import { filesRouter } from "./routes/files.js";
 import { paymentsRouter } from "./routes/payments.js";
@@ -78,6 +79,7 @@ app.get("/health/otp", (_req, res) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/config", configRouter);
 app.use("/drivers", driversRouter);
 app.use("/wallet", walletRouter);
 app.use("/payments", paymentsRouter);

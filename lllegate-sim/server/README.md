@@ -92,6 +92,36 @@ El saldo, el rol y el estado del piloto son los mismos en ambos clientes.
 
 Para un pasajero, `conductor` es `null` y `puede_pedir_viajes` es `true`.
 
+### Los precios que ve la app
+
+`GET /config/app` (público, sin sesión y sin tocar la base) entrega los servicios,
+las tarifas y las reglas de la billetera de prepago. La app Android lo pide al
+arrancar para no traer precios copiados en el APK:
+
+```json
+{
+  "ok": true,
+  "version": 1,
+  "services": [
+    { "slug": "mototaxi", "name": "Mototaxi", "icon": "bike", "minFareUSD": 1,
+      "perKmUSD": 0.3, "capacity": "1 pasajero", "eta": "3 a 7 min",
+      "status": "launch", "phase": null }
+  ],
+  "fareRules": { "model": "min_fare_plus_km", "perMinuteUSD": 0.04,
+    "roundTripDoublesDistance": true, "minFareChargedOnce": true, "currency": "USD" },
+  "walletRules": { "commissionRate": 0.1, "minCommissionUSD": 0.1, "welcomeUSD": 2,
+    "minRechargeUSD": 5, "maxRechargeUSD": 50 },
+  "rechargePacks": [
+    { "amount": 5, "name": "Arranque", "note": "Para empezar el día", "recommended": false }
+  ]
+}
+```
+
+Los datos viven en `src/appConfig.js` y son copia de los que usa la web
+(`src/data/services.ts` y `src/data/prepaid.ts`). El test
+`src/data/appConfig.test.ts` compara las dos listas, así que cambiar un precio en
+la web sin cambiarlo en el API falla antes de subir nada.
+
 ### Conectar la web
 
 La web cambia entre modo real y demostración solo con `VITE_API_URL`:
@@ -131,6 +161,7 @@ vuelve a ejecutar `npm run build`.
 | GET | `/health` | público | Vida del proceso, sin tocar la base |
 | GET | `/health/db` | público | Prueba la conexión a la base y, si falla, devuelve `codigo` y `mensaje` sin credenciales |
 | GET | `/health/otp` | público | Canal que usará el próximo OTP y si WhatsApp/SMS están configurados (sin credenciales) |
+| GET | `/config/app` | público | Servicios, tarifas y reglas de prepago que lee la app Android |
 | POST | `/auth/otp` | público | Envía el código OTP (`telefono`, `rol`, `nombre`, `estado` y `ciudad` opcionales) |
 | POST | `/auth/verify` | público | Verifica el código y entrega la sesión |
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
