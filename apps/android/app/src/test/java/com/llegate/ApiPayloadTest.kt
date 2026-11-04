@@ -1,11 +1,14 @@
 package com.llegate
 
+import com.llegate.model.ServiceType
+import com.llegate.model.tarifaUsd
 import com.llegate.network.configFrom
 import com.llegate.network.sessionFrom
 import com.llegate.network.usuarioFrom
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -120,6 +123,32 @@ class ApiPayloadTest {
     assertTrue(piloto.conductor!!.aprobado)
     assertEquals("moto", piloto.conductor?.tipoVehiculo)
     assertTrue(piloto.puedeConducir)
+  }
+
+  @Test
+  fun `los precios del APK coinciden con los que publica la API`() {
+    val config = configFrom(JSONObject(CONFIG_APP))
+
+    for (tipo in listOf(ServiceType.MOTO, ServiceType.CAR, ServiceType.DELIVERY)) {
+      val servicio = config.service(tipo.slug)
+      assertNotNull("falta ${tipo.slug} en /config/app", servicio)
+      assertEquals(tipo.name, servicio!!.minFareUsd, tipo.minFareUsd, 0.0)
+      assertEquals(tipo.name, servicio.perKmUsd, tipo.perKmUsd, 0.0)
+    }
+  }
+
+  @Test
+  fun `la tarifa es minima mas kilometros mas minutos`() {
+    val config = configFrom(JSONObject(CONFIG_APP))
+
+    // Mototaxi: 1,00 mínima + 0,30 x 3 km + 0,04 x 6 min
+    assertEquals(2.14, tarifaUsd(config, ServiceType.MOTO, 3.0, 6), 0.0)
+    // Taxi Pana: 3,00 + 0,50 x 10 km + 0,04 x 25 min
+    assertEquals(9.00, tarifaUsd(config, ServiceType.CAR, 10.0, 25), 0.0)
+    // Sin viaje cobrado por tiempo queda en la tarifa mínima
+    assertEquals(1.00, tarifaUsd(config, ServiceType.MOTO, 0.0, 0), 0.0)
+    // Y sin /config/app se usan los mismos números del APK
+    assertEquals(2.14, tarifaUsd(null, ServiceType.MOTO, 3.0, 6), 0.0)
   }
 
   private companion object {

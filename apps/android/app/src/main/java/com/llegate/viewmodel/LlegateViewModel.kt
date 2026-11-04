@@ -24,12 +24,15 @@ import com.llegate.model.SafeMeetingPoint
 import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
 import com.llegate.model.SubscriptionPlan
+import com.llegate.model.tarifaUsd
 import com.llegate.model.TripHistoryItem
 import com.llegate.model.TripStep
 import com.llegate.model.UpcomingService
 import com.llegate.network.ApiException
 import com.llegate.network.AuthRepository
 import com.llegate.network.BcvRateService
+import com.llegate.network.ConfigApp
+import com.llegate.network.ConfigRepository
 import com.llegate.network.Usuario
 import com.llegate.util.aE164Venezuela
 import com.llegate.util.esNombrePersona
@@ -411,6 +414,7 @@ data class LlegateUiState(
     val showTripRatingSheet: Boolean = false,
     val tripRating: Int = 5,
     val selectedTipUsd: Double = 0.0,
+    val config: ConfigApp? = null,
     val cuenta: Usuario? = null,
     val pasoInicio: PasoInicio = PasoInicio.DATOS,
     val telefono: String = "",
@@ -550,7 +554,10 @@ data class LlegateUiState(
         }
 }
 
-class LlegateViewModel(private val auth: AuthRepository) : ViewModel() {
+class LlegateViewModel(
+    private val auth: AuthRepository,
+    private val configRepo: ConfigRepository = ConfigRepository()
+) : ViewModel() {
 
     private val bcvRateService = BcvRateService()
     private val _uiState = MutableStateFlow(
@@ -564,7 +571,22 @@ class LlegateViewModel(private val auth: AuthRepository) : ViewModel() {
     init {
         recalculateEstimates()
         fetchBcvExchangeRate(showToast = false)
+        cargarConfiguracion()
         revisarSesion()
+    }
+
+    /** `/config/app` manda precios y reglas; si no llega, la app sigue con los del APK. */
+    fun cargarConfiguracion() {
+        viewModelScope.launch {
+            val config = try {
+                configRepo.cargar()
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                null
+            }
+            _uiState.update { it.copy(config = config) }
+            recalculateEstimates()
+        }
     }
 
     fun revisarSesion() {
@@ -983,9 +1005,9 @@ class LlegateViewModel(private val auth: AuthRepository) : ViewModel() {
         val deliverySpeedKmH = 30.0
         val deliveryEta = ((distance / deliverySpeedKmH) * 60).roundToInt().coerceAtLeast(6)
 
-        val motoUsd = (ServiceType.MOTO.baseRateUsd + (distance * ServiceType.MOTO.perKmRateUsd))
-        val carUsd = (ServiceType.CAR.baseRateUsd + (distance * ServiceType.CAR.perKmRateUsd))
-        val deliveryUsd = (ServiceType.DELIVERY.baseRateUsd + (distance * ServiceType.DELIVERY.perKmRateUsd))
+        val motoUsd = tarifaUsd(state.config, ServiceType.MOTO, distance, motoEta)
+        val carUsd = tarifaUsd(state.config, ServiceType.CAR, distance, carEta)
+        val deliveryUsd = tarifaUsd(state.config, ServiceType.DELIVERY, distance, deliveryEta)
 
         val motoBs = (motoUsd * state.bcvExchangeRate)
         val carBs = (carUsd * state.bcvExchangeRate)

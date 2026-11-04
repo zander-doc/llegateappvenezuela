@@ -1,22 +1,27 @@
 package com.llegate.model
 
+import com.llegate.network.ConfigApp
+import kotlin.math.roundToInt
+
 enum class ServiceType(
+    val slug: String,
     val title: String,
     val colloquialTitle: String,
     val subtitle: String,
     val speedTag: String,
-    val baseRateUsd: Double,
-    val perKmRateUsd: Double,
+    val minFareUsd: Double,
+    val perKmUsd: Double,
     val capacityInfo: String,
     val perks: List<String>
 ) {
     MOTO(
+        slug = "mototaxi",
         title = "Mototaxi Llégate",
         colloquialTitle = "Pedir Moto",
         subtitle = "El más rápido en la cola • Doble casco y chaleco",
         speedTag = "¡El más rápido!",
-        baseRateUsd = 1.20,
-        perKmRateUsd = 0.40,
+        minFareUsd = 1.00,
+        perKmUsd = 0.30,
         capacityInfo = "1 Pasajero • Doble casco certificado",
         perks = listOf(
             "Evasión rápida del tráfico en horas pico",
@@ -25,12 +30,13 @@ enum class ServiceType(
         )
     ),
     CAR(
+        slug = "taxi-pana",
         title = "Taxi Pana & Confort",
         colloquialTitle = "Pedir Carro",
         subtitle = "Sedanes modernos con aire • Maletas y hasta 4 panas",
         speedTag = "Más cómodo",
-        baseRateUsd = 2.50,
-        perKmRateUsd = 0.75,
+        minFareUsd = 3.00,
+        perKmUsd = 0.50,
         capacityInfo = "Hasta 4 Panas • Aire acondicionado full",
         perks = listOf(
             "Aire acondicionado y revisión mecánica al día",
@@ -39,12 +45,13 @@ enum class ServiceType(
         )
     ),
     DELIVERY(
+        slug = "delivery",
         title = "Delivery Express",
         colloquialTitle = "Pedir Delivery",
         subtitle = "20-45 min · Hasta 5 kg • Encomiendas rápidas",
         speedTag = "Express",
-        baseRateUsd = 1.35,
-        perKmRateUsd = 0.42,
+        minFareUsd = 1.00,
+        perKmUsd = 0.35,
         capacityInfo = "Hasta 5 kg • Bolso sellado o caja térmica",
         perks = listOf(
             "Rastreo en tiempo real punto a punto",
@@ -280,3 +287,32 @@ data class SafeMeetingPoint(
 )
 
 
+
+/**
+ * El mismo cálculo que `estimateTripFare` en la web: tarifa mínima + distancia +
+ * tiempo, y nunca por debajo de la mínima.
+ */
+fun tarifaUsd(
+  minFareUsd: Double,
+  perKmUsd: Double,
+  perMinuteUsd: Double,
+  km: Double,
+  minutes: Int
+): Double {
+  val distancia = (km * 10).roundToInt() / 10.0
+  val total = minFareUsd + perKmUsd * distancia + minutes * perMinuteUsd
+  return (maxOf(minFareUsd, total) * 100).roundToInt() / 100.0
+}
+
+fun tarifaUsd(config: ConfigApp?, tipo: ServiceType, km: Double, minutes: Int): Double {
+  val servicio = config?.service(tipo.slug)
+  return tarifaUsd(
+    minFareUsd = servicio?.minFareUsd ?: tipo.minFareUsd,
+    perKmUsd = servicio?.perKmUsd ?: tipo.perKmUsd,
+    perMinuteUsd = config?.fareRules?.perMinuteUsd ?: POR_MINUTO,
+    km = km,
+    minutes = minutes
+  )
+}
+
+private const val POR_MINUTO = 0.04
