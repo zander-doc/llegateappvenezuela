@@ -392,6 +392,7 @@ proveedor externo de autenticación ni hook: la verificación ocurre en
 ```bash
 WHATSAPP_TOKEN=EAAG...
 WHATSAPP_PHONE_ID=1234567890
+WHATSAPP_WABA_ID=1682936940122491
 WHATSAPP_OTP_TEMPLATE=llegate_otp
 WHATSAPP_OTP_LANGUAGE=es
 WHATSAPP_API_VERSION=v21.0
@@ -404,6 +405,11 @@ TWILIO_FROM=+1...
 - WhatsApp se usa cuando están `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_ID`. La
   plantilla debe ser de categoría **autenticación** con botón **Copiar código**;
   el envío manda el código dos veces (cuerpo y botón), como exige Meta.
+- Al arrancar, si está `WHATSAPP_WABA_ID`, el API lista los números que Meta
+  reconoce en ese WABA y deja en el log `[otp] remitente configurado es correcto`
+  o `[otp] WHATSAPP_PHONE_ID=… no es un número de este WABA. Opciones válidas: …`.
+  Así un identificador mal copiado se ve sin necesidad de Shell ni del portal de
+  desarrolladores.
 - Si WhatsApp falla (token vencido, destinatario no verificado en el número de
   prueba), se intenta Twilio y luego el log si está activo. La respuesta 202
   nombra el canal que realmente entregó el código.

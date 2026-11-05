@@ -98,6 +98,7 @@ export const config = {
     whatsapp: {
       token: text("WHATSAPP_TOKEN"),
       phoneId: text("WHATSAPP_PHONE_ID"),
+      wabaId: text("WHATSAPP_WABA_ID"),
       template: text("WHATSAPP_OTP_TEMPLATE") || "llegate_otp",
       language: text("WHATSAPP_OTP_LANGUAGE") || "es",
       apiVersion: text("WHATSAPP_API_VERSION") || "v21.0",

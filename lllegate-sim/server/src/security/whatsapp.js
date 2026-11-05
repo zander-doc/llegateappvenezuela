@@ -62,3 +62,49 @@ export async function enviarCodigoWhatsApp({
 
   return { ok: true };
 }
+
+/** Los números que Meta reconoce dentro del WABA, con su identificador real. */
+export async function numerosDelWaba({
+  wabaId,
+  fetchImpl = globalThis.fetch,
+  whatsapp = config.otp.whatsapp,
+}) {
+  if (!whatsapp.token || !wabaId) {
+    throw new Error("whatsapp_sin_credenciales_para_consultar");
+  }
+
+  const url = new URL(`https://graph.facebook.com/${whatsapp.apiVersion}/${wabaId}/phone_numbers`);
+  url.searchParams.set("fields", "id,display_phone_number,verified_name");
+
+  const respuesta = await fetchImpl(url, {
+    headers: { Authorization: `Bearer ${whatsapp.token}` },
+  });
+
+  if (!respuesta.ok) {
+    const detalle = await respuesta.text().catch(() => "");
+    throw new Error(`whatsapp_${respuesta.status}: ${detalle.slice(0, 200)}`);
+  }
+
+  const datos = await respuesta.json().catch(() => null);
+  return (datos?.data ?? []).map((numero) => ({
+    id: String(numero.id),
+    numero: numero.display_phone_number ?? "?",
+    nombre: numero.verified_name ?? "",
+  }));
+}
+
+/**
+ * Frase para el log: dice si el remitente configurado existe de verdad. Un
+ * WHATSAPP_PHONE_ID mal copiado se veía como un misterioso "does not exist" de
+ * Meta; aquí queda el candidato correcto a la vista.
+ */
+export function diagnosticoRemitente({ phoneId, numeros }) {
+  if (!phoneId) return "[otp] WHATSAPP_PHONE_ID no está configurado.";
+  if (!numeros.length) return `[otp] el WABA no tiene ningún número de teléfono; configurado: ${phoneId}`;
+
+  const coincide = numeros.find((numero) => numero.id === phoneId);
+  if (coincide) return `[otp] remitente configurado es correcto: ${coincide.id} (${coincide.numero}).`;
+
+  const opciones = numeros.map((numero) => `${numero.id} (${numero.numero})`).join(", ");
+  return `[otp] WHATSAPP_PHONE_ID=${phoneId} no es un número de este WABA. Opciones válidas: ${opciones}`;
+}

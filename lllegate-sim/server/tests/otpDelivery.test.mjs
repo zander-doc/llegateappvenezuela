@@ -6,6 +6,7 @@ const { enviarCodigoOtp, enviarCodigoSms, smsDisponible } = await import(
   "../src/security/otp-delivery.js"
 );
 const { enviarCodigoWhatsApp, whatsappDisponible } = await import("../src/security/whatsapp.js");
+const { diagnosticoRemitente, numerosDelWaba } = await import("../src/security/whatsapp.js");
 
 test("WhatsApp arma la plantilla de OTP con el número normalizado", async () => {
   let solicitud;
@@ -210,4 +211,58 @@ test("un 4xx de Twilio se reporta como error del proveedor", async () => {
       }),
     /sms_400/,
   );
+});
+
+test("numerosDelWaba lee los identificadores que Meta reconoce", async () => {
+  let url;
+  const fetchImpl = async (destino) => {
+    url = destino;
+    return new Response(
+      JSON.stringify({
+        data: [
+          { id: 1481277058382802, display_phone_number: "+1 555-613-0952", verified_name: "Test Number" },
+        ],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  };
+
+  const numeros = await numerosDelWaba({
+    wabaId: "1682936940122491",
+    fetchImpl,
+    whatsapp: { token: "token-meta", apiVersion: "v21.0" },
+  });
+
+  assert.equal(
+    String(url),
+    "https://graph.facebook.com/v21.0/1682936940122491/phone_numbers?fields=id%2Cdisplay_phone_number%2Cverified_name",
+  );
+  assert.deepEqual(numeros, [{ id: "1481277058382802", numero: "+1 555-613-0952", nombre: "Test Number" }]);
+});
+
+test("numerosDelWaba no sale a la red sin token ni WABA", async () => {
+  const fetchImpl = async () => {
+    throw new Error("no debía llamarse");
+  };
+
+  await assert.rejects(
+    () => numerosDelWaba({ wabaId: "", fetchImpl, whatsapp: { token: "x", apiVersion: "v21.0" } }),
+    /whatsapp_sin_credenciales_para_consultar/,
+  );
+  await assert.rejects(
+    () => numerosDelWaba({ wabaId: "1682936940122491", fetchImpl, whatsapp: { token: "", apiVersion: "v21.0" } }),
+    /whatsapp_sin_credenciales_para_consultar/,
+  );
+});
+
+test("el diagnóstico del remitente dice qué identificador sí sirve", () => {
+  const numeros = [
+    { id: "9876543210123456", numero: "+1 555-613-0952", nombre: "Test Number" },
+  ];
+
+  assert.match(diagnosticoRemitente({ phoneId: "1481277058382802", numeros }), /no es un número de este WABA/);
+  assert.match(diagnosticoRemitente({ phoneId: "1481277058382802", numeros }), /9876543210123456/);
+  assert.match(diagnosticoRemitente({ phoneId: "9876543210123456", numeros }), /es correcto/);
+  assert.match(diagnosticoRemitente({ phoneId: "9876543210123456", numeros: [] }), /no tiene ningún número/);
+  assert.match(diagnosticoRemitente({ phoneId: "", numeros }), /no está configurado/);
 });
