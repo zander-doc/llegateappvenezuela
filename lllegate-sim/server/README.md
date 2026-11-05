@@ -414,6 +414,13 @@ TWILIO_FROM=+1...
 - `GET /health/otp` responde `canal` (`whatsapp`, `sms`, `log` o `null`), si cada
   proveedor está configurado y la plantilla e idioma que se enviarán a Meta. Sirve
   para confirmar en producción qué canal se usará sin leer los logs.
+- `npm run whatsapp:otp -- <WABA_ID>` consulta Meta e imprime **solo** el estado de la
+  plantilla (`APPROVED`, `PENDING`, `REJECTED` o `CONSULTA_FALLO http=NNN`), filtrado por
+  una lista blanca: nunca imprime el token ni el cuerpo de una respuesta de error.
+- El `202` de `POST /auth/otp` significa que **Meta aceptó** el mensaje, no que llegó. La
+  entrega puede fallar después (plantilla sin aprobar, destinatario fuera de la lista de
+  números de prueba, teléfono sin WhatsApp) y hoy no se registra: haría falta el webhook
+  de estados de WhatsApp, que todavía no está implementado.
 
 El código vence a los 10 minutos, admite 5 intentos y se guarda como HMAC con
 `OTP_SECRET` (o `AUTH_JWT_SECRET` si no se define). Además hay una ventana
