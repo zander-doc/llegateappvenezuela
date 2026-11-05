@@ -1,15 +1,69 @@
 import { Router } from "express";
-import { fila, rpc } from "../db.js";
+import { fila, filas, rpc } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
 import { cancelTripSchema, createTripSchema, uuidSchema } from "../schemas.js";
 
 export const tripsRouter = Router();
 
-const TRIP_COLUMNS =
-  "id, cliente_id, conductor_id, estado, origen, destino, distancia_km, precio_usd, tasa_bcv, metodo_pago, comision_usd, comision_porcentaje, created_at, aceptado_en, iniciado_en, finalizado_en";
+const VIAJE_COLUMNAS = [
+  "id",
+  "cliente_id",
+  "conductor_id",
+  "estado",
+  "origen",
+  "destino",
+  "distancia_km",
+  "precio_usd",
+  "tasa_bcv",
+  "metodo_pago",
+  "comision_usd",
+  "comision_porcentaje",
+  "created_at",
+  "aceptado_en",
+  "iniciado_en",
+  "finalizado_en",
+];
+
+const TRIP_COLUMNS = VIAJE_COLUMNAS.join(", ");
+
+/**
+ * Quién maneja el viaje, para que el pasajero sepa a quién llamar. Es null mientras
+ * ningún piloto lo acepte; la cédula y los documentos del conductor no salen de la base.
+ */
+const CONDUCTOR_JSON = `
+  case when viajes.conductor_id is null then null else jsonb_build_object(
+    'nombre', conductor_usuario.nombre,
+    'telefono', conductor_usuario.telefono,
+    'placa', conductor_detalle.placa,
+    'tipo_vehiculo', conductor_detalle.tipo_vehiculo,
+    'marca', conductor_detalle.marca,
+    'modelo', conductor_detalle.modelo,
+    'verificacion', conductor_detalle.verificacion
+  ) end as conductor`;
+
+// Cada columna se califica porque el viaje se lee junto con las tablas del piloto.
+const SELECT_VIAJE = `
+  select ${VIAJE_COLUMNAS.map((columna) => `viajes.${columna}`).join(", ")}, ${CONDUCTOR_JSON}
+    from public.viajes
+    left join public.usuarios as conductor_usuario on conductor_usuario.id = viajes.conductor_id
+    left join public.conductores_detalles as conductor_detalle on conductor_detalle.usuario_id = viajes.conductor_id`;
 
 tripsRouter.use(requireUser);
+
+tripsRouter.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    // Los 50 viajes más recientes del pasajero, del más nuevo al más viejo: la app
+    // saca de ahí su historial y el viaje que tiene abierto.
+    const viajes = await filas(
+      `${SELECT_VIAJE} where viajes.cliente_id = $1 order by viajes.created_at desc limit 50`,
+      [req.user.id],
+    );
+
+    res.json({ ok: true, viajes });
+  }),
+);
 
 tripsRouter.post(
   "/",
@@ -29,7 +83,8 @@ tripsRouter.post(
       ],
     );
 
-    res.status(201).json({ ok: true, viaje });
+    // El viaje nace sin piloto: se devuelve la misma forma que en el listado y el detalle.
+    res.status(201).json({ ok: true, viaje: { ...viaje, conductor: null } });
   }),
 );
 
@@ -37,7 +92,11 @@ tripsRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
-    const viaje = await fila(`select ${TRIP_COLUMNS} from public.viajes where id = $1`, [id]);
+    // Solo los que participan en el viaje lo ven: el id de un pana no abre su viaje.
+    const viaje = await fila(
+      `${SELECT_VIAJE} where viajes.id = $1 and (viajes.cliente_id = $2 or viajes.conductor_id = $2)`,
+      [id, req.user.id],
+    );
 
     if (!viaje) throw new HttpError(404, "viaje_no_encontrado", "Viaje no encontrado");
 

@@ -185,7 +185,8 @@ vuelve a ejecutar `npm run build`.
 | POST | `/webhooks/binance-pay` | Binance | Confirma el pago con la firma RSA del webhook |
 | GET | `/files/:token` | público firmado | Descarga un documento con el enlace temporal que genera la API |
 | POST | `/trips` | cliente | Crea una solicitud de viaje |
-| GET | `/trips/:id` | participante | Detalle del viaje |
+| GET | `/trips` | cliente | Sus viajes, del más nuevo al más viejo (historial y viaje abierto de la app) |
+| GET | `/trips/:id` | participante | Detalle del viaje, con el piloto asignado |
 | POST | `/trips/:id/aceptar` | conductor | Acepta y reserva la comisión (valida saldo disponible) |
 | POST | `/trips/:id/iniciar` | conductor | Marca el viaje en curso |
 | POST | `/trips/:id/finalizar` | conductor | Captura la reserva y cobra la comisión (efectivo) |
@@ -436,7 +437,37 @@ curl -X POST http://localhost:3000/trips/$VIAJE_ID/iniciar -H "Authorization: Be
 
 # Al terminar, el servidor descuenta la comisión
 curl -X POST http://localhost:3000/trips/$VIAJE_ID/finalizar -H "Authorization: Bearer $TOKEN"
+
+# Historial del pasajero (los 50 más nuevos, del más nuevo al más viejo)
+curl http://localhost:3000/trips -H "Authorization: Bearer $CLIENTE_TOKEN"
 ```
+
+`GET /trips` y `GET /trips/:id` devuelven el viaje con el piloto que lo tomó, para que
+la app sepa a quién llamar y cómo es su carro. Es `null` hasta que alguien lo acepta:
+
+```json
+{
+  "ok": true,
+  "viaje": {
+    "id": "3f2a...",
+    "estado": "en_curso",
+    "conductor": {
+      "nombre": "Carlos Conductor",
+      "telefono": "+584141111112",
+      "placa": "AB123CD",
+      "tipo_vehiculo": "carro",
+      "marca": "Toyota",
+      "modelo": "Corolla",
+      "verificacion": "aprobado"
+    }
+  }
+}
+```
+
+De la cuenta del piloto solo salen esos datos de contacto y del vehículo: la cédula, los
+documentos y el saldo no viajan en la respuesta. `GET /trips/:id` lo responde `404` si
+quien pide no es el pasajero ni el conductor asignado, y `GET /trips` solo lista viajes
+donde el usuario es el pasajero.
 
 Respuesta al finalizar:
 

@@ -720,6 +720,16 @@ test("un viaje con saldo se acepta, inicia y cobra con la comisión del 10%", as
   assert.equal(detalle.status, 200);
   assert.equal(detalle.cuerpo.viaje.estado, "finalizado");
   assert.equal(detalle.cuerpo.viaje.comision_usd, 0.5);
+  assert.equal(detalle.cuerpo.viaje.conductor.nombre, "Carlos Conductor");
+  assert.equal(detalle.cuerpo.viaje.conductor.placa, "AB123CD");
+  assert.equal(detalle.cuerpo.viaje.conductor.verificacion, "aprobado");
+  assert.equal(detalle.cuerpo.viaje.conductor.cedula, undefined);
+
+  // El id de un viaje ajeno no abre el viaje de otro pana.
+  const admin = await sesion("admin", ADMIN);
+  const ajeno = await pedir("GET", `/trips/${viajeId}`, { token: admin.access_token });
+  assert.equal(ajeno.status, 404);
+  assert.equal(ajeno.cuerpo.error, "viaje_no_encontrado");
 
   const segundo = await pedir("POST", "/trips", {
     token: cliente.access_token,
@@ -748,4 +758,22 @@ test("un viaje con saldo se acepta, inicia y cobra con la comisión del 10%", as
     token: piloto.access_token,
   });
   assert.equal(uuidInvalido.status, 422);
+
+  // El historial y el viaje abierto de la app salen de este listado, del más nuevo al más viejo.
+  const historial = await pedir("GET", "/trips", { token: cliente.access_token });
+  assert.equal(historial.status, 200);
+  assert.deepEqual(
+    historial.cuerpo.viajes.map((viaje) => [viaje.id, viaje.estado]),
+    [
+      [segundoId, "cancelado"],
+      [viajeId, "finalizado"],
+    ]
+  );
+  assert.equal(historial.cuerpo.viajes[0].conductor.placa, "AB123CD");
+  assert.equal(historial.cuerpo.viajes[0].origen, "Chacao");
+
+  // El listado es del pasajero: el piloto no ve los viajes que él condujo por aquí.
+  const historialPiloto = await pedir("GET", "/trips", { token: piloto.access_token });
+  assert.equal(historialPiloto.status, 200);
+  assert.deepEqual(historialPiloto.cuerpo.viajes, []);
 });
