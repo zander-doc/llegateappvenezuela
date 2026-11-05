@@ -71,7 +71,11 @@ test("si WhatsApp falla, el código cae al log en vez de bloquear el registro", 
   });
 
   assert.equal(canal, "log");
-  assert.deepEqual(lineas, ["[otp] +584141234567: 123456"]);
+  assert.equal(lineas.length, 2);
+  assert.match(lineas[0], /^\[otp\] fallo de envío/);
+  assert.match(lineas[0], /whatsapp_400/);
+  assert.match(lineas[0], /destinatario no permitido/);
+  assert.deepEqual(lineas[1], "[otp] +584141234567: 123456");
 });
 
 test("si WhatsApp falla y hay Twilio, el código sale por SMS", async () => {

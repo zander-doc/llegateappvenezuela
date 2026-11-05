@@ -86,6 +86,12 @@ export async function enviarCodigoOtp({
     }
   }
 
+  // Sin esta línea el respaldo en el log tapa el motivo del fallo y el error de
+  // Meta nunca se ve; es lo único que permite diagnosticar la entrega.
+  if (fallos.length) {
+    log(`[otp] fallo de envío: ${fallos.join("; ")}`);
+  }
+
   if (registrarEnLog) {
     log(`[otp] ${telefono}: ${codigo}`);
     return "log";
