@@ -42,6 +42,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -207,10 +208,12 @@ private fun PasoCodigo(uiState: LlegateUiState, viewModel: LlegateViewModel) {
 
     Column(modifier = Modifier.fillMaxWidth()) {
         uiState.mensajeCanal?.let { mensaje ->
+            val entregado = uiState.canalOtp == "whatsapp" || uiState.canalOtp == "sms"
+            val colorCanal = if (entregado) Emerald500 else RacingYellow500
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = Emerald500.copy(alpha = 0.10f),
-                border = BorderStroke(1.dp, Emerald500.copy(alpha = 0.45f)),
+                color = colorCanal.copy(alpha = 0.10f),
+                border = BorderStroke(1.dp, colorCanal.copy(alpha = 0.45f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -218,9 +221,9 @@ private fun PasoCodigo(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = if (entregado) Icons.Default.CheckCircle else Icons.Default.Warning,
                         contentDescription = null,
-                        tint = Emerald500,
+                        tint = colorCanal,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))

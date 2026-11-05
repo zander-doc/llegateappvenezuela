@@ -372,6 +372,8 @@ data class LlegateUiState(
     val reenvioEn: Int = 0,
     /** Lo que `/auth/otp` contesta por qué canal salió el código; se lee en la pantalla. */
     val mensajeCanal: String? = null,
+    /** `whatsapp`/`sms` = entregado; `log` = el envío falló y el aviso va en ámbar, no en verde. */
+    val canalOtp: String? = null,
     /** El error del ingreso se muestra dentro de la hoja, no solo en el aviso flotante. */
     val avisoInicio: String? = null,
     val intentosInvalidos: Int = 0,
@@ -501,7 +503,7 @@ class LlegateViewModel(
 
     fun volverAEditarTelefono() {
         _uiState.update {
-            it.copy(pasoInicio = PasoInicio.DATOS, codigo = "", avisoInicio = null, mensajeCanal = null)
+            it.copy(pasoInicio = PasoInicio.DATOS, codigo = "", avisoInicio = null, mensajeCanal = null, canalOtp = null)
         }
     }
 
@@ -528,15 +530,16 @@ class LlegateViewModel(
             else -> viewModelScope.launch {
                 _uiState.update { it.copy(enviandoCodigo = true, avisoInicio = null) }
                 try {
-                    val mensaje = auth.pedirCodigo(e164, nombre = state.nombre.trim().ifBlank { null })
+                    val envio = auth.pedirCodigo(e164, nombre = state.nombre.trim().ifBlank { null })
                     _uiState.update {
                         it.copy(
                             pasoInicio = PasoInicio.CODIGO,
                             codigo = "",
                             telefono = e164,
                             reenvioEn = SEGUNDOS_REENVIO,
-                            mensajeCanal = mensaje,
-                            statusMessage = mensaje
+                            mensajeCanal = envio.mensaje,
+                            canalOtp = envio.canal,
+                            statusMessage = envio.mensaje
                         )
                     }
                     iniciarContadorReenvio()
@@ -570,7 +573,7 @@ class LlegateViewModel(
                             pasoInicio = PasoInicio.DATOS,
                             codigo = "",
                             avisoInicio = null,
-                            mensajeCanal = null,
+                            mensajeCanal = null, canalOtp = null,
                             statusMessage = "Listo, ${perfil.nombre?.substringBefore(' ') ?: "pana"}. Tu cuenta está activa."
                         )
                     }
@@ -607,7 +610,7 @@ class LlegateViewModel(
                     codigo = "",
                     nombre = "",
                     avisoInicio = null,
-                    mensajeCanal = null,
+                    mensajeCanal = null, canalOtp = null,
                     statusMessage = "Sesión cerrada."
                 )
             }

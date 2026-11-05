@@ -11,7 +11,8 @@ const idioma = process.env.WHATSAPP_OTP_LANGUAGE || "es";
 const version = process.env.WHATSAPP_API_VERSION || "v21.0";
 
 if (!token || !wabaId) {
-  console.log("estado=SIN_CONFIGURACION");
+  // Solo dice qué falta; nunca imprime valores.
+  console.log(`estado=SIN_CONFIGURACION ${token ? "token_ok" : "falta_token"} ${wabaId ? "waba_ok" : "falta_waba"}`);
   process.exit(0);
 }
 

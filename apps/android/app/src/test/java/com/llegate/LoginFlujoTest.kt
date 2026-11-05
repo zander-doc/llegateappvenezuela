@@ -6,7 +6,10 @@ import com.llegate.data.SessionStore
 import com.llegate.network.AuthRepository
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.PasoInicio
+import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -64,6 +67,23 @@ class LoginFlujoTest {
     viewModel.verificarCodigo()
 
     assertEquals("El código tiene 6 dígitos.", viewModel.uiState.value.statusMessage)
+  }
+
+  @Test
+  fun `el aviso del canal dice si el codigo salio o no`() = runBlocking {
+    val api = ApiFalsa(
+      respuestas = mapOf(
+        "/auth/otp" to JSONObject(
+          """{"ok":true,"canal":"log","mensaje":"No pudimos enviarte el código. Intenta de nuevo en unos minutos."}"""
+        )
+      )
+    )
+
+    val envio = AuthRepository(api = api, store = storeConSesion()).pedirCodigo("+584141234567")
+
+    assertEquals("log", envio.canal)
+    assertFalse("que el código quede en el log no es haberlo entregado", envio.entregado)
+    assertEquals("No pudimos enviarte el código. Intenta de nuevo en unos minutos.", envio.mensaje)
   }
 
   @Test

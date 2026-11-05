@@ -123,14 +123,15 @@ authRouter.post(
       throw new HttpError(502, "otp_envio_error", "No pudimos enviarte el código. Intenta de nuevo.");
     }
 
-    res.status(202).json({
-      ok: true,
-      mensaje: {
-        whatsapp: "Código enviado por WhatsApp",
-        sms: "Código enviado por SMS",
-        log: "No pudimos enviarte el código. Intenta de nuevo en unos minutos.",
-      }[canal],
-    });
+    const mensajes = {
+      whatsapp: "Código enviado por WhatsApp",
+      sms: "Código enviado por SMS",
+      log: "No pudimos enviarte el código. Intenta de nuevo en unos minutos.",
+    };
+
+    // El cliente pinta este aviso según el canal: "log" significa que la entrega falló,
+    // así que nunca debe mostrarse como un éxito.
+    res.status(202).json({ ok: true, canal, mensaje: mensajes[canal] });
   }),
 );
 

@@ -308,6 +308,8 @@ test("POST /auth/otp limita los códigos pedidos por teléfono", async () => {
   for (let intento = 0; intento < 3; intento += 1) {
     const respuesta = await pedir("POST", "/auth/otp", { cuerpo: { telefono } });
     assert.equal(respuesta.status, 202);
+    // El cliente pinta el aviso según el canal: sin proveedor configurado es "log".
+    assert.equal(respuesta.cuerpo.canal, "log");
   }
 
   const bloqueado = await pedir("POST", "/auth/otp", { cuerpo: { telefono } });

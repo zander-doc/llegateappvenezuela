@@ -67,6 +67,12 @@ internal fun usuarioFrom(json: JSONObject): Usuario {
   )
 }
 
+/** Lo que `/auth/otp` contesta: el texto para el usuario y el canal que realmente salió. */
+data class EnvioOtp(val mensaje: String, val canal: String?) {
+  val entregado: Boolean
+    get() = canal == "whatsapp" || canal == "sms"
+}
+
 class AuthRepository(
   private val api: ApiClient = ApiClient(),
   private val store: SessionStore
@@ -80,11 +86,19 @@ class AuthRepository(
 
   val tieneSesion: Boolean get() = store.tieneSesion
 
-  /** Devuelve el mensaje que la API manda mostrar (WhatsApp, SMS o el aviso de fallback). */
-  suspend fun pedirCodigo(telefono: String, rol: String = "cliente", nombre: String? = null): String {
+  /**
+   * Pide el código. `/auth/otp` contesta 202 con el canal que usó: `whatsapp` o `sms`
+   * significan que salió, `log` que la entrega falló y el código quedó solo en el
+   * servidor. La hoja de ingreso pinta el aviso según eso, no como un éxito.
+   */
+  suspend fun pedirCodigo(telefono: String, rol: String = "cliente", nombre: String? = null): EnvioOtp {
     val body = JSONObject().put("telefono", telefono).put("rol", rol)
     if (!nombre.isNullOrBlank()) body.put("nombre", nombre)
-    return api.post("/auth/otp", body).optString("mensaje", "Revisa tu WhatsApp: te enviamos el código.")
+    val respuesta = api.post("/auth/otp", body)
+    return EnvioOtp(
+      mensaje = respuesta.optString("mensaje", "Revisa tu WhatsApp: te enviamos el código."),
+      canal = respuesta.stringOrNull("canal")
+    )
   }
 
   suspend fun verificarCodigo(telefono: String, codigo: String): Session {
