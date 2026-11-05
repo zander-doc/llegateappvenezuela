@@ -264,6 +264,32 @@ motivos y conteo de documentos.
 update public.usuarios set rol = 'admin' where telefono = '+584141234567';
 ```
 
+**Ponerle nombre a una cuenta** (lo que se lee en `/auth/perfil`, en la web y en la app). El nombre vive en
+`public.usuarios.nombre`; la vista `perfil_usuario` sale de ahí, y el trigger solo lo copia de
+`auth.users.raw_user_meta_data` cuando la cuenta se crea, así que se escribe directo:
+
+```sql
+-- 1. Cómo está la cuenta hoy (si no sale fila, el teléfono está guardado con otro formato)
+select id, telefono, nombre, rol, telefono_verificado
+  from public.usuarios
+ where telefono = '+584124634040';
+
+-- 2. Cambiarlo en los dos sitios que lo guardan
+begin;
+  update public.usuarios
+     set nombre = 'Zander', updated_at = now()
+   where telefono = '+584124634040';
+
+  update auth.users
+     set raw_user_meta_data =
+           coalesce(raw_user_meta_data, '{}'::jsonb) || '{"nombre": "Zander"}'::jsonb
+   where phone = '+584124634040';
+commit;
+
+-- 3. Confirmar lo que va a leer la API
+select nombre, telefono, rol from public.perfil_usuario where telefono = '+584124634040';
+```
+
 **Cambiar la comisión**:
 
 ```sql
