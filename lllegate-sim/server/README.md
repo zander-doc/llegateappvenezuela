@@ -420,6 +420,10 @@ TWILIO_FROM=+1...
 - `npm run whatsapp:destinatarios` pide a Meta la lista de números que el **número de
   prueba** puede recibir (`allowed_whatsapp_numbers`) e imprime número y estado de
   verificación. Si faltan credenciales dice `SIN_CONFIGURACION falta_token falta_phone_id`.
+- `npm run whatsapp:numeros -- <WABA_ID>` lista los números de teléfono que Meta reconoce
+  dentro del WABA, con su identificador real y sus destinatarios permitidos. Es la prueba
+  definitiva cuando el envío falla con `Unsupported post request. Object with ID … does not
+  exist`: ese error significa que `WHATSAPP_PHONE_ID` no corresponde a un número de esa cuenta.
 - El `202` de `POST /auth/otp` significa que **Meta aceptó** el mensaje, no que llegó. Si
   Meta lo rechaza, el log queda `[otp] fallo de envío: whatsapp: <código HTTP>: <detalle>`
   antes del respaldo; la entrega final (leído/recibido) sí exigiría el webhook de estados
