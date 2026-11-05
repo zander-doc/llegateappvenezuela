@@ -65,4 +65,31 @@ class LoginFlujoTest {
 
     assertEquals("El código tiene 6 dígitos.", viewModel.uiState.value.statusMessage)
   }
+
+  @Test
+  fun `el error de validacion se ve dentro de la hoja y sacude el formulario`() {
+    val viewModel = nuevoViewModel()
+    viewModel.onTelefono("0414 1234567")
+
+    viewModel.enviarCodigo()
+
+    assertEquals("Debes aceptar los términos para usar Llégate.", viewModel.uiState.value.avisoInicio)
+    assertEquals(1, viewModel.uiState.value.intentosInvalidos)
+
+    viewModel.setAceptaTerminos(true)
+    assertNull("aceptar los términos borra el aviso", viewModel.uiState.value.avisoInicio)
+  }
+
+  @Test
+  fun `escribir el codigo limpia el error anterior`() {
+    val viewModel = nuevoViewModel()
+    viewModel.onTelefono("0414 1234567")
+
+    viewModel.verificarCodigo()
+    assertEquals("El código tiene 6 dígitos.", viewModel.uiState.value.avisoInicio)
+
+    viewModel.onCodigo("123456")
+    assertNull(viewModel.uiState.value.avisoInicio)
+    assertEquals(1, viewModel.uiState.value.intentosInvalidos)
+  }
 }

@@ -8,7 +8,13 @@ compartidos: una cuenta, dos clientes.
 ## Estado
 
 El ingreso ya es real: `ui/screens/LoginScreen.kt` pide el código en `/auth/otp`,
-verifica en `/auth/verify` y guarda la sesión en `data/SessionStore`. La hoja de
+verifica en `/auth/verify` y guarda la sesión en `data/SessionStore`. La hoja está animada
+(fondo de pista con líneas de velocidad, las dos hojas se deslizan entre sí, seis casillas
+de código con foco automático y cuenta regresiva en anillo) y es honesta: muestra el canal
+que contestó `/auth/otp` («Código enviado por WhatsApp»), deja el error de validación dentro
+de la pantalla con sacudida en vez de solo un aviso flotante, y el «¿No te llega el código?»
+explica que no hay SMS ni correo y que la plantilla de autenticación depende de la aprobación
+de Meta. La hoja de
 cuenta del icono de persona muestra el nombre, el teléfono enmascarado y el saldo
 que devuelve `/auth/me`, y su botón de cerrar sesión invalida el token. Las
 tarifas se leen de `/config/app` y se calculan con la misma fórmula que la web

@@ -370,6 +370,11 @@ data class LlegateUiState(
     val enviandoCodigo: Boolean = false,
     val verificandoCodigo: Boolean = false,
     val reenvioEn: Int = 0,
+    /** Lo que `/auth/otp` contesta por qué canal salió el código; se lee en la pantalla. */
+    val mensajeCanal: String? = null,
+    /** El error del ingreso se muestra dentro de la hoja, no solo en el aviso flotante. */
+    val avisoInicio: String? = null,
+    val intentosInvalidos: Int = 0,
     val statusMessage: String? = null,
     val locationSuggestions: List<LocationSuggestion> = listOf(
         LocationSuggestion("sug_1", "C.C. Las Américas", "Av. Las Delicias • Zona Comercial y Gastronómica", "Centro Comercial", 3.2, 7, 1.80, 10.2612, -67.5991, "🔥 Top Pana", "aragua", "Maracay"),
@@ -487,28 +492,41 @@ class LlegateViewModel(
     }
 
     fun onCodigo(valor: String) {
-        _uiState.update { it.copy(codigo = valor.filter(Char::isDigit).take(6)) }
+        _uiState.update { it.copy(codigo = valor.filter(Char::isDigit).take(6), avisoInicio = null) }
     }
 
     fun setAceptaTerminos(valor: Boolean) {
-        _uiState.update { it.copy(aceptaTerminos = valor) }
+        _uiState.update { it.copy(aceptaTerminos = valor, avisoInicio = null) }
     }
 
     fun volverAEditarTelefono() {
-        _uiState.update { it.copy(pasoInicio = PasoInicio.DATOS, codigo = "") }
+        _uiState.update {
+            it.copy(pasoInicio = PasoInicio.DATOS, codigo = "", avisoInicio = null, mensajeCanal = null)
+        }
+    }
+
+    /** Un error de ingreso se corrige en la misma hoja: el aviso flotante se va solo. */
+    private fun avisarInicio(texto: String) {
+        _uiState.update {
+            it.copy(
+                statusMessage = texto,
+                avisoInicio = texto,
+                intentosInvalidos = it.intentosInvalidos + 1
+            )
+        }
     }
 
     fun enviarCodigo() {
         val state = _uiState.value
         val e164 = aE164Venezuela(state.telefono)
         when {
-            e164 == null -> avisar("Escribe un número venezolano, por ejemplo 0414 1234567.")
+            e164 == null -> avisarInicio("Escribe un número venezolano, por ejemplo 0414 1234567.")
             state.nombre.isNotBlank() && !esNombrePersona(state.nombre) ->
-                avisar("Escribe tu nombre y apellido como aparecen en tu cédula.")
+                avisarInicio("Escribe tu nombre y apellido como aparecen en tu cédula.")
             !state.aceptaTerminos ->
-                avisar("Debes aceptar los términos para usar Llégate.")
+                avisarInicio("Debes aceptar los términos para usar Llégate.")
             else -> viewModelScope.launch {
-                _uiState.update { it.copy(enviandoCodigo = true) }
+                _uiState.update { it.copy(enviandoCodigo = true, avisoInicio = null) }
                 try {
                     val mensaje = auth.pedirCodigo(e164, nombre = state.nombre.trim().ifBlank { null })
                     _uiState.update {
@@ -517,15 +535,16 @@ class LlegateViewModel(
                             codigo = "",
                             telefono = e164,
                             reenvioEn = SEGUNDOS_REENVIO,
+                            mensajeCanal = mensaje,
                             statusMessage = mensaje
                         )
                     }
                     iniciarContadorReenvio()
                 } catch (fallo: ApiException) {
-                    _uiState.update { it.copy(statusMessage = fallo.message) }
+                    avisarInicio(fallo.message ?: FALLA_GENERICO)
                 } catch (fallo: Exception) {
                     if (fallo is CancellationException) throw fallo
-                    _uiState.update { it.copy(statusMessage = FALLA_GENERICO) }
+                    avisarInicio(FALLA_GENERICO)
                 } finally {
                     _uiState.update { it.copy(enviandoCodigo = false) }
                 }
@@ -537,10 +556,10 @@ class LlegateViewModel(
         val state = _uiState.value
         val e164 = aE164Venezuela(state.telefono)
         when {
-            e164 == null -> avisar("Escribe un número venezolano, por ejemplo 0414 1234567.")
-            state.codigo.length != 6 -> avisar("El código tiene 6 dígitos.")
+            e164 == null -> avisarInicio("Escribe un número venezolano, por ejemplo 0414 1234567.")
+            state.codigo.length != 6 -> avisarInicio("El código tiene 6 dígitos.")
             else -> viewModelScope.launch {
-                _uiState.update { it.copy(verificandoCodigo = true) }
+                _uiState.update { it.copy(verificandoCodigo = true, avisoInicio = null) }
                 try {
                     auth.verificarCodigo(e164, state.codigo)
                     val perfil = auth.perfil()
@@ -550,15 +569,17 @@ class LlegateViewModel(
                             revisandoSesion = false,
                             pasoInicio = PasoInicio.DATOS,
                             codigo = "",
+                            avisoInicio = null,
+                            mensajeCanal = null,
                             statusMessage = "Listo, ${perfil.nombre?.substringBefore(' ') ?: "pana"}. Tu cuenta está activa."
                         )
                     }
                     refrescarBilletera(silencioso = true)
                 } catch (fallo: ApiException) {
-                    _uiState.update { it.copy(statusMessage = fallo.message) }
+                    avisarInicio(fallo.message ?: FALLA_GENERICO)
                 } catch (fallo: Exception) {
                     if (fallo is CancellationException) throw fallo
-                    _uiState.update { it.copy(statusMessage = FALLA_GENERICO) }
+                    avisarInicio(FALLA_GENERICO)
                 } finally {
                     _uiState.update { it.copy(verificandoCodigo = false) }
                 }
@@ -585,6 +606,8 @@ class LlegateViewModel(
                     pasoInicio = PasoInicio.DATOS,
                     codigo = "",
                     nombre = "",
+                    avisoInicio = null,
+                    mensajeCanal = null,
                     statusMessage = "Sesión cerrada."
                 )
             }
@@ -812,7 +835,7 @@ class LlegateViewModel(
         _uiState.update { it.copy(statusMessage = mensaje) }
     }
 
-    private companion object {
+    companion object {
         const val SEGUNDOS_REENVIO = 30
 
         /** Cada cuánto se le pregunta al servidor por el viaje abierto. */
