@@ -301,7 +301,7 @@ export function IngresarPage() {
                 </p>
                 <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
                   <Button to="/app">
-                    Probar la demo <ArrowRight className="h-4 w-4" />
+                    Ver la app <ArrowRight className="h-4 w-4" />
                   </Button>
                   <Button variant="secondary" onClick={() => changeMode("login")}>
                     <ArrowLeft className="h-4 w-4" /> Volver al acceso

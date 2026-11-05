@@ -87,7 +87,7 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
           actions={
             <>
               <Button to="/app" onClick={onClose}>
-                Probar la demo web <ArrowRight className="h-4 w-4" />
+                Ver la app <ArrowRight className="h-4 w-4" />
               </Button>
               <Button variant="ghost" onClick={onClose}>
                 Cerrar

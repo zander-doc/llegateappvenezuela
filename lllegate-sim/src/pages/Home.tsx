@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Check,
   Crown,
-  Download,
   Gift,
   MapPin,
   MessageCircle,
@@ -133,10 +132,10 @@ export function HomePage() {
           <div className="mt-7 flex flex-col items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:flex-row sm:px-5">
             <p className="flex items-center gap-2.5 text-[13px] text-ink-300">
               <Sparkles className="h-4 w-4 shrink-0 text-racing-500" />
-              ¿Quieres verlo antes de descargar? La demo web reproduce el flujo completo.
+              ¿Quieres saber qué hace la app hoy? Su pantalla lo dice sin adornos.
             </p>
             <Button size="sm" variant="secondary" to="/app">
-              Abrir la demo <ArrowRight className="h-3.5 w-3.5" />
+              Ver la app <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -372,11 +371,11 @@ export function HomePage() {
                 día que arrancamos.
               </p>
               <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                <Button size="lg" onClick={() => openModal({ type: "download" })}>
-                  <Download className="h-4 w-4" /> Avísame del lanzamiento
+                <Button size="lg" to="/ingresar">
+                  <ArrowRight className="h-4 w-4" /> Entrar con mi teléfono
                 </Button>
                 <Button size="lg" variant="secondary" to="/app">
-                  <Sparkles className="h-4 w-4" /> Probar la demo
+                  <Sparkles className="h-4 w-4" /> Ver la app
                 </Button>
               </div>
               <p className="mt-4 flex items-center gap-1.5 text-[11.5px] text-ink-500">

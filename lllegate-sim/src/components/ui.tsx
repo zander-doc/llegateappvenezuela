@@ -244,9 +244,9 @@ export function Money({
 export function RateNote({ className = "" }: { className?: string }) {
   return (
     <p className={`text-[12px] leading-relaxed text-ink-400 ${className}`}>
-      Conversión de demostración a la tasa BCV de {DEMO_BCV_RATE.toLocaleString("es-VE", {
+      Conversión a la tasa BCV de referencia de {DEMO_BCV_RATE.toLocaleString("es-VE", {
         minimumFractionDigits: 2,
-      })} Bs/USD. En la app se usa una sola tasa oficial, actualizada a diario.
+      })} Bs/USD. La app usa la tasa oficial del día que entrega el servidor.
     </p>
   );
 }

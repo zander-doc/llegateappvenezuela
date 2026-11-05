@@ -139,7 +139,7 @@ export const FAQ_GROUPS: FaqGroup[] = [
       },
       {
         q: "¿Puedo pedir un viaje desde la web?",
-        a: "La web es informativa y de demostración. Los viajes reales se piden desde la app, para que puedas compartir tu ubicación y usar el botón de emergencia.",
+        a: "Todavía no. La web abre tu cuenta real —ingreso por código, saldo e historial—, pero el viaje se pide desde la app, que es la que comparte tu ubicación en vivo y trae el botón de emergencia.",
       },
     ],
   },

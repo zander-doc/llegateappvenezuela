@@ -1,13 +1,27 @@
 import { Link } from "react-router-dom";
 
-export function Logo({ className = "h-8", link = true }: { className?: string; link?: boolean }) {
+const MARCA = {
+  horizontal: { src: "/assets/marca/llegateapp-horizontal.png", width: 1250, height: 400 },
+  redondo: { src: "/assets/marca/llegateapp-redondo.png", width: 1200, height: 1200 },
+} as const;
+
+export function Logo({
+  className = "h-8",
+  link = true,
+  forma = "horizontal",
+}: {
+  className?: string;
+  link?: boolean;
+  forma?: keyof typeof MARCA;
+}) {
+  const marca = MARCA[forma];
   const img = (
     <img
-      src="/assets/aistudio/logo-2_5e250e49.png"
+      src={marca.src}
       alt="Llégate App — Tu carrera con panas"
       className={`${className} w-auto`}
-      width={1860}
-      height={450}
+      width={marca.width}
+      height={marca.height}
     />
   );
   if (!link) return img;

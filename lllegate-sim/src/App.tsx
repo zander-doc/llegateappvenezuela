@@ -25,7 +25,7 @@ const SeguridadPage = lazy(() => import("./pages/Seguridad").then((m) => ({ defa
 const MercadoPage = lazy(() => import("./pages/Market").then((m) => ({ default: m.MercadoPage })));
 const PublicarPage = lazy(() => import("./pages/Market").then((m) => ({ default: m.PublicarPage })));
 const VendorDetailPage = lazy(() => import("./pages/Market").then((m) => ({ default: m.VendorDetailPage })));
-const AppDemoPage = lazy(() => import("./pages/AppDemo").then((m) => ({ default: m.AppDemoPage })));
+const MobileAppPage = lazy(() => import("./pages/MobileApp").then((m) => ({ default: m.MobileAppPage })));
 const IngresarPage = lazy(() => import("./pages/Ingresar").then((m) => ({ default: m.IngresarPage })));
 const CuentaRegistroPage = lazy(() => import("./pages/CuentaRegistro").then((m) => ({ default: m.CuentaRegistroPage })));
 const EmpresasPage = lazy(() => import("./pages/Empresas").then((m) => ({ default: m.EmpresasPage })));
@@ -58,7 +58,7 @@ export default function App() {
                 <Route path="/mercado" element={<MercadoPage />} />
                 <Route path="/mercado/negocio/:slug" element={<VendorDetailPage />} />
                 <Route path="/mercado/publicar" element={<PublicarPage />} />
-                <Route path="/app" element={<AppDemoPage />} />
+                <Route path="/app" element={<MobileAppPage />} />
                 <Route path="/ingresar" element={<IngresarPage />} />
                 <Route path="/registro" element={<CuentaRegistroPage />} />
                 <Route path="/empresas" element={<EmpresasPage />} />

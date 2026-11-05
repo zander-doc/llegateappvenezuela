@@ -508,7 +508,7 @@ export function CuentaRegistroPage() {
 
                   <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
                     <Button to="/app">
-                      Probar la demo <ArrowRight className="h-4 w-4" />
+                      Ver la app <ArrowRight className="h-4 w-4" />
                     </Button>
                     <Button variant="secondary" to="/ingresar">
                       <ArrowLeft className="h-4 w-4" /> Volver a ingresar

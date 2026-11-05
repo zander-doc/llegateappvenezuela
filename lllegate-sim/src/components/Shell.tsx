@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Download, Smartphone, X } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { LogIn, Smartphone, X } from "lucide-react";
 import { useUI } from "../lib/ui";
 
 export function ScrollManager() {
@@ -25,7 +25,6 @@ export function ScrollManager() {
 }
 
 export function InstallBar() {
-  const { openModal } = useUI();
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem("llegate_sim_install_bar") === "1";
@@ -52,15 +51,15 @@ export function InstallBar() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold text-white">Llégate en tu móvil</p>
-          <p className="truncate text-[11.5px] text-ink-400">Te avisamos al lanzar</p>
+          <p className="truncate text-[11.5px] text-ink-400">Ya funciona con tu cuenta de la web</p>
         </div>
-        <button
-          type="button"
-          onClick={() => openModal({ type: "download" })}
+        <Link
+          to="/ingresar"
+          onClick={() => setDismissed(true)}
           className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-brand-500 px-3.5 text-[12.5px] font-bold text-asphalt-950"
         >
-          <Download className="h-3.5 w-3.5" /> Avísame
-        </button>
+          <LogIn className="h-3.5 w-3.5" /> Entrar
+        </Link>
         <button
           type="button"
           onClick={() => {

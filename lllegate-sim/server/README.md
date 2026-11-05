@@ -430,6 +430,10 @@ TWILIO_FROM=+1...
   dentro del WABA, con su identificador real y sus destinatarios permitidos. Es la prueba
   definitiva cuando el envío falla con `Unsupported post request. Object with ID … does not
   exist`: ese error significa que `WHATSAPP_PHONE_ID` no corresponde a un número de esa cuenta.
+- `npm run cuenta:nombre -- <teléfono> "<nombre>"` cambia el nombre visible de una cuenta ya
+  creada. Hace falta porque `handle_new_user()` fija el nombre solo al insertar (`on conflict
+  do nothing`) y todavía no existe un endpoint de edición de perfil. Escribe en la base de
+  producción: lo corre una persona, no el agente.
 - El `202` de `POST /auth/otp` significa que **Meta aceptó** el mensaje, no que llegó. Si
   Meta lo rechaza, el log queda `[otp] fallo de envío: whatsapp: <código HTTP>: <detalle>`
   antes del respaldo; la entrega final (leído/recibido) sí exigiría el webhook de estados

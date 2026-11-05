@@ -67,7 +67,7 @@ export function Header() {
           <div className="flex items-center gap-2.5 text-ink-400">
             <span className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-racing-500 animate-pulse-dot" aria-hidden="true" />
-              Prototipo de rediseño
+              Piloto cerrado
             </span>
             <span className="text-ink-700" aria-hidden="true">·</span>
             <span>{realAuthEnabled ? "Cuenta real activa" : "Datos de ejemplo"}</span>
@@ -275,7 +275,7 @@ export function Header() {
                       Avísame
                     </Button>
                     <Button size="sm" variant="secondary" to="/app" onClick={() => setDrawer(false)}>
-                      Probar demo
+                      Ver la app
                     </Button>
                   </div>
                 </div>
@@ -426,8 +426,8 @@ export function Header() {
                 </div>
                 <p className="mt-4 text-[11px] leading-relaxed text-ink-500">
                   {realAuthEnabled
-                    ? "Prototipo de rediseño. Las cuentas de pasajero son reales; el resto del contenido es de ejemplo."
-                    : "Prototipo de rediseño con datos de ejemplo. No es el sitio oficial ni procesa solicitudes reales."}
+                    ? "Piloto cerrado. El ingreso por código, la billetera y los viajes trabajan con la base real; las fichas del mercado y el mapa de cobertura son de ejemplo."
+                    : "Piloto cerrado. Sin acceso real activado, todo el contenido de esta pantalla es de ejemplo."}
                 </p>
               </div>
 

@@ -44,10 +44,10 @@ const quickLinks = [
   },
   {
     icon: Smartphone,
-    title: "Probar la app sin instalar nada",
-    text: "Una demo interactiva con los flujos principales.",
+    title: "Ver qué hace la app hoy",
+    text: "Lo que ya funciona en el piloto y lo que todavía falta.",
     to: "/app",
-    label: "Abrir la demo",
+    label: "Ver la app",
   },
   {
     icon: Compass,

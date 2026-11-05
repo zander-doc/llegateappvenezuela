@@ -449,9 +449,9 @@ export function Hero() {
 
           <StaggerItem>
             <p className="mt-3 text-[11.5px] text-ink-500">
-              Prototipo de rediseño.{" "}
+              La app ya funciona con esta misma cuenta.{" "}
               <Link to="/app" className="font-semibold text-brand-400 hover:text-brand-300">
-                Prueba la demo web <ArrowRight className="inline h-3 w-3" />
+                Ver la app <ArrowRight className="inline h-3 w-3" />
               </Link>
             </p>
           </StaggerItem>

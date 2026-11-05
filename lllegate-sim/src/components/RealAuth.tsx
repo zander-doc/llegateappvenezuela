@@ -288,7 +288,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
 
         <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
           <Button to="/app">
-            Probar la demo <ArrowRight className="h-4 w-4" />
+            Ver la app <ArrowRight className="h-4 w-4" />
           </Button>
           <Button variant="secondary" onClick={cerrarSesion} disabled={cargando}>
             {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}

@@ -78,17 +78,16 @@ export function Footer() {
                   <span className="block text-[13px] font-semibold text-white">App Store y Google Play</span>
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={() => openModal({ type: "download" })}
+              <Link
+                to="/app"
                 className="flex min-h-[48px] items-center gap-2.5 rounded-xl border border-white/12 bg-white/[0.04] px-4 text-left transition hover:border-brand-400/50"
               >
                 <Download className="h-5 w-5 text-racing-500" />
                 <span>
-                  <span className="block text-[10px] uppercase tracking-wider text-ink-400">Mientras tanto</span>
-                  <span className="block text-[13px] font-semibold text-white">Probar la demo</span>
+                  <span className="block text-[10px] uppercase tracking-wider text-ink-400">En tu teléfono</span>
+                  <span className="block text-[13px] font-semibold text-white">Ver la app real</span>
                 </span>
-              </button>
+              </Link>
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -152,9 +151,10 @@ export function Footer() {
         </div>
 
         <p className="mt-6 max-w-4xl text-[11.5px] leading-relaxed text-ink-500">
-          Prototipo de rediseño con fines de demostración. Las tarifas, fichas de negocios, saldos y datos de
-          cobertura son ejemplos y no representan una oferta comercial vigente. El acceso con tu teléfono y la
-          billetera sí guardan datos reales para probar el piloto; este sitio todavía no procesa viajes ni pagos.
+          Sitio en piloto cerrado. El ingreso por código, la billetera y los viajes trabajan contra la base
+          de datos real de Llégate. Las tarifas usan la tasa BCV de referencia del proyecto (887,30 Bs por
+          dólar); la app toma la tasa oficial del día desde el servidor. Las fichas del mercado y el mapa de
+          cobertura siguen siendo de ejemplo hasta que carguemos los datos definitivos.
         </p>
       </div>
 

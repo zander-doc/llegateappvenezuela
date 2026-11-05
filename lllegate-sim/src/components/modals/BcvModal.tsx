@@ -26,14 +26,14 @@ export function BcvModal({ onClose }: { onClose: () => void }) {
             Tasa BCV
           </span>
           <span className="rounded-full border border-racing-500/30 bg-racing-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-racing-400">
-            Demo
+            Referencia
           </span>
         </div>
         <p className="mono mt-2 text-[34px] font-semibold leading-none text-white">
           {formatRate(DEMO_BCV_RATE)} <span className="text-[15px] font-normal text-ink-300">Bs / USD</span>
         </p>
         <p className="mt-2 text-[11.5px] leading-relaxed text-ink-400">
-          Valor fijo de demostración. En producción se toma de la fuente oficial y se actualiza a diario.
+          Valor de referencia del proyecto. La app toma del servidor la tasa oficial del día.
         </p>
       </div>
 

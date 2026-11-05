@@ -49,11 +49,12 @@ export function TarifasPage() {
           <div className="card p-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-400">Tasa de referencia</p>
             <p className="mono mt-2 text-[30px] font-semibold text-white">{formatRate(DEMO_BCV_RATE)}</p>
-            <p className="text-[12px] text-ink-400">Bs por dólar · valor de demostración</p>
+            <p className="text-[12px] text-ink-400">Bs por dólar · valor de referencia del proyecto</p>
             <p className="mt-3 flex items-start gap-2 border-t border-white/8 pt-3 text-[11.5px] leading-relaxed text-ink-400">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-400" />
-              La web y la app usan una sola tasa oficial, actualizada a diario. No hay dos precios para el mismo
-              viaje.
+              La app lee la tasa oficial del día desde el servidor; esta web muestra el valor de referencia
+              del proyecto mientras no use la misma fuente. Los mínimos y el costo por kilómetro sí son
+              idénticos en los dos lados, así que no hay dos precios para el mismo viaje.
             </p>
           </div>
         }
@@ -93,7 +94,7 @@ export function TarifasPage() {
           kicker="Tabla de referencia"
           title="Qué cuesta cada servicio"
           text="Mínimo + kilómetros. Los servicios de lanzamiento aparecen primero; las próximas fases son de referencia hasta que se activen."
-          action={<Badge tone="yellow">Precios de demostración</Badge>}
+          action={<Badge tone="yellow">Tarifas de referencia</Badge>}
         />
 
         <TableHint />
@@ -155,7 +156,7 @@ export function TarifasPage() {
         </div>
         <p className="mt-2 text-[11.5px] text-ink-500">
           Ejemplos con tarifa mínima + kilómetros, sin recargos. La ida y vuelta de 5 km suma {formatKm(5)} de regreso
-          (10 km en total). Mínimos y precios de demostración que pueden variar por ciudad. Conversión a{" "}
+          (10 km en total). Mínimos y precios de referencia que pueden variar por ciudad. Conversión a{" "}
           {formatRate(DEMO_BCV_RATE)} Bs/USD.
         </p>
       </section>
