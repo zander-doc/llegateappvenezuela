@@ -48,7 +48,6 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.TwoWheeler
@@ -837,7 +836,7 @@ fun HomeScreen(
                 )
             }
 
-            // QUICK TRIP HISTORY BANNER (REPETIR RUTA EN 1 TOQUE)
+            // RESUMEN DE LOS VIAJES QUE CONTESTA GET /trips
             item {
                 Card(
                     modifier = Modifier
@@ -879,7 +878,7 @@ fun HomeScreen(
                                         color = Stone100
                                     )
                                     Text(
-                                        text = "${uiState.tripHistory.size} carreras guardadas",
+                                        text = "${uiState.viajes.size} viajes en tu historial",
                                         fontSize = 11.sp,
                                         color = Stone400
                                     )
@@ -901,57 +900,28 @@ fun HomeScreen(
                             }
                         }
 
-                        if (uiState.tripHistory.isNotEmpty()) {
-                            val lastTrip = uiState.tripHistory.first()
+                        uiState.viajes.firstOrNull()?.let { ultimo ->
                             Spacer(modifier = Modifier.height(10.dp))
                             HorizontalDivider(color = Asphalt800, thickness = 1.dp)
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Último: ${lastTrip.origin.title} → ${lastTrip.destination.title}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Stone200,
-                                        maxLines = 1
-                                    )
-                                    Text(
-                                        text = "${lastTrip.date} • ${lastTrip.driverName} (${lastTrip.driverAlias})",
-                                        fontSize = 11.sp,
-                                        color = Stone400
-                                    )
-                                }
-
-                                Surface(
-                                    onClick = { viewModel.repeatTrip(lastTrip) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = RacingYellow500,
-                                    modifier = Modifier.testTag("repeat_last_trip_btn")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Replay,
-                                            contentDescription = "Repetir",
-                                            tint = Asphalt950,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = "Repetir",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Asphalt950
-                                        )
-                                    }
-                                }
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Último: ${ultimo.origen} → ${ultimo.destino}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Stone200,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = listOfNotNull(
+                                        ultimo.fechaTexto.takeIf { it.isNotEmpty() },
+                                        ultimo.estadoTexto,
+                                        ultimo.conductor?.nombre?.let { "piloto $it" }
+                                    ).joinToString(" • "),
+                                    fontSize = 11.sp,
+                                    color = Stone400
+                                )
                             }
                         }
                     }

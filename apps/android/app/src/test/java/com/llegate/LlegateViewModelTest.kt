@@ -12,6 +12,7 @@ import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,10 +60,11 @@ class LlegateViewModelTest {
     assertEquals(AppScreen.BOOKING_DETAILS, bookingState.currentScreen)
     assertEquals(ServiceType.CAR, bookingState.selectedService)
 
-    viewModel.confirmAndStartTrip()
-    val tripState = viewModel.uiState.value
-    assertEquals(AppScreen.TRIP_ACTIVE, tripState.currentScreen)
-    assertNotNull(tripState.activeTrip)
+    viewModel.pedirViaje()
+    val sinSesion = viewModel.uiState.value
+    assertEquals(AppScreen.BOOKING_DETAILS, sinSesion.currentScreen)
+    assertNull(sinSesion.activeTrip)
+    assertEquals("Entra a tu cuenta para pedir un viaje.", sinSesion.statusMessage)
   }
 
   @Test
@@ -87,27 +89,30 @@ class LlegateViewModelTest {
   }
 
   @Test
-  fun `verify trip history and single-tap repeat trip`() {
+  fun `el historial esta vacio hasta que la API lo conteste`() {
     val viewModel = nuevoViewModel()
-    val state = viewModel.uiState.value
 
-    // Check pre-seeded trips
-    assertTrue(state.tripHistory.isNotEmpty())
-    val firstTrip = state.tripHistory.first()
+    assertTrue(viewModel.uiState.value.viajes.isEmpty())
 
-    // Open trip history
     viewModel.openTripHistory()
     assertEquals(AppScreen.TRIP_HISTORY, viewModel.uiState.value.currentScreen)
 
-    // Repeat first trip with 1-tap
-    viewModel.repeatTrip(firstTrip)
-    val repeatedState = viewModel.uiState.value
+    // Sin sesión la app no pregunta: `/trips` es un endpoint autenticado.
+    assertTrue(viewModel.uiState.value.viajes.isEmpty())
+  }
 
-    assertEquals(AppScreen.BOOKING_DETAILS, repeatedState.currentScreen)
-    assertEquals(firstTrip.serviceType, repeatedState.selectedService)
-    assertEquals(firstTrip.origin.title, repeatedState.origin.title)
-    assertEquals(firstTrip.destination.title, repeatedState.destination.title)
-    assertEquals(firstTrip.paymentMethod, repeatedState.selectedPaymentMethod)
+  @Test
+  fun `cancelar o cerrar sin viaje abierto solo devuelve al inicio`() {
+    val viewModel = nuevoViewModel()
+    viewModel.openTripHistory()
+
+    viewModel.cancelarViaje("Cambié de planes")
+    assertEquals(AppScreen.HOME, viewModel.uiState.value.currentScreen)
+
+    viewModel.openTripHistory()
+    viewModel.cerrarViaje()
+    assertEquals(AppScreen.HOME, viewModel.uiState.value.currentScreen)
+    assertNull(viewModel.uiState.value.activeTrip)
   }
 
   @Test
@@ -211,7 +216,7 @@ class LlegateViewModelTest {
   }
 
   @Test
-  fun `verify request ride screen origin destination swap and send request to nearby drivers`() {
+  fun `la ruta se invierte y el viaje se pide solo con sesion`() {
     val viewModel = nuevoViewModel()
     viewModel.openBooking(ServiceType.MOTO)
 
@@ -219,10 +224,6 @@ class LlegateViewModelTest {
     assertEquals(AppScreen.BOOKING_DETAILS, bookingState.currentScreen)
 
     // Verify initial origin and destination
-    val originalOriginTitle = bookingState.origin.title
-    val originalDestTitle = bookingState.destination.title
-
-    // Test updating origin and destination
     val customOrigin = LocationPoint("Plaza Bolívar de Maracay", "Centro histórico", 10.2480, -67.6000, stateName = "Aragua", cityName = "Maracay")
     val customDest = LocationPoint("Centro Comercial Parque Aragua", "Av. Bolívar Este", 10.2458, -67.5855, stateName = "Aragua", cityName = "Maracay")
     viewModel.updateOrigin(customOrigin)
@@ -238,17 +239,11 @@ class LlegateViewModelTest {
     assertEquals("Centro Comercial Parque Aragua", swappedState.origin.title)
     assertEquals("Plaza Bolívar de Maracay", swappedState.destination.title)
 
-    // Test sending ride request to nearby drivers
-    viewModel.sendRideRequestToNearbyDrivers()
-    val tripStartedState = viewModel.uiState.value
-
-    assertEquals(AppScreen.TRIP_ACTIVE, tripStartedState.currentScreen)
-    assertNotNull(tripStartedState.activeTrip)
-    assertEquals(ServiceType.MOTO, tripStartedState.activeTrip?.serviceType)
-    assertEquals("Centro Comercial Parque Aragua", tripStartedState.activeTrip?.origin?.title)
-    assertEquals("Plaza Bolívar de Maracay", tripStartedState.activeTrip?.destination?.title)
-    assertTrue(tripStartedState.activeTrip!!.priceEstimate.priceUsd > 0.0)
-    assertTrue(tripStartedState.activeTrip!!.priceEstimate.priceBs > 0.0)
+    // La carrera se calcula con la distancia entre los dos puntos, no se inventa.
+    val viaje = swappedState.motoEstimate
+    assertNotNull(viaje)
+    assertTrue(viaje!!.priceUsd > 0.0)
+    assertTrue(viaje.priceBs > 0.0)
   }
 }
 

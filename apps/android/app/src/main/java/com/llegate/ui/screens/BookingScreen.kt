@@ -266,7 +266,7 @@ fun RequestRideScreen(
 
                     // THE PRIMARY ACTION BUTTON: SEND REQUEST TO NEARBY DRIVERS
                     Button(
-                        onClick = { viewModel.sendRideRequestToNearbyDrivers() },
+                        onClick = { viewModel.pedirViaje() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
@@ -289,13 +289,13 @@ fun RequestRideScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "Enviar Solicitud a Conductores Cercanos",
+                                    text = "Pedir este viaje • 0% Regateo",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Asphalt950
                                 )
                                 Text(
-                                    text = "Notificando a ${uiState.nearbyVehicles.size} pilotos en la zona • 0% Regateo",
+                                    text = "Se registra en Llégate y un piloto de la zona lo acepta",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF2A2000)
@@ -670,40 +670,6 @@ fun RequestRideScreen(
                             onSelect = { viewModel.selectService(ServiceType.DELIVERY) }
                         )
                     }
-                }
-            }
-
-            // 5. PERKS & DRIVER INSTRUCTIONS
-            item {
-                Column {
-                    Text(
-                        text = "INDICACIÓN AL CONDUCTOR (OPCIONAL)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Stone400,
-                        letterSpacing = 0.5.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = uiState.driverNote,
-                        onValueChange = { viewModel.setDriverNote(it) },
-                        placeholder = {
-                            Text("Ej: Frente a la farmacia, voy con camisa negra, llevo pago móvil listo...")
-                        },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("driver_note_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = RacingYellow500,
-                            unfocusedBorderColor = Asphalt700,
-                            focusedTextColor = Stone100,
-                            unfocusedTextColor = Stone100,
-                            focusedContainerColor = Asphalt900,
-                            unfocusedContainerColor = Asphalt900
-                        )
-                    )
                 }
             }
 

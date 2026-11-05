@@ -58,3 +58,7 @@ internal fun viewModelSinRed(api: ApiClient = ApiFalsa()): LlegateViewModel {
   val contexto = ApplicationProvider.getApplicationContext<Context>()
   return LlegateViewModel(AuthRepository(api = api, store = SessionStore(contexto)))
 }
+
+/** Con sesión ya guardada, para probar lo que la app manda y lee de la API de viajes. */
+internal fun viewModelConSesion(api: ApiClient = ApiFalsa()): LlegateViewModel =
+  LlegateViewModel(AuthRepository(api = api, store = storeConSesion()))

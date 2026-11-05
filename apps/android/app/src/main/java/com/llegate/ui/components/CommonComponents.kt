@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -164,7 +163,6 @@ fun VenezuelanPlateBadge(
 @Composable
 fun DriverAvatarBadge(
     initials: String,
-    rating: Double,
     isVerified: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -392,35 +390,6 @@ fun RouteCanvasMap(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun StarRatingBar(
-    rating: Int,
-    onRatingChanged: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        for (i in 1..5) {
-            Surface(
-                onClick = { onRatingChanged(i) },
-                shape = CircleShape,
-                color = Color.Transparent,
-                modifier = Modifier.padding(4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = "$i estrellas",
-                    tint = if (i <= rating) RacingYellow500 else Asphalt700,
-                    modifier = Modifier.size(36.dp)
-                )
             }
         }
     }

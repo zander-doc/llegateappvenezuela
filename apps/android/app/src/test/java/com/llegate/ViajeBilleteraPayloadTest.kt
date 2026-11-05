@@ -96,9 +96,52 @@ class ViajeBilleteraPayloadTest {
   }
 
   @Test
+  fun `el viaje se pide con la tarifa y el metodo de pago que vio el pana`() = runBlocking {
+    val api = ApiFalsa(respuestas = mapOf("/trips" to JSONObject(VIAJE_RECIEN)))
+
+    val viaje = TripRepository(clienteAutorizado(api)).pedir(
+      origen = "Maracay, Av. Las Delicias",
+      destino = "Terminal de Carga",
+      precioUsd = 2.14,
+      distanciaKm = 3.0,
+      metodoPago = "saldo"
+    )
+
+    val (path, cuerpo) = api.llamadas.single()
+    assertEquals("/trips", path)
+    assertEquals("Maracay, Av. Las Delicias", cuerpo.getString("origen"))
+    assertEquals("Terminal de Carga", cuerpo.getString("destino"))
+    assertEquals(2.14, cuerpo.getDouble("precio_usd"), 0.0)
+    assertEquals(3.0, cuerpo.getDouble("distancia_km"), 0.0)
+    assertEquals("saldo", cuerpo.getString("metodo_pago"))
+    assertEquals(EstadoViaje.SOLICITADO, viaje.estado)
+    assertNull("el viaje recién pedido todavía no tiene piloto", viaje.conductor)
+  }
+
+  @Test
+  fun `cancelar manda el motivo al servidor`() = runBlocking {
+    val api = ApiFalsa(respuestas = mapOf("/trips/a1/cancelar" to JSONObject("""{"ok":true,"viaje_id":"a1","estado":"cancelado"}""")))
+
+    val estado = TripRepository(clienteAutorizado(api)).cancelar("a1", "Cambié de planes")
+
+    assertEquals(EstadoViaje.CANCELADO, estado)
+    assertEquals("Cambié de planes", api.llamadas.single().second.getString("motivo"))
+  }
+
+  @Test
+  fun `el historial se lee en espanol y con la tasa del dia`() {
+    val viaje = viajeFrom(JSONObject(VIAJE_FINALIZADO).getJSONObject("viaje"))
+
+    assertEquals("Finalizado", viaje.estadoTexto)
+    assertEquals("Efectivo $", viaje.metodoPagoTexto)
+    assertEquals(420.5, viaje.tasaBcv!!, 0.0)
+    assertEquals("9.0 × la tasa BCV del viaje", 3784.5, viaje.precioBs!!, 0.0)
+    assertEquals("Saldo Llégate", viajeFrom(JSONObject(VIAJE_RECIEN).getJSONObject("viaje")).metodoPagoTexto)
+  }
+
+  @Test
   fun `un estado que la app no conoce no revienta la pantalla`() {
     assertEquals(EstadoViaje.DESCONOCIDO, estadoViajeDe("reembolsado"))
-    assertEquals(EstadoViaje.DESCONOCIDO, estadoViajeDe(null))
     for (estado in EstadoViaje.entries) {
       if (estado == EstadoViaje.DESCONOCIDO) continue
       assertEquals(estado, estadoViajeDe(estado.name.lowercase()))

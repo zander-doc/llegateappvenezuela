@@ -24,7 +24,6 @@ import com.llegate.model.SafeMeetingPoint
 import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
 import com.llegate.model.tarifaUsd
-import com.llegate.model.TripHistoryItem
 import com.llegate.model.TripStep
 import com.llegate.model.UpcomingService
 import com.llegate.network.ApiException
@@ -34,6 +33,7 @@ import com.llegate.network.Billetera
 import com.llegate.network.ConfigApp
 import com.llegate.network.ConfigRepository
 import com.llegate.network.EstadoPago
+import com.llegate.network.EstadoViaje
 import com.llegate.network.MetodoPagoDisponible
 import com.llegate.network.Movimiento
 import com.llegate.network.Pago
@@ -278,39 +278,6 @@ data class LlegateUiState(
     ),
     val showCitySelectorModal: Boolean = false,
     val showStateSelectorModal: Boolean = false,
-    // SEED INITIAL COMPLETED TRIPS FOR "MI HISTORIAL"
-    val tripHistory: List<TripHistoryItem> = listOf(
-        TripHistoryItem(
-            id = "viaje_001",
-            date = "Hoy, 10:15 AM",
-            serviceType = ServiceType.MOTO,
-            origin = LocationPoint("Av. Bolívar Este, Maracay", "Maracay, Estado Aragua", 10.2458, -67.5855, stateName = "Aragua", cityName = "Maracay"),
-            destination = LocationPoint("CC Parque Aragua", "Maracay, Estado Aragua", 10.2465, -67.5800, stateName = "Aragua", cityName = "Maracay"),
-            priceUsd = 1.80,
-            priceBs = 1600.67,
-            driverName = "Wilmer Rondón",
-            driverAlias = "\"El Catire\"",
-            driverVehicle = "Bera SBR 150cc Azul",
-            driverPlate = "AB123CD",
-            ratingGiven = 5,
-            paymentMethod = PaymentMethod.PAGO_MOVIL
-        ),
-        TripHistoryItem(
-            id = "viaje_002",
-            date = "Ayer, 4:30 PM",
-            serviceType = ServiceType.CAR,
-            origin = LocationPoint("Las Delicias / CC Las Américas", "Maracay, Estado Aragua", 10.2612, -67.5991, stateName = "Aragua", cityName = "Maracay"),
-            destination = LocationPoint("Centro de Cagua", "Plaza Sucre / Cagua", 10.1873, -67.4589, stateName = "Aragua", cityName = "Cagua"),
-            priceUsd = 4.50,
-            priceBs = 4001.67,
-            driverName = "Yorbis José Briceño",
-            driverAlias = "\"El Pana\"",
-            driverVehicle = "Toyota Yaris Sedan Plateado",
-            driverPlate = "AG456LM",
-            ratingGiven = 5,
-            paymentMethod = PaymentMethod.EFECTIVO_USD
-        )
-    ),
     val upcomingServices: List<UpcomingService> = listOf(
         UpcomingService(
             id = "vans",
@@ -376,7 +343,6 @@ data class LlegateUiState(
     val showTripCustomization: Boolean = false,
     val customizationPreferences: Set<String> = setOf("Aire Acondicionado Full", "Casco Limpio"),
     val selectedPaymentMethod: PaymentMethod = PaymentMethod.PAGO_MOVIL,
-    val driverNote: String = "",
     val activeTrip: ActiveTrip? = null,
     val bcvExchangeRate: Double = 889.26,
     val isFetchingBcvRate: Boolean = false,
@@ -385,9 +351,6 @@ data class LlegateUiState(
     val showCuentaModal: Boolean = false,
     val showVitrinaModal: Boolean = false,
     val showCancelDialog: Boolean = false,
-    val showTripRatingSheet: Boolean = false,
-    val tripRating: Int = 5,
-    val selectedTipUsd: Double = 0.0,
     val config: ConfigApp? = null,
     val cuenta: Usuario? = null,
     val billetera: Billetera? = null,
@@ -555,7 +518,7 @@ class LlegateViewModel(
     )
     val uiState: StateFlow<LlegateUiState> = _uiState.asStateFlow()
 
-    private var tripSimulationJob: Job? = null
+    private var viajeJob: Job? = null
     private var reenvioJob: Job? = null
 
     init {
@@ -684,13 +647,14 @@ class LlegateViewModel(
     fun cerrarSesion() {
         viewModelScope.launch {
             auth.cerrarSesion()
-            tripSimulationJob?.cancel()
+            viajeJob?.cancel()
             _uiState.update {
                 it.copy(
                     cuenta = null,
                     billetera = null,
                     movimientos = emptyList(),
                     pagos = emptyList(),
+                    viajes = emptyList(),
                     showCuentaModal = false,
                     showRecargaModal = false,
                     pagoEnCurso = null,
@@ -742,6 +706,7 @@ class LlegateViewModel(
      * con lo que ya tenía: un problema leyendo viajes no puede tapar el saldo.
      */
     private suspend fun refrescarViajes() {
+        if (!auth.tieneSesion) return
         val viajes = try {
             tripRepo.listar()
         } catch (fallo: Exception) {
@@ -902,6 +867,9 @@ class LlegateViewModel(
 
     private companion object {
         const val SEGUNDOS_REENVIO = 30
+
+        /** Cada cuánto se le pregunta al servidor por el viaje abierto. */
+        const val MS_SEGUIMIENTO_VIAJE = 5_000L
         const val FALLA_GENERICO = "No pudimos comunicarte con Llégate. Intenta de nuevo."
     }
 
@@ -947,22 +915,10 @@ class LlegateViewModel(
         _uiState.update { it.copy(showCitySelectorModal = show) }
     }
 
+    /** El historial es `GET /trips`: al abrir la pantalla se vuelve a leer, no se inventa. */
     fun openTripHistory() {
         _uiState.update { it.copy(currentScreen = AppScreen.TRIP_HISTORY) }
-    }
-
-    fun repeatTrip(historyItem: TripHistoryItem) {
-        _uiState.update {
-            it.copy(
-                origin = historyItem.origin,
-                destination = historyItem.destination,
-                selectedService = historyItem.serviceType,
-                selectedPaymentMethod = historyItem.paymentMethod,
-                currentScreen = AppScreen.BOOKING_DETAILS,
-                statusMessage = "Ruta cargada desde historial: ${historyItem.destination.title}"
-            )
-        }
-        recalculateEstimates()
+        viewModelScope.launch { refrescarViajes() }
     }
 
     fun fetchBcvExchangeRate(showToast: Boolean = true) {
@@ -1017,10 +973,6 @@ class LlegateViewModel(
         recalculateEstimates()
     }
 
-    fun setDriverNote(note: String) {
-        _uiState.update { it.copy(driverNote = note) }
-    }
-
     fun selectPaymentMethod(method: PaymentMethod) {
         _uiState.update { it.copy(selectedPaymentMethod = method) }
     }
@@ -1041,61 +993,44 @@ class LlegateViewModel(
         _uiState.update { it.copy(showCancelDialog = show) }
     }
 
-    fun setTripRating(stars: Int) {
-        _uiState.update { it.copy(tripRating = stars) }
-    }
+    /** El piloto terminó en el servidor: se suelta la pantalla y el historial se recarga solo. */
+    fun cerrarViaje() = limpiarViaje("¡Carrera terminada! Ya está en tu historial.")
 
-    fun setTipUsd(tip: Double) {
-        _uiState.update { it.copy(selectedTipUsd = tip) }
-    }
-
-    fun closeRatingSheetAndFinish() {
-        tripSimulationJob?.cancel()
-        val completedTrip = _uiState.value.activeTrip
-        val newHistoryItem = completedTrip?.let { trip ->
-            TripHistoryItem(
-                id = "viaje_${System.currentTimeMillis()}",
-                date = "Reciente",
-                serviceType = trip.serviceType,
-                origin = trip.origin,
-                destination = trip.destination,
-                priceUsd = trip.priceEstimate.priceUsd,
-                priceBs = trip.priceEstimate.priceBs,
-                driverName = trip.driver.name,
-                driverAlias = trip.driver.alias,
-                driverVehicle = trip.driver.vehicleModel,
-                driverPlate = trip.driver.plate,
-                ratingGiven = _uiState.value.tripRating,
-                paymentMethod = trip.paymentMethod
-            )
+    /**
+     * Cancelar también es una llamada. Si el servidor la rechaza —el piloto ya arrancó el
+     * viaje, por ejemplo— la carrera sigue abierta y el motivo se muestra tal cual.
+     */
+    fun cancelarViaje(motivo: String) {
+        val id = _uiState.value.activeTrip?.viajeId
+        if (id == null) {
+            limpiarViaje("Viaje cancelado: $motivo")
+            return
         }
-
-        _uiState.update { state ->
-            val updatedHistory = if (newHistoryItem != null) {
-                listOf(newHistoryItem) + state.tripHistory
-            } else {
-                state.tripHistory
+        viajeJob?.cancel()
+        viewModelScope.launch {
+            try {
+                tripRepo.cancelar(id, motivo)
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+                seguirViaje(id)
+                return@launch
             }
-            state.copy(
-                tripHistory = updatedHistory,
-                showTripRatingSheet = false,
-                activeTrip = null,
-                currentScreen = AppScreen.HOME,
-                statusMessage = "¡Carrera completada y guardada en Mi Historial!"
-            )
+            limpiarViaje("Viaje cancelado: $motivo")
         }
     }
 
-    fun cancelTrip(reason: String) {
-        tripSimulationJob?.cancel()
+    private fun limpiarViaje(mensaje: String) {
+        viajeJob?.cancel()
         _uiState.update {
             it.copy(
                 showCancelDialog = false,
                 activeTrip = null,
                 currentScreen = AppScreen.HOME,
-                statusMessage = "Viaje cancelado: $reason"
+                statusMessage = mensaje
             )
         }
+        viewModelScope.launch { refrescarViajes() }
     }
 
     fun clearStatusMessage() {
@@ -1292,167 +1227,169 @@ class LlegateViewModel(
         recalculateEstimates()
     }
 
-    fun sendRideRequestToNearbyDrivers() {
-        val nearbyCount = _uiState.value.nearbyVehicles.size
-        _uiState.update {
-            it.copy(statusMessage = "Enviando solicitud a $nearbyCount conductores cercanos en la zona...")
-        }
-        confirmAndStartTrip()
-    }
-
-    fun confirmAndStartTrip() {
+    /**
+     * Pide el viaje a la API. La app ya no simula que un pana la acepta ni que la carrera
+     * avanza sola: `viajeJob` solo lee `GET /trips/:id` y pinta lo que conteste el servidor.
+     */
+    fun pedirViaje() {
         val state = _uiState.value
+        if (!auth.tieneSesion) {
+            avisar("Entra a tu cuenta para pedir un viaje.")
+            return
+        }
         val estimate = when (state.selectedService) {
-            ServiceType.MOTO -> state.motoEstimate ?: PriceEstimate(ServiceType.MOTO, 3.2, 7, 2.48, 2205.36)
-            ServiceType.CAR -> state.carEstimate ?: PriceEstimate(ServiceType.CAR, 3.2, 14, 4.90, 4357.37)
-            ServiceType.DELIVERY -> state.deliveryEstimate ?: PriceEstimate(ServiceType.DELIVERY, 3.2, 8, 2.65, 2356.54)
+            ServiceType.MOTO -> state.motoEstimate
+            ServiceType.CAR -> state.carEstimate
+            ServiceType.DELIVERY -> state.deliveryEstimate
+        }
+        if (estimate == null) {
+            avisar("Toca un origen y un destino para conocer la tarifa.")
+            return
         }
 
-        val driver = when (state.selectedService) {
-            ServiceType.MOTO -> DriverProfile(
-                name = "Wilmer Rondón",
-                alias = "\"El Catire\"",
-                rating = 4.98,
-                tripsCount = 1420,
-                vehicleModel = "Bera SBR 150cc",
-                vehicleColor = "Azul Metalizado",
-                plate = "AB123CD",
-                phone = "+58 412 555-8921",
-                pinCode = "8492"
-            )
-            ServiceType.CAR -> DriverProfile(
-                name = "Yorbis José Briceño",
-                alias = "\"El Pana\"",
-                rating = 4.96,
-                tripsCount = 2150,
-                vehicleModel = "Toyota Yaris Sedan",
-                vehicleColor = "Plateado Nítido",
-                plate = "AG456LM",
-                phone = "+58 414 777-3310",
-                pinCode = "3721"
-            )
-            ServiceType.DELIVERY -> DriverProfile(
-                name = "Carlos Márquez",
-                alias = "\"Flash\"",
-                rating = 4.99,
-                tripsCount = 980,
-                vehicleModel = "Empire Keeway Horse 150cc",
-                vehicleColor = "Negro / Caja Térmica",
-                plate = "AK902PX",
-                phone = "+58 416 333-1245",
-                pinCode = "5190"
-            )
+        viewModelScope.launch {
+            val viaje = try {
+                tripRepo.pedir(
+                    origen = state.origin.title,
+                    destino = state.destination.title,
+                    precioUsd = estimate.priceUsd,
+                    distanciaKm = estimate.distanceKm,
+                    metodoPago = state.selectedPaymentMethod.identifier
+                )
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                _uiState.update { it.copy(currentScreen = AppScreen.BOOKING_DETAILS) }
+                avisar(fallo.message ?: FALLA_GENERICO)
+                return@launch
+            }
+
+            val paso = pasoDe(viaje.estado, TripStep.SEARCHING_DRIVER)
+            _uiState.update {
+                it.copy(
+                    activeTrip = ActiveTrip(
+                        serviceType = state.selectedService,
+                        origin = state.origin,
+                        destination = state.destination,
+                        priceEstimate = estimate,
+                        paymentMethod = state.selectedPaymentMethod,
+                        viajeId = viaje.id,
+                        driver = conductorDe(viaje),
+                        currentStep = paso,
+                        progressFraction = progresoDe(paso)
+                    ),
+                    currentScreen = AppScreen.TRIP_ACTIVE
+                )
+            }
+            seguirViaje(viaje.id)
         }
-
-        val trip = ActiveTrip(
-            serviceType = state.selectedService,
-            origin = state.origin,
-            destination = state.destination,
-            priceEstimate = estimate,
-            paymentMethod = state.selectedPaymentMethod,
-            driverNote = state.driverNote,
-            driver = driver,
-            currentStep = TripStep.SEARCHING_DRIVER,
-            progressFraction = 0f,
-            remainingSeconds = 180
-        )
-
-        _uiState.update {
-            it.copy(
-                activeTrip = trip,
-                currentScreen = AppScreen.TRIP_ACTIVE
-            )
-        }
-
-        startSimulationLifecycle()
     }
 
-    private fun startSimulationLifecycle() {
-        tripSimulationJob?.cancel()
-        tripSimulationJob = viewModelScope.launch {
-            delay(2800)
-
-            _uiState.update { state ->
-                state.activeTrip?.let { trip ->
-                    state.copy(
-                        activeTrip = trip.copy(
-                            currentStep = TripStep.DRIVER_EN_ROUTE,
-                            remainingSeconds = 120,
-                            progressFraction = 0.2f
-                        )
-                    )
-                } ?: state
-            }
-
-            delay(3500)
-
-            _uiState.update { state ->
-                state.activeTrip?.let { trip ->
-                    state.copy(
-                        activeTrip = trip.copy(
-                            currentStep = TripStep.TRIP_IN_PROGRESS,
-                            remainingSeconds = 60,
-                            progressFraction = 0.5f
-                        )
-                    )
-                } ?: state
-            }
-
-            val steps = 6
-            for (i in 1..steps) {
-                delay(1200)
-                _uiState.update { state ->
-                    state.activeTrip?.let { trip ->
-                        val newProgress = 0.5f + (i * 0.08f)
-                        state.copy(
-                            activeTrip = trip.copy(
-                                progressFraction = newProgress.coerceAtMost(0.98f),
-                                remainingSeconds = (60 - (i * 9)).coerceAtLeast(5)
-                            )
-                        )
-                    } ?: state
+    /** Cada 5 segundos se pregunta por el viaje; se para en seco si lo cancelan o termina. */
+    private fun seguirViaje(id: String) {
+        viajeJob?.cancel()
+        viajeJob = viewModelScope.launch {
+            while (true) {
+                delay(MS_SEGUIMIENTO_VIAJE)
+                val viaje = try {
+                    tripRepo.consultar(id)
+                } catch (fallo: ApiException) {
+                    if (fallo.httpStatus == 404) {
+                        limpiarViaje("Ese viaje ya no está en Llégate.")
+                        return@launch
+                    }
+                    continue
+                } catch (fallo: Exception) {
+                    if (fallo is CancellationException) throw fallo
+                    continue
                 }
-            }
-
-            _uiState.update { state ->
-                state.activeTrip?.let { trip ->
-                    state.copy(
-                        activeTrip = trip.copy(
-                            currentStep = TripStep.TRIP_COMPLETED,
-                            progressFraction = 1f,
-                            remainingSeconds = 0
-                        ),
-                        showTripRatingSheet = true
-                    )
-                } ?: state
+                aplicarViaje(viaje)
+                if (viaje.estado == EstadoViaje.CANCELADO) {
+                    limpiarViaje("El viaje se canceló. Pide otro cuando quieras.")
+                    return@launch
+                }
+                if (!viaje.abierto) return@launch
             }
         }
+    }
+
+    private fun aplicarViaje(viaje: Viaje) {
+        _uiState.update { state ->
+            val trip = state.activeTrip ?: return@update state
+            val paso = pasoDe(viaje.estado, trip.currentStep)
+            state.copy(
+                activeTrip = trip.copy(
+                    currentStep = paso,
+                    progressFraction = progresoDe(paso),
+                    driver = conductorDe(viaje) ?: trip.driver
+                )
+            )
+        }
+    }
+
+    /** `public.estado_viaje` es el único que mueve la pantalla; un estado nuevo deja lo anterior. */
+    private fun pasoDe(estado: EstadoViaje, actual: TripStep): TripStep = when (estado) {
+        EstadoViaje.SOLICITADO -> TripStep.SEARCHING_DRIVER
+        EstadoViaje.ACEPTADO -> TripStep.DRIVER_EN_ROUTE
+        EstadoViaje.EN_CURSO -> TripStep.TRIP_IN_PROGRESS
+        EstadoViaje.FINALIZADO -> TripStep.TRIP_COMPLETED
+        else -> actual
+    }
+
+    /** La barra indica en qué etapa está el viaje, no cuánto falta: el servidor no da posición. */
+    private fun progresoDe(paso: TripStep): Float = when (paso) {
+        TripStep.SEARCHING_DRIVER -> 0.15f
+        TripStep.DRIVER_EN_ROUTE -> 0.4f
+        TripStep.TRIP_IN_PROGRESS -> 0.75f
+        TripStep.TRIP_COMPLETED -> 1f
+        else -> 0f
+    }
+
+    private fun conductorDe(viaje: Viaje): DriverProfile? = viaje.conductor?.let {
+        DriverProfile(
+            name = it.nombre,
+            plate = it.placa,
+            vehicleModel = listOfNotNull(it.marca, it.modelo).joinToString(" ").ifBlank { null },
+            phone = it.telefono,
+            verified = it.verificado
+        )
     }
 
     fun makeCall(context: Context, phoneNumber: String) {
-        try {
-            val intent = Intent(Intent.ACTION_DIAL).apply {
-                data = Uri.parse("tel:${phoneNumber.replace(" ", "")}")
-            }
-            context.startActivity(intent)
-        } catch (_: Exception) {
-            _uiState.update { it.copy(statusMessage = "Llamando a $phoneNumber...") }
-        }
+        abrir(context, Intent(Intent.ACTION_DIAL, Uri.parse("tel:${digitos(phoneNumber)}")))
     }
 
+    /** La API no tiene chat: el mensaje se va por WhatsApp al teléfono real del piloto. */
+    fun enviarWhatsApp(context: Context, telefono: String, mensaje: String) {
+        val numero = aE164Venezuela(telefono)?.drop(1) ?: digitos(telefono)
+        abrir(context, Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$numero?text=${Uri.encode(mensaje)}")))
+    }
+
+    /** Compartir manda lo que el servidor sí tiene del viaje: ruta, tarifa y piloto asignado. */
     fun shareTrip(context: Context) {
         val trip = _uiState.value.activeTrip ?: return
-        val shareText = "¡Epa, mi pana! Voy en camino en un ${trip.serviceType.title} de Llégate con ${trip.driver.name} (${trip.driver.alias}) en su ${trip.driver.vehicleModel} [Placa: ${trip.driver.plate}]. PIN: ${trip.driver.pinCode}. Destino: ${trip.destination.title}. ¡Sigue mi carrera con panas!"
-        try {
-            val sendIntent = Intent().apply {
-                action = Intent.ACTION_SEND
-                putExtra(Intent.EXTRA_TEXT, shareText)
-                type = "text/plain"
+        val pana = trip.driver
+        val texto = buildString {
+            append("Viaje de Llégate: ${trip.origin.title} → ${trip.destination.title}. ")
+            append("Tarifa de referencia ${usd(trip.priceEstimate.priceUsd)}, pago ${trip.paymentMethod.title}.")
+            if (pana != null) {
+                append(" Piloto: ${pana.name}")
+                pana.vehicleModel?.let { append(", $it") }
+                pana.plate?.let { append(", placa $it") }
             }
-            val shareIntent = Intent.createChooser(sendIntent, "Compartir mi carrera con panas")
-            context.startActivity(shareIntent)
+        }
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, texto)
+            type = "text/plain"
+        }
+        abrir(context, Intent.createChooser(sendIntent, "Compartir mi viaje con Llégate"))
+    }
+
+    private fun abrir(context: Context, intent: Intent) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (_: Exception) {
-            _uiState.update { it.copy(statusMessage = "Detalles copiados al portapapeles") }
+            avisar("Tu teléfono no pudo abrir esa acción. Inténtalo manualmente.")
         }
     }
 

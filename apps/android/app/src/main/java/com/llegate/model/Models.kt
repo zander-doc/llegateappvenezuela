@@ -40,7 +40,7 @@ enum class ServiceType(
         capacityInfo = "Hasta 4 Panas • Aire acondicionado full",
         perks = listOf(
             "Aire acondicionado y revisión mecánica al día",
-            "Conductores verificados con antecedentes",
+            "Conductores verificados por Llégate",
             "Ideal para compras, traslados interurbanos o lluvia"
         )
     ),
@@ -54,9 +54,9 @@ enum class ServiceType(
         perKmUsd = 0.35,
         capacityInfo = "Hasta 5 kg • Bolso sellado o caja térmica",
         perks = listOf(
-            "Rastreo en tiempo real punto a punto",
-            "Confirmación segura con código PIN",
-            "Entregas express de documentos y paquetes"
+            "Rastreo del viaje desde la app",
+            "El piloto te escribe por WhatsApp para la entrega",
+            "Entregas de documentos y paquetes pequeños"
         )
     )
 }
@@ -137,16 +137,16 @@ enum class PaymentMethod(
     )
 }
 
+/**
+ * El piloto que la API asignó al viaje. La app no inventa reseñas, carreras hechas,
+ * colores ni códigos PIN: muestra solo lo que el servidor de verdad tiene.
+ */
 data class DriverProfile(
     val name: String,
-    val alias: String,
-    val rating: Double,
-    val tripsCount: Int,
-    val vehicleModel: String,
-    val vehicleColor: String,
-    val plate: String,
-    val phone: String,
-    val pinCode: String
+    val plate: String?,
+    val vehicleModel: String?,
+    val phone: String?,
+    val verified: Boolean
 )
 
 enum class TripStep {
@@ -164,27 +164,11 @@ data class ActiveTrip(
     val destination: LocationPoint,
     val priceEstimate: PriceEstimate,
     val paymentMethod: PaymentMethod,
-    val driverNote: String,
-    val driver: DriverProfile,
+    /** `id` del viaje en la API: con él se consulta el estado y se cancela. */
+    val viajeId: String,
+    val driver: DriverProfile?,
     val currentStep: TripStep,
-    val progressFraction: Float = 0f,
-    val remainingSeconds: Int = 180
-)
-
-data class TripHistoryItem(
-    val id: String,
-    val date: String,
-    val serviceType: ServiceType,
-    val origin: LocationPoint,
-    val destination: LocationPoint,
-    val priceUsd: Double,
-    val priceBs: Double,
-    val driverName: String,
-    val driverAlias: String,
-    val driverVehicle: String,
-    val driverPlate: String,
-    val ratingGiven: Int = 5,
-    val paymentMethod: PaymentMethod
+    val progressFraction: Float = 0f
 )
 
 enum class MapDisplayMode(

@@ -34,6 +34,7 @@ data class Viaje(
   val destino: String,
   val distanciaKm: Double?,
   val precioUsd: Double,
+  val tasaBcv: Double?,
   val metodoPago: String,
   val comisionUsd: Double?,
   val conductorId: String?,
@@ -46,6 +47,31 @@ data class Viaje(
 
   val fechaTexto: String
     get() = fechaCorta(creadoEn)
+
+  /** Cómo se lee el estado en pantalla; `DESCONOCIDO` cubre un estado nuevo del servidor. */
+  val estadoTexto: String
+    get() = when (estado) {
+      EstadoViaje.SOLICITADO -> "Buscando piloto"
+      EstadoViaje.ACEPTADO -> "El piloto viene en camino"
+      EstadoViaje.EN_CURSO -> "En viaje"
+      EstadoViaje.FINALIZADO -> "Finalizado"
+      EstadoViaje.CANCELADO -> "Cancelado"
+      EstadoViaje.DESCONOCIDO -> "Estado pendiente"
+    }
+
+  /** `public.metodo_pago` en español; lo que el servidor guarde como binance_pay se ve igual. */
+  val metodoPagoTexto: String
+    get() = when (metodoPago) {
+      "saldo" -> "Saldo Llégate"
+      "pago_movil" -> "Pago Móvil"
+      "binance_pay" -> "Binance Pay"
+      "efectivo" -> "Efectivo $"
+      else -> metodoPago
+    }
+
+  /** Los Bs solo existen cuando el viaje terminó y el servidor guardó la tasa del día. */
+  val precioBs: Double?
+    get() = tasaBcv?.let { precioUsd * it }
 }
 
 internal fun conductorFrom(json: JSONObject?): ConductorAsignado? = json?.let {
@@ -67,6 +93,7 @@ internal fun viajeFrom(json: JSONObject): Viaje = Viaje(
   destino = json.stringOr("destino"),
   distanciaKm = json.doubleOrNull("distancia_km"),
   precioUsd = json.doubleOr("precio_usd"),
+  tasaBcv = json.doubleOrNull("tasa_bcv"),
   metodoPago = json.stringOr("metodo_pago", "efectivo"),
   comisionUsd = json.doubleOrNull("comision_usd"),
   conductorId = json.stringOrNull("conductor_id"),

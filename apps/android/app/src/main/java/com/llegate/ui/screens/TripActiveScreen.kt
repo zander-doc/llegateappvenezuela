@@ -1,7 +1,7 @@
 package com.llegate.ui.screens
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -31,10 +31,8 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,15 +44,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,23 +68,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.llegate.R
+import com.llegate.model.ActiveTrip
+import com.llegate.model.DriverProfile
 import com.llegate.model.ServiceType
 import com.llegate.model.TripStep
 import com.llegate.ui.components.DriverAvatarBadge
-import com.llegate.ui.components.DynamicGpsMap
 import com.llegate.ui.components.LeafletDarkMapView
-import com.llegate.ui.components.RouteCanvasMap
 import com.llegate.ui.components.SpeedStripes
-import com.llegate.ui.components.StarRatingBar
 import com.llegate.ui.components.VenezuelanPlateBadge
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Emerald500
-import com.llegate.ui.theme.LlegateHeading
 import com.llegate.ui.theme.Emerald900
-import com.llegate.ui.theme.NeonOrange300
+import com.llegate.ui.theme.LlegateHeading
 import com.llegate.ui.theme.NeonOrange400
 import com.llegate.ui.theme.NeonOrange500
 import com.llegate.ui.theme.RacingRed400
@@ -99,9 +91,10 @@ import com.llegate.ui.theme.RacingYellow500
 import com.llegate.ui.theme.Stone100
 import com.llegate.ui.theme.Stone300
 import com.llegate.ui.theme.Stone400
+import com.llegate.util.bs
+import com.llegate.util.usd
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,16 +105,13 @@ fun TripActiveScreen(
 ) {
     val context = LocalContext.current
     val trip = uiState.activeTrip ?: return
-
-    var showChatDialog by remember { mutableStateOf(false) }
-    var chatMessage by remember { mutableStateOf("") }
-    var sentQuickChat by remember { mutableStateOf<String?>(null) }
+    val pana = trip.driver
 
     BackHandler {
-        if (trip.currentStep != TripStep.TRIP_COMPLETED) {
-            viewModel.showCancelPrompt(true)
+        if (trip.currentStep == TripStep.TRIP_COMPLETED) {
+            viewModel.cerrarViaje()
         } else {
-            viewModel.closeRatingSheetAndFinish()
+            viewModel.showCancelPrompt(true)
         }
     }
 
@@ -175,7 +165,7 @@ fun TripActiveScreen(
                         }
                     } else {
                         Button(
-                            onClick = { viewModel.closeRatingSheetAndFinish() },
+                            onClick = { viewModel.cerrarViaje() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp)
@@ -203,7 +193,6 @@ fun TripActiveScreen(
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // BRAND LOGO IN SIMULATION
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -220,7 +209,7 @@ fun TripActiveScreen(
                 }
             }
 
-            // 1. LIVE STATUS HEADER BANNER
+            // 1. ESTADO DEL VIAJE: lo que contesta GET /trips/:id, nada simulado
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -261,7 +250,7 @@ fun TripActiveScreen(
                                 }
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Text(
-                                    text = "Buscando al pana más cercano...",
+                                    text = "Buscando piloto en ${trip.origin.title}...",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Stone100,
@@ -269,7 +258,7 @@ fun TripActiveScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Conectando con conductores activos en ${trip.origin.title}",
+                                    text = "Tu viaje ya está pedido. En cuanto un pana lo acepte, aparece aquí.",
                                     fontSize = 13.sp,
                                     color = Stone400,
                                     textAlign = TextAlign.Center
@@ -281,7 +270,7 @@ fun TripActiveScreen(
                                     shape = RoundedCornerShape(20.dp)
                                 ) {
                                     Text(
-                                        text = "¡EL PANA VIENE EN CAMINO!",
+                                        text = "¡EL PANA ACEPTÓ TU VIAJE!",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Asphalt950,
@@ -290,17 +279,21 @@ fun TripActiveScreen(
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Text(
-                                    text = "Llega en aprox. 2 minutos",
+                                    text = "Viene buscarte a ${trip.origin.title}",
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Black,
                                     fontFamily = LlegateHeading,
-                                    color = Stone100
+                                    color = Stone100,
+                                    textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "${trip.driver.name} ya aceptó tu carrera con panas",
+                                    text = pana?.name
+                                        ?.let { "$it ya tiene tu viaje. Marcalo para coordinar dónde los encuentran." }
+                                        ?: "Un piloto aceptó tu viaje.",
                                     fontSize = 13.sp,
-                                    color = Stone400
+                                    color = Stone400,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                             TripStep.TRIP_IN_PROGRESS -> {
@@ -354,7 +347,7 @@ fun TripActiveScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Esperamos hayas disfrutado tu carrera",
+                                    text = "El piloto cerró el viaje. Ya quedó en tu historial.",
                                     fontSize = 13.sp,
                                     color = Stone300
                                 )
@@ -362,7 +355,6 @@ fun TripActiveScreen(
                             else -> {}
                         }
 
-                        // PROGRESS BAR IN NEON ORANGE
                         Spacer(modifier = Modifier.height(14.dp))
                         LinearProgressIndicator(
                             progress = { trip.progressFraction },
@@ -377,7 +369,7 @@ fun TripActiveScreen(
                 }
             }
 
-            // 2. LIVE LEAFLET + CARTODB DARK MATTER ROUTE MAP
+            // 2. RUTA EN EL MAPA: origen y destino declarados, sin posición del piloto
             item {
                 LeafletDarkMapView(
                     uiState = uiState,
@@ -388,236 +380,33 @@ fun TripActiveScreen(
                 )
             }
 
-            // 3. VERIFIED DRIVER PROFILE & VEHICLE IDENTIFIER CARD
-            if (trip.currentStep != TripStep.SEARCHING_DRIVER) {
+            // 3. EL PILOTO QUE LA API ASIGNÓ (o el aviso de que aún no hay)
+            if (pana != null) {
+                item {
+                    TarjetaPiloto(trip = trip, pana = pana, viewModel = viewModel, context = context)
+                }
+            } else {
                 item {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("driver_profile_card"),
+                            .testTag("sin_piloto_card"),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = Asphalt900),
-                        border = BorderStroke(1.dp, Asphalt700),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                        border = BorderStroke(1.dp, Asphalt700)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            // Driver Top Row: Avatar, Name, Rating
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                DriverAvatarBadge(
-                                    initials = trip.driver.name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString(""),
-                                    rating = trip.driver.rating
-                                )
-
-                                Spacer(modifier = Modifier.width(14.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = trip.driver.name,
-                                            fontSize = 17.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Stone100
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = trip.driver.alias,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = RacingYellow500
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = null,
-                                            tint = RacingYellow500,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "${trip.driver.rating}",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Stone100
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "• ${trip.driver.tripsCount} carreras",
-                                            fontSize = 12.sp,
-                                            color = Stone400
-                                        )
-                                    }
-                                }
-
-                                // Security PIN Badge
-                                Surface(
-                                    color = Asphalt800,
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(1.dp, NeonOrange500.copy(alpha = 0.5f))
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.Lock,
-                                                contentDescription = null,
-                                                tint = NeonOrange400,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(3.dp))
-                                            Text(
-                                                text = "PIN",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = NeonOrange400
-                                            )
-                                        }
-                                        Text(
-                                            text = trip.driver.pinCode,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = RacingYellow500
-                                        )
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 14.dp),
-                                color = Asphalt800
-                            )
-
-                            // Vehicle Identifier & Plate Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = if (trip.serviceType == ServiceType.MOTO) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
-                                            contentDescription = null,
-                                            tint = NeonOrange400,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = trip.driver.vehicleModel,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Stone100
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "Color: ${trip.driver.vehicleColor}",
-                                        fontSize = 12.sp,
-                                        color = Stone400
-                                    )
-                                }
-
-                                VenezuelanPlateBadge(plate = trip.driver.plate)
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Action buttons: Call, Chat, Share trip
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Button(
-                                    onClick = { viewModel.makeCall(context, trip.driver.phone) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(44.dp)
-                                        .testTag("call_driver_button"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Asphalt800),
-                                    border = BorderStroke(1.dp, Asphalt700)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Call,
-                                        contentDescription = "Llamar",
-                                        tint = Stone100,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(text = "Llamar", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Stone100)
-                                }
-
-                                Button(
-                                    onClick = { showChatDialog = true },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(44.dp)
-                                        .testTag("chat_driver_button"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Asphalt800),
-                                    border = BorderStroke(1.dp, Asphalt700)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Message,
-                                        contentDescription = "Mensaje",
-                                        tint = Stone100,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(text = "Mensaje", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Stone100)
-                                }
-
-                                Button(
-                                    onClick = { viewModel.shareTrip(context) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(44.dp)
-                                        .testTag("share_trip_button"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = NeonOrange500)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "Compartir",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(text = "Compartir", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
-                                }
-                            }
-
-                            // Feedback if message sent
-                            AnimatedVisibility(visible = sentQuickChat != null) {
-                                Surface(
-                                    color = Emerald900.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, Emerald500),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 10.dp)
-                                ) {
-                                    Text(
-                                        text = "Mensaje enviado al pana: \"$sentQuickChat\"",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Emerald500,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            text = "Todavía no hay piloto asignado. La app pregunta al servidor cada 5 segundos " +
+                                "y aquí mismo aparece en cuanto alguno acepte.",
+                            fontSize = 13.sp,
+                            color = Stone300,
+                            modifier = Modifier.padding(16.dp)
+                        )
                     }
                 }
             }
 
-            // 4. TARIFA CLARA SUMMARY CARD
+            // 4. TARIFA CLARA
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -656,14 +445,14 @@ fun TripActiveScreen(
                             )
                             Row(verticalAlignment = Alignment.Bottom) {
                                 Text(
-                                    text = "Ref. $${String.format(Locale.US, "%.2f", trip.priceEstimate.priceUsd)}",
+                                    text = "Ref. ${usd(trip.priceEstimate.priceUsd)}",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Black,
                                     color = RacingYellow500
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "(${String.format(Locale.US, "%,.2f", trip.priceEstimate.priceBs)} Bs.)",
+                                    text = "(${bs(trip.priceEstimate.priceBs)})",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Stone300
@@ -676,100 +465,7 @@ fun TripActiveScreen(
         }
     }
 
-    // MODAL: QUICK CHAT WITH DRIVER
-    if (showChatDialog) {
-        AlertDialog(
-            onDismissRequest = { showChatDialog = false },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (chatMessage.isNotBlank()) {
-                            sentQuickChat = chatMessage
-                            chatMessage = ""
-                        }
-                        showChatDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonOrange500)
-                ) {
-                    Text("Enviar al pana", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showChatDialog = false }) {
-                    Text("Cancelar", color = Stone400)
-                }
-            },
-            containerColor = Asphalt900,
-            title = {
-                Text(
-                    text = "Mensaje a ${trip.driver.name}",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 17.sp,
-                    color = Stone100
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "Mensajes rápidos:",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Stone400
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    val quickMessages = listOf(
-                        "¡Ya voy bajando!",
-                        "Estoy frente a la panadería.",
-                        "Voy de camisa azul.",
-                        "Espérame 2 minuticos por fa."
-                    )
-
-                    quickMessages.forEach { qm ->
-                        Surface(
-                            onClick = {
-                                sentQuickChat = qm
-                                showChatDialog = false
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            color = Asphalt800,
-                            border = BorderStroke(1.dp, Asphalt700),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "💬 \"$qm\"",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Stone100,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = chatMessage,
-                        onValueChange = { chatMessage = it },
-                        label = { Text("Escribir mensaje propio") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NeonOrange500,
-                            unfocusedBorderColor = Asphalt700,
-                            focusedTextColor = Stone100,
-                            unfocusedTextColor = Stone100,
-                            focusedContainerColor = Asphalt800,
-                            unfocusedContainerColor = Asphalt800
-                        )
-                    )
-                }
-            }
-        )
-    }
-
-    // MODAL: CANCEL TRIP CONFIRMATION
+    // MODAL: CANCELAR EL VIAJE EN EL SERVIDOR
     if (uiState.showCancelDialog) {
         var selectedCancelReason by remember { mutableStateOf("El pana tardó mucho") }
         val cancelReasons = listOf(
@@ -783,7 +479,7 @@ fun TripActiveScreen(
             onDismissRequest = { viewModel.showCancelPrompt(false) },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.cancelTrip(selectedCancelReason) },
+                    onClick = { viewModel.cancelarViaje(selectedCancelReason) },
                     colors = ButtonDefaults.buttonColors(containerColor = RacingRed500),
                     modifier = Modifier.testTag("confirm_cancel_button")
                 ) {
@@ -807,7 +503,8 @@ fun TripActiveScreen(
             text = {
                 Column {
                     Text(
-                        text = "El pana ${trip.driver.name} ya está en ruta para buscarte. Cuéntanos por qué cancelas:",
+                        text = pana?.name?.let { "El pana $it ya tiene tu viaje. Cuéntanos por qué cancelas:" }
+                            ?: "El viaje ya está pedido. Cuéntanos por qué cancelas:",
                         fontSize = 13.sp,
                         color = Stone400
                     )
@@ -839,119 +536,151 @@ fun TripActiveScreen(
             }
         )
     }
+}
 
-    // TRIP RATING & REVIEW BOTTOM SHEET
-    if (uiState.showTripRatingSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.closeRatingSheetAndFinish() },
-            sheetState = sheetState,
-            containerColor = Asphalt900
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+/**
+ * La ficha del piloto con lo único que la API guarda de él: nombre, teléfono, vehículo,
+ * placa y si su verificación está aprobada. No hay reseñas, PIN ni color que inventar.
+ */
+@Composable
+private fun TarjetaPiloto(
+    trip: ActiveTrip,
+    pana: DriverProfile,
+    viewModel: LlegateViewModel,
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    val iniciales = pana.name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString("")
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("driver_profile_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Asphalt900),
+        border = BorderStroke(1.dp, Asphalt700),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = Emerald900,
-                    shape = CircleShape,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
+                DriverAvatarBadge(initials = iniciales, isVerified = pana.verified)
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = pana.name, fontSize = 17.sp, fontWeight = FontWeight.Black, color = Stone100)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                            imageVector = if (trip.serviceType == ServiceType.MOTO) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
                             contentDescription = null,
-                            tint = Emerald500,
-                            modifier = Modifier.size(36.dp)
+                            tint = NeonOrange400,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = pana.vehicleModel ?: "Vehículo sin modelo cargado",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Stone100
                         )
                     }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (pana.verified) "Verificado por Llégate" else "Verificación pendiente",
+                        fontSize = 12.sp,
+                        color = if (pana.verified) Emerald500 else RacingYellow500
+                    )
                 }
+                pana.plate?.let { VenezuelanPlateBadge(plate = it) }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 14.dp),
+                color = Asphalt800
+            )
 
-                Text(
-                    text = "¡Llegaste fino a ${trip.destination.title}!",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Stone100,
-                    textAlign = TextAlign.Center
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val telefono = pana.phone
+                if (telefono != null) {
+                    Button(
+                        onClick = { viewModel.makeCall(context, telefono) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("call_driver_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Asphalt800),
+                        border = BorderStroke(1.dp, Asphalt700)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Call,
+                            contentDescription = "Llamar",
+                            tint = Stone100,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Llamar", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Stone100)
+                    }
 
-                Text(
-                    text = "¿Cómo estuvo tu carrera con ${trip.driver.name}?",
-                    fontSize = 13.sp,
-                    color = Stone400,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                StarRatingBar(
-                    rating = uiState.tripRating,
-                    onRatingChanged = { viewModel.setTripRating(it) },
-                    modifier = Modifier.testTag("rating_stars_bar")
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "¿Quieres dejarle algo pal refresco al pana?",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Stone300
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val tipOptions = listOf(0.0 to "Sin propina", 0.50 to "+$0.50", 1.0 to "+$1.00", 2.0 to "+$2.00")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    tipOptions.forEach { (tipAmount, label) ->
-                        val isSelected = uiState.selectedTipUsd == tipAmount
-                        Surface(
-                            onClick = { viewModel.setTipUsd(tipAmount) },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) NeonOrange500 else Asphalt800,
-                            border = BorderStroke(1.dp, if (isSelected) NeonOrange500 else Asphalt700),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(38.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = label,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color.White else Stone300
-                                )
-                            }
-                        }
+                    Button(
+                        onClick = {
+                            viewModel.enviarWhatsApp(
+                                context,
+                                telefono,
+                                "Hola ${pana.name}, soy tu pana de Llégate por el viaje de ${trip.origin.title} a ${trip.destination.title}."
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("chat_driver_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Asphalt800),
+                        border = BorderStroke(1.dp, Asphalt700)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Message,
+                            contentDescription = "Mensaje",
+                            tint = Stone100,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Mensaje", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Stone100)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
-
                 Button(
-                    onClick = { viewModel.closeRatingSheetAndFinish() },
+                    onClick = { viewModel.shareTrip(context) },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .testTag("submit_rating_button"),
-                    shape = RoundedCornerShape(14.dp),
+                        .weight(1f)
+                        .height(44.dp)
+                        .testTag("share_trip_button"),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = NeonOrange500)
                 ) {
-                    Text(
-                        text = "Finalizar y calificar carrera",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Compartir",
+                        tint = Color.White,
+                        modifier = Modifier.size(17.dp)
                     )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Compartir", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
                 }
+            }
 
-                Spacer(modifier = Modifier.height(20.dp))
+            if (pana.phone == null) {
+                Text(
+                    text = "El piloto no tiene teléfono cargado: puedes seguir el viaje desde el historial.",
+                    fontSize = 11.sp,
+                    color = Stone400,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
             }
         }
     }

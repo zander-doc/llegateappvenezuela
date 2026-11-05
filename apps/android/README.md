@@ -14,20 +14,32 @@ que devuelve `/auth/me`, y su botón de cerrar sesión invalida el token. Las
 tarifas se leen de `/config/app` y se calculan con la misma fórmula que la web
 (`model/Models.kt::tarifaUsd`).
 
-Sigue simulado: los pilotos cercanos, la búsqueda y el seguimiento del viaje y el
-historial. La billetera ya es real: la hoja de cuenta lee `/wallet/billetera` (saldo
-disponible, reserva y estado) y `/wallet/movimientos` (los tres últimos movimientos, con
-su signo y su estado — una recarga `en_revision` se ve amarilla hasta que un admin la
-confirma). El botón «Recargar» abre `RecargaSheet`, que recorre
+Los viajes también son reales. `BookingScreen` registra el viaje con `POST /trips`
+(origen, destino, tarifa y el método de pago de `public.metodo_pago`) y
+`TripActiveScreen` pinta lo que contesta `GET /trips/:id` cada 5 segundos: buscando
+piloto, el pana que aceptó, en viaje o finalizado. La ficha del piloto lleva solo lo que
+hay en la base —nombre, teléfono, vehículo, placa y si su verificación está aprobada—;
+no hay reseñas, PIN, color ni ETA inventados, y «Mensaje» abre WhatsApp con el número
+real porque la API todavía no tiene chat. Cancelar llama a `/trips/:id/cancelar` y, si
+el servidor lo rechaza, el viaje queda abierto con el motivo en pantalla.
+`TripHistoryScreen` es exactamente `GET /trips`: fecha, estado, ruta, tarifa (con sus
+bolívares cuando el servidor guardó la tasa BCV) y el piloto asignado.
+
+La billetera es real: la hoja de cuenta lee `/wallet/billetera` (saldo disponible,
+reserva y estado) y `/wallet/movimientos` (los tres últimos movimientos, con su signo y
+su estado — una recarga `en_revision` se ve amarilla hasta que un admin la confirma).
+El botón «Recargar» abre `RecargaSheet`, que recorre
 el mismo flujo de la web — monto y método, `/payments/intents`, los datos del comercio
 para Pago Móvil o el checkout de Binance Pay, y el reporte de la referencia que deja la
 recarga `en_revision` hasta que un admin la confirma (`network/PagoRepository.kt`
 traduce las claves de las RPC a frases y `AuthorizedClient` renueva el token ante un
-401). Lo que sigue es conectar los viajes: pedir y seguir el viaje con `/trips`; la
-capa de datos (`network/TripRepository.kt`) ya está escrita y probada contra los JSON
-reales, pero sin pantalla. También falta la verificación de documentos del piloto. La
-vitrina de concesionarios (`automotivePartners`) lista beneficios comerciales que aún
-no están firmados: hay que confirmarlos o retirarlos antes de publicar.
+401).
+
+Sigue simulado, y no debe publicarse como si fuera real: el radar de pilotos cercanos,
+la telemetría GPS del mapa y las alertas de la comunidad —la API no tiene *discovery*,
+posición en vivo ni reportes—. También falta retomar el viaje abierto al relanzar la
+app, la verificación de documentos del piloto y confirmar o retirar la vitrina de
+concesionarios (`automotivePartners`), que lista beneficios aún no firmados.
 
 ## Requisitos
 
