@@ -149,19 +149,19 @@ export const FAQ_GROUPS: FaqGroup[] = [
     items: [
       {
         q: "¿Qué es el Mercado Motor?",
-        a: "Un directorio de repuestos, talleres, cauchos, grúas y accesorios verificados. Puedes buscar por categoría y ciudad, y contactar al negocio desde la misma página.",
+        a: "La vitrina de repuestos, talleres, cauchos, grúas y accesorios que estamos preparando. Todavía no tiene negocios publicados: no la llenamos con fichas de ejemplo.",
       },
       {
         q: "¿Cómo publico mi negocio?",
-        a: "Envía el formulario con los datos del negocio y el servicio que ofreces. Revisamos la información y te contactamos para verificar la ficha antes de publicarla.",
+        a: "Aún no recibimos fichas. Escríbenos a hola@llegate.app y te avisamos el día que abramos la recepción. Antes de publicar revisamos el contacto, la dirección y la oferta.",
       },
       {
-        q: "¿Qué significa el sello Verificado?",
-        a: "Que revisamos los datos del negocio, su dirección y un canal de contacto. No es una garantía de resultados: siempre confirma condiciones y precios antes de pagar.",
+        q: "¿Qué significará el sello Verificado?",
+        a: "Que revisamos los datos del negocio, su dirección y un canal de contacto real. No es una garantía de resultados: confirma condiciones y precios antes de pagar.",
       },
       {
         q: "¿Llégate cobra por publicar?",
-        a: "La ficha básica es gratuita durante el lanzamiento. Los planes de visibilidad destacada son opcionales y se muestran con la etiqueta Patrocinado.",
+        a: "La ficha básica será gratuita durante el lanzamiento. La visibilidad destacada será opcional y siempre irá etiquetada como Patrocinado.",
       },
     ],
   },

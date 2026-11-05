@@ -426,7 +426,7 @@ export function Header() {
                 </div>
                 <p className="mt-4 text-[11px] leading-relaxed text-ink-500">
                   {realAuthEnabled
-                    ? "Piloto cerrado. El ingreso por código, la billetera y los viajes trabajan con la base real; las fichas del mercado y el mapa de cobertura son de ejemplo."
+                    ? "Piloto cerrado. El ingreso por código, la billetera y los viajes trabajan con la base real; el Mercado Motor aún no tiene negocios publicados y el mapa de cobertura es de ejemplo."
                     : "Piloto cerrado. Sin acceso real activado, todo el contenido de esta pantalla es de ejemplo."}
                 </p>
               </div>

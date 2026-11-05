@@ -28,14 +28,14 @@ const suggestions = [
   },
   {
     icon: Smartphone,
-    title: "Probar la app",
-    text: "Una demo interactiva, sin descargas ni registros.",
+    title: "Ver la app",
+    text: "La misma cuenta, en tu teléfono.",
     to: "/app",
   },
   {
     icon: Wrench,
     title: "Mercado Motor",
-    text: "Talleres, repuestos y grúas de ejemplo.",
+    text: "El plan de la vitrina de talleres y repuestos.",
     to: "/mercado",
   },
   {
@@ -88,7 +88,7 @@ export function NotFoundPage() {
               </Badge>
             </div>
             <p className="mt-3 text-[12px] leading-relaxed text-ink-400">
-              En este prototipo, los enlaces válidos están en el menú superior y en el pie de página.
+              En esta web, los enlaces válidos están en el menú superior y en el pie de página.
             </p>
           </div>
         }

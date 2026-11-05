@@ -5,11 +5,9 @@ export type ModalState =
   | { type: "bcv" }
   | { type: "driver" }
   | { type: "plan"; planId: string }
-  | { type: "vendor"; vendorSlug: string }
   | { type: "fare"; serviceSlug?: string }
   | { type: "coverage"; city?: string }
   | { type: "lead"; intent: "empresa" | "aliado" | "contacto" }
-  | { type: "publish" }
   | null;
 
 export interface Toast {

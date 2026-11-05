@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import { Layout } from "./components/Layout";
 import { UIProvider } from "./lib/ui";
@@ -24,7 +24,6 @@ const ClubVipPage = lazy(() => import("./pages/ClubVip").then((m) => ({ default:
 const SeguridadPage = lazy(() => import("./pages/Seguridad").then((m) => ({ default: m.SeguridadPage })));
 const MercadoPage = lazy(() => import("./pages/Market").then((m) => ({ default: m.MercadoPage })));
 const PublicarPage = lazy(() => import("./pages/Market").then((m) => ({ default: m.PublicarPage })));
-const VendorDetailPage = lazy(() => import("./pages/Market").then((m) => ({ default: m.VendorDetailPage })));
 const MobileAppPage = lazy(() => import("./pages/MobileApp").then((m) => ({ default: m.MobileAppPage })));
 const IngresarPage = lazy(() => import("./pages/Ingresar").then((m) => ({ default: m.IngresarPage })));
 const CuentaRegistroPage = lazy(() => import("./pages/CuentaRegistro").then((m) => ({ default: m.CuentaRegistroPage })));
@@ -56,7 +55,8 @@ export default function App() {
                 <Route path="/pasajeros/club-vip" element={<ClubVipPage />} />
                 <Route path="/seguridad" element={<SeguridadPage />} />
                 <Route path="/mercado" element={<MercadoPage />} />
-                <Route path="/mercado/negocio/:slug" element={<VendorDetailPage />} />
+                {/* Esas URLs existieron con fichas de ejemplo: ahora apuntan al plan. */}
+                <Route path="/mercado/negocio/:slug" element={<Navigate to="/mercado" replace />} />
                 <Route path="/mercado/publicar" element={<PublicarPage />} />
                 <Route path="/app" element={<MobileAppPage />} />
                 <Route path="/ingresar" element={<IngresarPage />} />

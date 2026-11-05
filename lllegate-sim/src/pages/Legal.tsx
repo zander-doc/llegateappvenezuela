@@ -68,7 +68,7 @@ const DOCS: Doc[] = [
       {
         title: "6. Mercado Motor",
         paragraphs: [
-          "El Mercado Motor es un directorio de negocios del sector automotor. La verificación de una ficha significa que revisamos datos de contacto, dirección y actividad declarada; no es una garantía de resultados ni de precios.",
+          "El Mercado Motor será un directorio de negocios del sector automotor. Hoy no tiene fichas publicadas: cuando abra, cada ficha se revisa antes de salir (datos de contacto, dirección y actividad declarada), y eso no es una garantía de resultados ni de precios.",
           "Las transacciones entre usuarios y negocios ocurren fuera de la plataforma. Confirma condiciones, precios y garantías antes de pagar.",
         ],
       },
@@ -153,7 +153,7 @@ const DOCS: Doc[] = [
         title: "7. Qué es real en este piloto",
         paragraphs: [
           "El acceso con tu teléfono, la billetera prepago y la verificación de conductores funcionan con datos reales y se guardan en nuestra API y base de datos para probar el piloto.",
-          "Los viajes, las tarifas mostradas y los pagos son simulados: no despachamos vehículos ni cobramos dinero. Las fichas del Mercado Motor son ejemplos.",
+          "Los viajes, las tarifas mostradas y los pagos son simulados: no despachamos vehículos ni cobramos dinero. El Mercado Motor no tiene negocios publicados todavía.",
           "Puedes pedir la eliminación de tu cuenta y sus datos escribiendo a hola@llegate.app.",
         ],
       },
@@ -233,7 +233,7 @@ export function LegalPage() {
         <PageHero
           kicker="Legal"
           title="Documento no encontrado"
-          description="El enlace que abriste no corresponde a un documento disponible en este prototipo."
+          description="El enlace que abriste no corresponde a un documento disponible en esta versión piloto."
           crumbs={[{ label: "Legal", to: "/legal/terminos" }]}
           compact
         />

@@ -43,7 +43,7 @@ const columns = [
     links: [
       { label: "Llégate Empresas", to: "/empresas" },
       { label: "Aliados y patrocinios", to: "/nosotros/aliados" },
-      { label: "Publica tu negocio", to: "/mercado/publicar" },
+      { label: "Vitrina en preparación", to: "/mercado" },
       { label: "Términos y condiciones", to: "/legal/terminos" },
       { label: "Privacidad", to: "/legal/privacidad" },
     ],
@@ -153,8 +153,8 @@ export function Footer() {
         <p className="mt-6 max-w-4xl text-[11.5px] leading-relaxed text-ink-500">
           Sitio en piloto cerrado. El ingreso por código, la billetera y los viajes trabajan contra la base
           de datos real de Llégate. Las tarifas usan la tasa BCV de referencia del proyecto (887,30 Bs por
-          dólar); la app toma la tasa oficial del día desde el servidor. Las fichas del mercado y el mapa de
-          cobertura siguen siendo de ejemplo hasta que carguemos los datos definitivos.
+          dólar); la app toma la tasa oficial del día desde el servidor. La vitrina del Mercado Motor todavía
+          no tiene negocios publicados y el mapa de cobertura es de ejemplo.
         </p>
       </div>
 

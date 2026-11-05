@@ -31,14 +31,13 @@ import { Hero } from "../components/Hero";
 import { Ticker } from "../components/Ticker";
 import { Stagger, StaggerItem } from "../components/Motion";
 import { ServiceCard } from "../components/ServiceCard";
-import { VendorCard } from "../components/VendorCard";
 import { FareEstimator } from "../components/FareEstimator";
 import { CoverageSearch } from "../components/CoverageSearch";
 import { useUI } from "../lib/ui";
 import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
 import { PILOT_RULES } from "../data/prepaid";
 import { formatUSD } from "../lib/format";
-import { VENDORS } from "../data/vendors";
+import { VENDOR_CATEGORIES } from "../data/vendors";
 import { homeFaqs } from "../data/faqs";
 import { SAFETY_POINTS, STEPS } from "../data/site";
 import { DEMO_BCV_RATE, formatRate } from "../lib/format";
@@ -48,7 +47,6 @@ const safetyIcons = [ShieldCheck, Share2, Siren, Wallet];
 export function HomePage() {
   const { openModal } = useUI();
   const homeFaqItems = homeFaqs.flatMap((g) => g.items).slice(0, 6);
-  const featuredVendors = VENDORS.slice(0, 3);
 
   return (
     <>
@@ -272,25 +270,29 @@ export function HomePage() {
         <SectionHead
           kicker="Mercado Motor"
           title="Repuestos, talleres y grúas cerca."
-          text="Un directorio de negocios del mundo motor, con fichas verificadas y contacto directo."
+          text="La vitrina está en preparación. No publicamos fichas de ejemplo: cada negocio aparecerá con sus datos reales y verificados."
           action={
             <Button variant="secondary" to="/mercado">
-              Explorar el mercado <ArrowRight className="h-4 w-4" />
+              Ver el plan de la vitrina <ArrowRight className="h-4 w-4" />
             </Button>
           }
         />
-        <div className="mt-8 grid gap-3 md:grid-cols-3">
-          {featuredVendors.map((vendor) => (
-            <VendorCard key={vendor.slug} vendor={vendor} />
+        <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          {VENDOR_CATEGORIES.slice(0, 3).map((categoria) => (
+            <div key={categoria} className="card p-5">
+              <Eyebrow>Categoría planeada</Eyebrow>
+              <p className="mt-2 font-heading text-[19px] tracking-tight text-white">{categoria}</p>
+              <p className="mt-1 text-[12.5px] text-ink-400">Todavía sin negocios publicados.</p>
+            </div>
           ))}
         </div>
         <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:flex-row sm:items-center sm:px-5">
           <p className="flex items-center gap-2.5 text-[12.5px] text-ink-300">
-            <Store className="h-4 w-4 shrink-0 text-brand-400" /> ¿Tienes un taller, repuestera o grúa?
-            Publica tu ficha sin costo durante el lanzamiento.
+            <Store className="h-4 w-4 shrink-0 text-brand-400" /> ¿Tienes un taller, repuestera o grúa? Aún no
+            recibimos fichas; escríbenos y te avisamos cuando abramos la vitrina.
           </p>
           <Button size="sm" variant="secondary" to="/mercado/publicar">
-            Publicar mi negocio
+            Quiero que me avisen
           </Button>
         </div>
       </section>

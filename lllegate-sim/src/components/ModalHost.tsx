@@ -5,9 +5,7 @@ import { FareModal } from "./modals/FareModal";
 import { CoverageModal } from "./modals/CoverageModal";
 import { DriverWizard } from "./modals/DriverWizard";
 import { PlanModal } from "./modals/PlanModal";
-import { VendorModal } from "./modals/VendorModal";
 import { LeadModal } from "./modals/LeadModal";
-import { PublishModal } from "./modals/PublishModal";
 
 export function ModalHost() {
   const { modal, closeModal } = useUI();
@@ -26,12 +24,8 @@ export function ModalHost() {
       return <DriverWizard onClose={closeModal} />;
     case "plan":
       return <PlanModal planId={modal.planId} onClose={closeModal} />;
-    case "vendor":
-      return <VendorModal vendorSlug={modal.vendorSlug} onClose={closeModal} />;
     case "lead":
       return <LeadModal intent={modal.intent} onClose={closeModal} />;
-    case "publish":
-      return <PublishModal onClose={closeModal} />;
     default:
       return null;
   }

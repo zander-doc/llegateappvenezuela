@@ -30,7 +30,7 @@ const allianceTypes = [
   {
     icon: Wrench,
     title: "Talleres y comercios",
-    text: "Fichas verificadas en el Mercado Motor y beneficios para conductores de la red.",
+    text: "El Mercado Motor está en preparación: cuando abramos la vitrina, tu ficha sale verificada antes de publicarse.",
     fit: "Repuestos, cauchos, lubricantes, talleres, grúas.",
   },
   {
@@ -49,7 +49,7 @@ const allianceTypes = [
 
 const offer = [
   "Presencia en la app y en la web para tu marca",
-  "Fichas y ofertas para conductores en el Mercado Motor",
+  "Ficha en el Mercado Motor cuando abramos la vitrina",
   "Contenido conjunto para canales y redes",
   "Acceso anticipado a novedades del lanzamiento",
 ];
@@ -161,8 +161,8 @@ export function AliadosPage() {
               <CheckList items={offer} />
             </div>
             <p className="mt-4 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 text-[11px] leading-relaxed text-ink-500">
-              El alcance y los espacios se definen en la propuesta. No inventamos cifras de audiencia en esta
-              demostración.
+              El alcance y los espacios se definen en la propuesta. No publicamos cifras de audiencia que no
+              podamos demostrar.
             </p>
           </div>
           <div className="card p-5">
@@ -172,7 +172,8 @@ export function AliadosPage() {
             </div>
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-racing-500/20 bg-racing-500/[0.06] px-3 py-2 text-[11.5px] text-ink-300">
               <Store className="h-4 w-4 shrink-0 text-racing-400" />
-              Si tienes un negocio automotriz, quizá te convenga primero una ficha en el Mercado Motor.
+              Si tienes un negocio automotriz, la ficha del Mercado Motor aún no está abierta: te avisamos
+              primero.
             </div>
           </div>
         </div>
