@@ -37,8 +37,10 @@ traduce las claves de las RPC a frases y `AuthorizedClient` renueva el token ant
 
 Sigue simulado, y no debe publicarse como si fuera real: el radar de pilotos cercanos,
 la telemetría GPS del mapa y las alertas de la comunidad —la API no tiene *discovery*,
-posición en vivo ni reportes—. También falta retomar el viaje abierto al relanzar la
-app, la verificación de documentos del piloto y confirmar o retirar la vitrina de
+posición en vivo ni reportes—. Si la app se cerró a mitad de un viaje, al abrir sesión
+`GET /trips` devuelve el viaje abierto y la pantalla se reconstruye sola (con la ruta en
+texto, porque la base guarda origen y destino como texto, sin coordenadas). También falta
+la verificación de documentos del piloto y confirmar o retirar la vitrina de
 concesionarios (`automotivePartners`), que lista beneficios aún no firmados.
 
 ## Requisitos

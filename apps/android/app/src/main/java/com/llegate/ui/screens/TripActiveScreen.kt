@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TwoWheeler
@@ -70,7 +71,6 @@ import androidx.compose.ui.unit.sp
 import com.llegate.R
 import com.llegate.model.ActiveTrip
 import com.llegate.model.DriverProfile
-import com.llegate.model.ServiceType
 import com.llegate.model.TripStep
 import com.llegate.ui.components.DriverAvatarBadge
 import com.llegate.ui.components.LeafletDarkMapView
@@ -369,15 +369,21 @@ fun TripActiveScreen(
                 }
             }
 
-            // 2. RUTA EN EL MAPA: origen y destino declarados, sin posición del piloto
-            item {
-                LeafletDarkMapView(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(250.dp)
-                )
+            // 2. LA RUTA: mapa si hay coordenadas, texto si la API solo guardó nombres
+            if (trip.origin.tieneCoordenadas && trip.destination.tieneCoordenadas) {
+                item {
+                    LeafletDarkMapView(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(250.dp)
+                    )
+                }
+            } else {
+                item {
+                    TarjetaRutaTexto(trip)
+                }
             }
 
             // 3. EL PILOTO QUE LA API ASIGNÓ (o el aviso de que aún no hay)
@@ -429,7 +435,7 @@ fun TripActiveScreen(
                                 color = Stone400
                             )
                             Text(
-                                text = trip.paymentMethod.title,
+                                text = trip.metodoPagoTexto,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Stone100
@@ -445,14 +451,14 @@ fun TripActiveScreen(
                             )
                             Row(verticalAlignment = Alignment.Bottom) {
                                 Text(
-                                    text = "Ref. ${usd(trip.priceEstimate.priceUsd)}",
+                                    text = "Ref. ${usd(trip.precioUsd)}",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Black,
                                     color = RacingYellow500
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "(${bs(trip.priceEstimate.priceBs)})",
+                                    text = "(${bs(trip.precioBs)})",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Stone300
@@ -539,6 +545,51 @@ fun TripActiveScreen(
 }
 
 /**
+ * Un viaje reanudado solo tiene los nombres de la ruta: la base guarda `origen` y
+ * `destino` como texto, sin coordenadas, así que no se puede dibujar sin mentir.
+ */
+@Composable
+private fun TarjetaRutaTexto(trip: ActiveTrip, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("ruta_sin_coordenadas_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Asphalt900),
+        border = BorderStroke(1.dp, Asphalt700)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Emerald500)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(text = trip.origin.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Stone100)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = NeonOrange400,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = trip.destination.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Stone100)
+            }
+            Text(
+                text = "Este viaje se reanudó desde tu historial: Llégate guarda la ruta como texto, " +
+                    "así que el mapa aparece cuando pidas un viaje nuevo.",
+                fontSize = 11.sp,
+                color = Stone400
+            )
+        }
+    }
+}
+
+/**
  * La ficha del piloto con lo único que la API guarda de él: nombre, teléfono, vehículo,
  * placa y si su verificación está aprobada. No hay reseñas, PIN ni color que inventar.
  */
@@ -551,6 +602,7 @@ private fun TarjetaPiloto(
     modifier: Modifier = Modifier
 ) {
     val iniciales = pana.name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString("")
+    val esMoto = pana.tipoVehiculo?.contains("moto", true) ?: false
 
     Card(
         modifier = modifier
@@ -573,7 +625,7 @@ private fun TarjetaPiloto(
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = if (trip.serviceType == ServiceType.MOTO) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
+                            imageVector = if (esMoto) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
                             contentDescription = null,
                             tint = NeonOrange400,
                             modifier = Modifier.size(16.dp)

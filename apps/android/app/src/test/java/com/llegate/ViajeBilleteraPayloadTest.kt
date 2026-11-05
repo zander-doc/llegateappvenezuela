@@ -1,10 +1,13 @@
 package com.llegate
 
+import com.llegate.model.TripStep
 import com.llegate.network.EstadoViaje
 import com.llegate.network.TripRepository
+import com.llegate.network.activeTripDe
 import com.llegate.network.billeteraFrom
 import com.llegate.network.estadoViajeDe
 import com.llegate.network.movimientoFrom
+import com.llegate.network.puntoDeTexto
 import com.llegate.network.viajeFrom
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -116,6 +119,27 @@ class ViajeBilleteraPayloadTest {
     assertEquals("saldo", cuerpo.getString("metodo_pago"))
     assertEquals(EstadoViaje.SOLICITADO, viaje.estado)
     assertNull("el viaje recién pedido todavía no tiene piloto", viaje.conductor)
+  }
+
+  @Test
+  fun `un viaje reanudado arma la pantalla sin coordenadas y con la tasa de hoy`() {
+    val viaje = viajeFrom(JSONObject(VIAJE_EN_CURSO).getJSONObject("viaje"))
+
+    val trip = activeTripDe(
+      viaje = viaje,
+      origen = puntoDeTexto(viaje.origen, "Origen de tu viaje"),
+      destino = puntoDeTexto(viaje.destino, "Destino de tu viaje"),
+      bcv = 900.0
+    )
+
+    assertEquals(viaje.id, trip.viajeId)
+    assertEquals(TripStep.TRIP_IN_PROGRESS, trip.currentStep)
+    assertEquals(0.75f, trip.progressFraction, 0.0f)
+    assertEquals("Pago Móvil", trip.metodoPagoTexto)
+    assertEquals(false, trip.origin.tieneCoordenadas)
+    assertEquals("sin tasa del viaje se usan los Bs de la tasa que trae la app", 5670.0, trip.precioBs, 0.0)
+    assertEquals("Carlos Conductor", trip.driver?.name)
+    assertEquals("carro", trip.driver?.tipoVehiculo)
   }
 
   @Test

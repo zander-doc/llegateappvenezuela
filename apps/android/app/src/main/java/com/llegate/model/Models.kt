@@ -104,7 +104,11 @@ data class LocationPoint(
     val isCurrentGps: Boolean = false,
     val stateName: String = "Aragua",
     val cityName: String = "Maracay"
-)
+) {
+    /** `viajes.origen` y `viajes.destino` son texto en la base: sin coordenadas no hay mapa. */
+    val tieneCoordenadas: Boolean
+        get() = lat != 0.0 || lng != 0.0
+}
 
 data class PriceEstimate(
     val serviceType: ServiceType,
@@ -145,6 +149,7 @@ data class DriverProfile(
     val name: String,
     val plate: String?,
     val vehicleModel: String?,
+    val tipoVehiculo: String?,
     val phone: String?,
     val verified: Boolean
 )
@@ -158,14 +163,18 @@ enum class TripStep {
     TRIP_COMPLETED
 }
 
+/**
+ * La carrera que se está viendo en `TripActiveScreen`. Todo sale de `GET /trips/:id`:
+ * el servicio pedido no se guarda en la base, así que el icono se elige con el vehículo
+ * real del piloto y el mapa solo se dibuja cuando hay coordenadas.
+ */
 data class ActiveTrip(
-    val serviceType: ServiceType,
+    val viajeId: String,
     val origin: LocationPoint,
     val destination: LocationPoint,
-    val priceEstimate: PriceEstimate,
-    val paymentMethod: PaymentMethod,
-    /** `id` del viaje en la API: con él se consulta el estado y se cancela. */
-    val viajeId: String,
+    val precioUsd: Double,
+    val precioBs: Double,
+    val metodoPagoTexto: String,
     val driver: DriverProfile?,
     val currentStep: TripStep,
     val progressFraction: Float = 0f

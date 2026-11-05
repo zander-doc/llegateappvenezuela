@@ -1,5 +1,9 @@
 package com.llegate.network
 
+import com.llegate.model.ActiveTrip
+import com.llegate.model.DriverProfile
+import com.llegate.model.LocationPoint
+import com.llegate.model.TripStep
 import com.llegate.util.fechaCorta
 import org.json.JSONObject
 
@@ -100,6 +104,66 @@ internal fun viajeFrom(json: JSONObject): Viaje = Viaje(
   conductor = conductorFrom(json.optJSONObject("conductor")),
   creadoEn = json.stringOrNull("created_at")
 )
+
+/** El piloto asignado, en la forma que usa la pantalla del viaje. */
+fun conductorDe(viaje: Viaje): DriverProfile? = viaje.conductor?.let {
+  DriverProfile(
+    name = it.nombre,
+    plate = it.placa,
+    vehicleModel = listOfNotNull(it.marca, it.modelo).joinToString(" ").ifBlank { null },
+    tipoVehiculo = it.tipoVehiculo,
+    phone = it.telefono,
+    verified = it.verificado
+  )
+}
+
+/** `public.estado_viaje` es el único que mueve la pantalla; un estado nuevo deja el anterior. */
+fun pasoDeViaje(estado: EstadoViaje, actual: TripStep): TripStep = when (estado) {
+  EstadoViaje.SOLICITADO -> TripStep.SEARCHING_DRIVER
+  EstadoViaje.ACEPTADO -> TripStep.DRIVER_EN_ROUTE
+  EstadoViaje.EN_CURSO -> TripStep.TRIP_IN_PROGRESS
+  EstadoViaje.FINALIZADO -> TripStep.TRIP_COMPLETED
+  else -> actual
+}
+
+/** La barra dice en qué etapa está el viaje, no cuánto falta: el servidor no da posición. */
+fun progresoDePaso(paso: TripStep): Float = when (paso) {
+  TripStep.SEARCHING_DRIVER -> 0.15f
+  TripStep.DRIVER_EN_ROUTE -> 0.4f
+  TripStep.TRIP_IN_PROGRESS -> 0.75f
+  TripStep.TRIP_COMPLETED -> 1f
+  else -> 0f
+}
+
+/**
+ * La pantalla del viaje armada desde lo que contestó la API. Al reanudar, origen y
+ * destino llegan como texto sin coordenadas (`viajes.origen` no guarda lat/lng), así que
+ * el mapa se apaga y los bolívares se calculan con la tasa BCV que traiga la app.
+ */
+fun activeTripDe(
+  viaje: Viaje,
+  origen: LocationPoint,
+  destino: LocationPoint,
+  bcv: Double,
+  actual: TripStep = TripStep.SEARCHING_DRIVER
+): ActiveTrip {
+  val paso = pasoDeViaje(viaje.estado, actual)
+  return ActiveTrip(
+    viajeId = viaje.id,
+    origin = origen,
+    destination = destino,
+    precioUsd = viaje.precioUsd,
+    precioBs = viaje.precioBs ?: viaje.precioUsd * bcv,
+    metodoPagoTexto = viaje.metodoPagoTexto,
+    driver = conductorDe(viaje),
+    currentStep = paso,
+    progressFraction = progresoDePaso(paso)
+  )
+}
+
+/** Punto de ruta que solo existe como texto en la base. */
+fun puntoDeTexto(titulo: String, detalle: String): LocationPoint =
+  LocationPoint(title = titulo, subtitle = detalle, lat = 0.0, lng = 0.0)
 
 class TripRepository(private val http: AuthorizedClient) {
 

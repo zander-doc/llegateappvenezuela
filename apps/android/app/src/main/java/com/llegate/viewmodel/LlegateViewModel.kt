@@ -12,7 +12,6 @@ import com.llegate.model.AutomotivePartner
 import com.llegate.model.CityInfo
 import com.llegate.model.CommunityAlert
 import com.llegate.model.CommunityAlertType
-import com.llegate.model.DriverProfile
 import com.llegate.model.GpsTelemetry
 import com.llegate.model.LocationPoint
 import com.llegate.model.LocationSuggestion
@@ -24,9 +23,9 @@ import com.llegate.model.SafeMeetingPoint
 import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
 import com.llegate.model.tarifaUsd
-import com.llegate.model.TripStep
 import com.llegate.model.UpcomingService
 import com.llegate.network.ApiException
+import com.llegate.network.activeTripDe
 import com.llegate.network.AuthRepository
 import com.llegate.network.BcvRateService
 import com.llegate.network.Billetera
@@ -38,6 +37,7 @@ import com.llegate.network.MetodoPagoDisponible
 import com.llegate.network.Movimiento
 import com.llegate.network.Pago
 import com.llegate.network.PagoRepository
+import com.llegate.network.puntoDeTexto
 import com.llegate.network.TripRepository
 import com.llegate.network.Usuario
 import com.llegate.network.Viaje
@@ -714,6 +714,31 @@ class LlegateViewModel(
             return
         }
         _uiState.update { it.copy(viajes = viajes) }
+        reanudarViajeAbierto(viajes)
+    }
+
+    /**
+     * Si la app se cerró a mitad de un viaje, `/trips` todavía lo tiene abierto: se
+     * reconstruye la pantalla con los datos del servidor y se sigue preguntando por él.
+     * Solo salta a la carrera si el pana estaba en su casa, no a mitad de una reserva.
+     */
+    private fun reanudarViajeAbierto(viajes: List<Viaje>) {
+        if (_uiState.value.activeTrip != null) return
+        val abierto = viajes.firstOrNull { it.abierto } ?: return
+        val trip = activeTripDe(
+            viaje = abierto,
+            origen = puntoDeTexto(abierto.origen, "Origen de tu viaje"),
+            destino = puntoDeTexto(abierto.destino, "Destino de tu viaje"),
+            bcv = _uiState.value.bcvExchangeRate
+        )
+        val enCasa = _uiState.value.currentScreen == AppScreen.HOME
+        _uiState.update { state ->
+            state.copy(
+                activeTrip = trip,
+                currentScreen = if (enCasa) AppScreen.TRIP_ACTIVE else state.currentScreen
+            )
+        }
+        seguirViaje(abierto.id)
     }
 
     /** La hoja de recarga siempre devuelve a la de cuenta: son dos pasos del mismo viaje. */
@@ -1263,23 +1288,13 @@ class LlegateViewModel(
                 return@launch
             }
 
-            val paso = pasoDe(viaje.estado, TripStep.SEARCHING_DRIVER)
-            _uiState.update {
-                it.copy(
-                    activeTrip = ActiveTrip(
-                        serviceType = state.selectedService,
-                        origin = state.origin,
-                        destination = state.destination,
-                        priceEstimate = estimate,
-                        paymentMethod = state.selectedPaymentMethod,
-                        viajeId = viaje.id,
-                        driver = conductorDe(viaje),
-                        currentStep = paso,
-                        progressFraction = progresoDe(paso)
-                    ),
-                    currentScreen = AppScreen.TRIP_ACTIVE
-                )
-            }
+            val viajeActivo = activeTripDe(
+                viaje = viaje,
+                origen = state.origin,
+                destino = state.destination,
+                bcv = state.bcvExchangeRate
+            )
+            _uiState.update { it.copy(activeTrip = viajeActivo, currentScreen = AppScreen.TRIP_ACTIVE) }
             seguirViaje(viaje.id)
         }
     }
@@ -1315,43 +1330,16 @@ class LlegateViewModel(
     private fun aplicarViaje(viaje: Viaje) {
         _uiState.update { state ->
             val trip = state.activeTrip ?: return@update state
-            val paso = pasoDe(viaje.estado, trip.currentStep)
             state.copy(
-                activeTrip = trip.copy(
-                    currentStep = paso,
-                    progressFraction = progresoDe(paso),
-                    driver = conductorDe(viaje) ?: trip.driver
+                activeTrip = activeTripDe(
+                    viaje = viaje,
+                    origen = trip.origin,
+                    destino = trip.destination,
+                    bcv = state.bcvExchangeRate,
+                    actual = trip.currentStep
                 )
             )
         }
-    }
-
-    /** `public.estado_viaje` es el único que mueve la pantalla; un estado nuevo deja lo anterior. */
-    private fun pasoDe(estado: EstadoViaje, actual: TripStep): TripStep = when (estado) {
-        EstadoViaje.SOLICITADO -> TripStep.SEARCHING_DRIVER
-        EstadoViaje.ACEPTADO -> TripStep.DRIVER_EN_ROUTE
-        EstadoViaje.EN_CURSO -> TripStep.TRIP_IN_PROGRESS
-        EstadoViaje.FINALIZADO -> TripStep.TRIP_COMPLETED
-        else -> actual
-    }
-
-    /** La barra indica en qué etapa está el viaje, no cuánto falta: el servidor no da posición. */
-    private fun progresoDe(paso: TripStep): Float = when (paso) {
-        TripStep.SEARCHING_DRIVER -> 0.15f
-        TripStep.DRIVER_EN_ROUTE -> 0.4f
-        TripStep.TRIP_IN_PROGRESS -> 0.75f
-        TripStep.TRIP_COMPLETED -> 1f
-        else -> 0f
-    }
-
-    private fun conductorDe(viaje: Viaje): DriverProfile? = viaje.conductor?.let {
-        DriverProfile(
-            name = it.nombre,
-            plate = it.placa,
-            vehicleModel = listOfNotNull(it.marca, it.modelo).joinToString(" ").ifBlank { null },
-            phone = it.telefono,
-            verified = it.verificado
-        )
     }
 
     fun makeCall(context: Context, phoneNumber: String) {
@@ -1370,7 +1358,7 @@ class LlegateViewModel(
         val pana = trip.driver
         val texto = buildString {
             append("Viaje de Llégate: ${trip.origin.title} → ${trip.destination.title}. ")
-            append("Tarifa de referencia ${usd(trip.priceEstimate.priceUsd)}, pago ${trip.paymentMethod.title}.")
+            append("Tarifa de referencia ${usd(trip.precioUsd)}, pago ${trip.metodoPagoTexto}.")
             if (pana != null) {
                 append(" Piloto: ${pana.name}")
                 pana.vehicleModel?.let { append(", $it") }
