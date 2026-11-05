@@ -417,10 +417,13 @@ TWILIO_FROM=+1...
 - `npm run whatsapp:otp -- <WABA_ID>` consulta Meta e imprime **solo** el estado de la
   plantilla (`APPROVED`, `PENDING`, `REJECTED` o `CONSULTA_FALLO http=NNN`), filtrado por
   una lista blanca: nunca imprime el token ni el cuerpo de una respuesta de error.
-- El `202` de `POST /auth/otp` significa que **Meta aceptó** el mensaje, no que llegó. La
-  entrega puede fallar después (plantilla sin aprobar, destinatario fuera de la lista de
-  números de prueba, teléfono sin WhatsApp) y hoy no se registra: haría falta el webhook
-  de estados de WhatsApp, que todavía no está implementado.
+- `npm run whatsapp:destinatarios` pide a Meta la lista de números que el **número de
+  prueba** puede recibir (`allowed_whatsapp_numbers`) e imprime número y estado de
+  verificación. Si faltan credenciales dice `SIN_CONFIGURACION falta_token falta_phone_id`.
+- El `202` de `POST /auth/otp` significa que **Meta aceptó** el mensaje, no que llegó. Si
+  Meta lo rechaza, el log queda `[otp] fallo de envío: whatsapp: <código HTTP>: <detalle>`
+  antes del respaldo; la entrega final (leído/recibido) sí exigiría el webhook de estados
+  de WhatsApp, que todavía no está implementado.
 
 El código vence a los 10 minutos, admite 5 intentos y se guarda como HMAC con
 `OTP_SECRET` (o `AUTH_JWT_SECRET` si no se define). Además hay una ventana
