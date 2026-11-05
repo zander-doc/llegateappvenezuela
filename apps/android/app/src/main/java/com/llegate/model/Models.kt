@@ -180,66 +180,6 @@ data class ActiveTrip(
     val progressFraction: Float = 0f
 )
 
-enum class MapDisplayMode(
-    val label: String,
-    val shortLabel: String,
-    val description: String
-) {
-    LIVE_TRAFFIC("Tráfico en Vivo", "Tráfico", "Líneas de congestión en tiempo real"),
-    RADAR_SCAN("Radar de Panas", "Radar", "Barrido 360° de conductores activos"),
-    URBAN_NIGHT("Modo Nocturno", "Noche", "Contraste asfalto y neón de alta visibilidad"),
-    SATELLITE_HYBRID("Satélite GPS", "Satélite", "Telemetría satelital y precisión HDOP")
-}
-
-data class GpsTelemetry(
-    val satellitesCount: Int = 14,
-    val accuracyMeters: Double = 2.4,
-    val speedKmh: Double = 0.0,
-    val bearingDegrees: Float = 48f,
-    val altitudeMeters: Double = 445.0,
-    val signalQuality: String = "Excelente (DGPS Dual-Band)",
-    val isGpsLocked: Boolean = true
-)
-
-data class NearbyVehicle(
-    val id: String,
-    val serviceType: ServiceType,
-    val driverName: String,
-    val vehicleModel: String,
-    val plate: String,
-    val xRatio: Float,
-    val yRatio: Float,
-    val bearingDegrees: Float,
-    val etaMinutes: Int,
-    val isAvailable: Boolean = true
-)
-
-enum class CommunityAlertType(
-    val title: String,
-    val badgeLabel: String,
-    val emoji: String
-) {
-    POLICE_CHECKPOINT("Punto de Control / Alcabala", "Alcabala", "👮"),
-    POTHOLE("Hueco o vía deteriorada", "Hueco", "⚠️"),
-    TRAFFIC_JAM("Cola pesada / Trancón", "Trancón", "🛑"),
-    GAS_STATION("Bomba con Gasolina activa", "Gasolina", "⛽"),
-    HEAVY_RAIN("Lluvia fuerte / Asfalto mojado", "Lluvia", "🌧️")
-}
-
-data class CommunityAlert(
-    val id: String,
-    val type: CommunityAlertType,
-    val title: String,
-    val description: String,
-    val locationName: String,
-    val xRatio: Float,
-    val yRatio: Float,
-    val reportedBy: String,
-    val reportedMinutesAgo: Int,
-    val confirmations: Int,
-    val userConfirmed: Boolean = false
-)
-
 data class LocationSuggestion(
     val id: String,
     val title: String,
@@ -261,11 +201,8 @@ data class SafeMeetingPoint(
     val tag: String,
     val distanceText: String,
     val lat: Double,
-    val lng: Double,
-    val isWellLit: Boolean = true
+    val lng: Double
 )
-
-
 
 /**
  * El mismo cálculo que `estimateTripFare` en la web: tarifa mínima + distancia +

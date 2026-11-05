@@ -55,8 +55,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.llegate.model.CommunityAlert
-import com.llegate.model.CommunityAlertType
 import com.llegate.model.LocationSuggestion
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
@@ -235,22 +233,22 @@ private fun SuggestionCard(
     }
 }
 
+/**
+ * Las alertas de la comunidad todavía no tienen endpoint: la app no inventa alcabalas,
+ * huecos ni trancones, así que la sección se muestra como lo que es, una promesa futura.
+ */
 @Composable
-fun CommunityAlertsSection(
-    uiState: LlegateUiState,
-    viewModel: LlegateViewModel,
-    modifier: Modifier = Modifier
-) {
-    Column(
+fun CommunityAlertsSection(modifier: Modifier = Modifier) {
+    Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 10.dp)
+            .testTag("alertas_comunidad_proximamente"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Asphalt900),
+        border = BorderStroke(1.dp, Asphalt700)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.Security,
@@ -260,322 +258,35 @@ fun CommunityAlertsSection(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "ALERTAS DE LA COMUNIDAD EN VIVO",
+                    text = "ALERTAS DE LA COMUNIDAD",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Black,
                     color = Stone100,
                     letterSpacing = 1.sp
                 )
-            }
-
-            Surface(
-                onClick = { viewModel.showReportModal(true) },
-                shape = RoundedCornerShape(12.dp),
-                color = NeonOrange500.copy(alpha = 0.15f),
-                border = BorderStroke(1.dp, NeonOrange500)
-            ) {
-                Text(
-                    text = "+ Reportar",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = NeonOrange400,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Categories horizontal filter chips
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            item {
-                FilterChipPill(
-                    label = "Todas (${uiState.communityAlerts.size})",
-                    isSelected = uiState.filterAlertCategory == null,
-                    onClick = { viewModel.filterAlertCategory(null) }
-                )
-            }
-            items(CommunityAlertType.values()) { cat ->
-                val count = uiState.communityAlerts.count { it.type == cat }
-                FilterChipPill(
-                    label = "${cat.emoji} ${cat.badgeLabel} ($count)",
-                    isSelected = uiState.filterAlertCategory == cat,
-                    onClick = { viewModel.filterAlertCategory(cat) }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // List of alerts
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            uiState.filteredAlerts.forEach { alert ->
-                CommunityAlertItemRow(
-                    alert = alert,
-                    onInspectOnMap = {
-                        viewModel.selectMapAlert(alert)
-                    },
-                    onConfirm = { viewModel.confirmCommunityAlert(alert.id) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterChipPill(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = if (isSelected) RacingYellow500 else Asphalt900,
-        border = BorderStroke(1.dp, if (isSelected) RacingYellow500 else Asphalt700)
-    ) {
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
-            color = if (isSelected) Asphalt950 else Stone300,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-        )
-    }
-}
-
-@Composable
-private fun CommunityAlertItemRow(
-    alert: CommunityAlert,
-    onInspectOnMap: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onInspectOnMap),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Asphalt900),
-        border = BorderStroke(1.dp, Asphalt800)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Asphalt800),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = alert.type.emoji, fontSize = 20.sp)
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = alert.title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Stone100,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${alert.locationName} • Hace ${alert.reportedMinutesAgo}m por ${alert.reportedBy}",
-                    fontSize = 11.sp,
-                    color = Stone400,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Surface(
-                onClick = onConfirm,
-                shape = RoundedCornerShape(10.dp),
-                color = if (alert.userConfirmed) Emerald500 else Asphalt800,
-                border = BorderStroke(1.dp, if (alert.userConfirmed) Emerald500 else Asphalt700)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ThumbUp,
-                        contentDescription = null,
-                        tint = if (alert.userConfirmed) Asphalt950 else RacingYellow500,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${alert.confirmations}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (alert.userConfirmed) Asphalt950 else Stone100
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CommunityReportDialog(
-    isOpen: Boolean,
-    onDismiss: () -> Unit,
-    onSubmit: (type: CommunityAlertType, note: String, location: String) -> Unit,
-    defaultLocation: String
-) {
-    if (!isOpen) return
-
-    var selectedType by remember { mutableStateOf(CommunityAlertType.POLICE_CHECKPOINT) }
-    var locationInput by remember { mutableStateOf(defaultLocation) }
-    var noteInput by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Asphalt900,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.AddAlert,
-                    contentDescription = null,
-                    tint = NeonOrange500,
-                    modifier = Modifier.size(24.dp)
-                )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Reportar en Vía con Panas",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Stone100
-                )
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Ayuda a los conductores y pasajeros de la zona compartiendo el estado actual de la vía:",
-                    fontSize = 12.sp,
-                    color = Stone400
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Tipo de Incidencia:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Stone300
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Type selector grid / list
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    CommunityAlertType.values().forEach { type ->
-                        val isSelected = selectedType == type
-                        Surface(
-                            onClick = { selectedType = type },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) NeonOrange500.copy(alpha = 0.2f) else Asphalt800,
-                            border = BorderStroke(1.dp, if (isSelected) NeonOrange500 else Asphalt700),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = type.emoji, fontSize = 18.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = type.title,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Stone100 else Stone300,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = NeonOrange400,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = RacingYellow500.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, RacingYellow500)
+                ) {
+                    Text(
+                        text = "Próximamente",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RacingYellow500,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = locationInput,
-                    onValueChange = { locationInput = it },
-                    label = { Text("Lugar / Referencia") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Stone100,
-                        unfocusedTextColor = Stone100,
-                        focusedBorderColor = RacingYellow500,
-                        unfocusedBorderColor = Asphalt700,
-                        focusedContainerColor = Asphalt950,
-                        unfocusedContainerColor = Asphalt950
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = noteInput,
-                    onValueChange = { noteInput = it },
-                    label = { Text("Detalle rápido (opcional)") },
-                    placeholder = { Text("Ej: Sentido Maracay, canal rápido") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Stone100,
-                        unfocusedTextColor = Stone100,
-                        focusedBorderColor = RacingYellow500,
-                        unfocusedBorderColor = Asphalt700,
-                        focusedContainerColor = Asphalt950,
-                        unfocusedContainerColor = Asphalt950
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSubmit(selectedType, noteInput, locationInput)
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = NeonOrange500),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("submit_community_report_button")
-            ) {
-                Text(
-                    text = "¡Publicar para los panas!",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar", color = Stone400)
-            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Aquí verás alcabalas, huecos, trancones y bombas con gasolina reportadas por otros panas. " +
+                    "Llégate todavía no publica reportes desde la app, así que preferimos no mostrar avisos inventados.",
+                fontSize = 12.sp,
+                color = Stone400,
+                lineHeight = 16.sp
+            )
         }
-    )
+    }
 }

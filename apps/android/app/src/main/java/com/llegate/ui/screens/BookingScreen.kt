@@ -572,12 +572,12 @@ fun RequestRideScreen(
                 }
             }
 
-            // 3. LIVE RADAR OF NEARBY DRIVERS BROADCAST BANNER
+            // 3. LO QUE PASA DESPUÉS DE PEDIR EL VIAJE
             item {
                 Surface(
                     color = Asphalt900,
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, Emerald500.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.dp, NeonOrange500.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -588,18 +588,18 @@ fun RequestRideScreen(
                             modifier = Modifier
                                 .size(10.dp)
                                 .clip(CircleShape)
-                                .background(Emerald500)
+                                .background(NeonOrange500)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "🟢 ${uiState.nearbyVehicles.size} Conductores listos para tu solicitud",
+                                text = "El viaje se registra y un piloto de la zona lo acepta",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Stone100
                             )
                             Text(
-                                text = "${uiState.nearbyVehicles.count { it.serviceType == ServiceType.MOTO }} motos y ${uiState.nearbyVehicles.count { it.serviceType == ServiceType.CAR }} taxis en ${uiState.selectedCityName} • Respuesta: < 1 min",
+                                text = "Verás su nombre, su placa y su teléfono en la pantalla del viaje. El radar de panas cercanos es una fase próxima.",
                                 fontSize = 11.sp,
                                 color = Stone400
                             )

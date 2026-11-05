@@ -35,13 +35,18 @@ recarga `en_revision` hasta que un admin la confirma (`network/PagoRepository.kt
 traduce las claves de las RPC a frases y `AuthorizedClient` renueva el token ante un
 401).
 
-Sigue simulado, y no debe publicarse como si fuera real: el radar de pilotos cercanos,
-la telemetría GPS del mapa y las alertas de la comunidad —la API no tiene *discovery*,
-posición en vivo ni reportes—. Si la app se cerró a mitad de un viaje, al abrir sesión
-`GET /trips` devuelve el viaje abierto y la pantalla se reconstruye sola (con la ruta en
-texto, porque la base guarda origen y destino como texto, sin coordenadas). También falta
-la verificación de documentos del piloto y confirmar o retirar la vitrina de
-concesionarios (`automotivePartners`), que lista beneficios aún no firmados.
+Si la app se cerró a mitad de un viaje, al abrir sesión `GET /trips` devuelve el viaje
+abierto y la pantalla se reconstruye sola (con la ruta en texto, porque la base guarda
+origen y destino como texto, sin coordenadas).
+
+Lo que la API aún no tiene ya no se finge en pantalla: se borraron el radar de pilotos
+cercanos, la telemetría GPS (satélites, precisión y rumbo de mentira) y el feed de alertas
+de la comunidad con sus reportes guardados solo en el teléfono; `BookingScreen` dejó de
+contar cuántos panas están cerca y de prometer respuesta en menos de un minuto, y la
+sección de alertas queda rotulada «Próximamente». El mapa (`LeafletDarkMapView`) solo
+dibuja la ruta declarada en el viaje. Siguen pendientes la verificación de documentos del
+piloto y decidir qué hacer con la vitrina de concesionarios (`automotivePartners`), que
+lista beneficios aún no firmados.
 
 ## Requisitos
 

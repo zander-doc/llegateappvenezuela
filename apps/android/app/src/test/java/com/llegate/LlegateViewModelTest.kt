@@ -3,14 +3,13 @@ package com.llegate
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.llegate.data.SessionStore
-import com.llegate.model.CommunityAlertType
 import com.llegate.model.LocationPoint
-import com.llegate.model.MapDisplayMode
 import com.llegate.model.ServiceType
 import com.llegate.network.AuthRepository
 import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -116,55 +115,14 @@ class LlegateViewModelTest {
   }
 
   @Test
-  fun `verify dynamic gps telemetry and map mode switching`() {
+  fun `el mapa solo se expande, sin capas de telemetry ni radar simuladas`() {
     val viewModel = nuevoViewModel()
-    val state = viewModel.uiState.value
 
-    // GPS Telemetry initial checks
-    assertTrue(state.gpsTelemetry.satellitesCount > 10)
-    assertTrue(state.gpsTelemetry.accuracyMeters < 5.0)
-    assertTrue(state.nearbyVehicles.isNotEmpty())
-    assertEquals(MapDisplayMode.LIVE_TRAFFIC, state.mapDisplayMode)
-
-    // Switch map modes
-    viewModel.setMapDisplayMode(MapDisplayMode.RADAR_SCAN)
-    assertEquals(MapDisplayMode.RADAR_SCAN, viewModel.uiState.value.mapDisplayMode)
-
-    viewModel.setMapDisplayMode(MapDisplayMode.URBAN_NIGHT)
-    assertEquals(MapDisplayMode.URBAN_NIGHT, viewModel.uiState.value.mapDisplayMode)
-
-    // Toggle fullscreen map
     viewModel.toggleFullMapExpanded(true)
     assertTrue(viewModel.uiState.value.showFullMapExpanded)
+
     viewModel.toggleFullMapExpanded(false)
-    assertTrue(!viewModel.uiState.value.showFullMapExpanded)
-  }
-
-  @Test
-  fun `verify community alerts reporting and upvoting`() {
-    val viewModel = nuevoViewModel()
-    val state = viewModel.uiState.value
-
-    assertTrue(state.communityAlerts.isNotEmpty())
-    val firstAlert = state.communityAlerts.first()
-    val initialVotes = firstAlert.confirmations
-
-    // Upvote alert
-    viewModel.confirmCommunityAlert(firstAlert.id)
-    val updatedAlert = viewModel.uiState.value.communityAlerts.first { it.id == firstAlert.id }
-    assertEquals(initialVotes + 1, updatedAlert.confirmations)
-    assertTrue(updatedAlert.userConfirmed)
-
-    // Submit new report
-    val initialCount = viewModel.uiState.value.communityAlerts.size
-    viewModel.submitCommunityReport(
-        type = CommunityAlertType.POLICE_CHECKPOINT,
-        note = "Punto de control en Peaje La Cabrera",
-        locationName = "Peaje La Cabrera - ARC"
-    )
-    val afterReportState = viewModel.uiState.value
-    assertEquals(initialCount + 1, afterReportState.communityAlerts.size)
-    assertEquals("Peaje La Cabrera - ARC", afterReportState.communityAlerts.first().locationName)
+    assertFalse(viewModel.uiState.value.showFullMapExpanded)
   }
 
   @Test

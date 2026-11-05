@@ -10,13 +10,8 @@ import androidx.lifecycle.viewModelScope
 import com.llegate.model.ActiveTrip
 import com.llegate.model.AutomotivePartner
 import com.llegate.model.CityInfo
-import com.llegate.model.CommunityAlert
-import com.llegate.model.CommunityAlertType
-import com.llegate.model.GpsTelemetry
 import com.llegate.model.LocationPoint
 import com.llegate.model.LocationSuggestion
-import com.llegate.model.MapDisplayMode
-import com.llegate.model.NearbyVehicle
 import com.llegate.model.PaymentMethod
 import com.llegate.model.PriceEstimate
 import com.llegate.model.SafeMeetingPoint
@@ -376,72 +371,6 @@ data class LlegateUiState(
     val verificandoCodigo: Boolean = false,
     val reenvioEn: Int = 0,
     val statusMessage: String? = null,
-    // MODERN DYNAMIC GPS, TELEMETRY & COMMUNITY
-    val mapDisplayMode: MapDisplayMode = MapDisplayMode.LIVE_TRAFFIC,
-    val gpsTelemetry: GpsTelemetry = GpsTelemetry(),
-    val nearbyVehicles: List<NearbyVehicle> = listOf(
-        NearbyVehicle("moto_1", ServiceType.MOTO, "Pana Carlos", "Bera SBR 150cc Azul", "AB345KL", 0.44f, 0.46f, 32f, 2),
-        NearbyVehicle("moto_2", ServiceType.MOTO, "Pana Yorman", "Keeway Horse 150 Roja", "AF912MN", 0.62f, 0.35f, 115f, 4),
-        NearbyVehicle("moto_3", ServiceType.MOTO, "Pana Wilmer", "Bera Socialista 150 Negra", "AK780XY", 0.30f, 0.65f, 210f, 3),
-        NearbyVehicle("moto_4", ServiceType.MOTO, "Pana Luis", "Haojue Cool 150 Plateada", "AO112RT", 0.74f, 0.72f, 290f, 5),
-        NearbyVehicle("car_1", ServiceType.CAR, "Pana Yorbis", "Toyota Corolla Blanco (Aire)", "AE678ZZ", 0.54f, 0.54f, 85f, 4),
-        NearbyVehicle("car_2", ServiceType.CAR, "Pana Richard", "Chevrolet Aveo Dorado", "AD432TY", 0.24f, 0.40f, 175f, 6),
-        NearbyVehicle("car_3", ServiceType.CAR, "Pana Daniel", "Hyundai Accent Gris", "AB990PQ", 0.80f, 0.48f, 260f, 7)
-    ),
-    val communityAlerts: List<CommunityAlert> = listOf(
-        CommunityAlert(
-            id = "alert_1",
-            type = CommunityAlertType.POLICE_CHECKPOINT,
-            title = "Alcabala Peaje Palo Negro / ARC",
-            description = "Punto de control preventivo activo. Tráfico fluido, documentación en regla.",
-            locationName = "Distribuidor Palo Negro - ARC",
-            xRatio = 0.65f,
-            yRatio = 0.28f,
-            reportedBy = "Pana Yorman (Moto)",
-            reportedMinutesAgo = 4,
-            confirmations = 12,
-            userConfirmed = false
-        ),
-        CommunityAlert(
-            id = "alert_2",
-            type = CommunityAlertType.TRAFFIC_JAM,
-            title = "Cola por Semáforo / Obras",
-            description = "Tráfico pesado en cruce con Av. Fuerzas Aéreas por mantenimiento vial.",
-            locationName = "Av. Bolívar Este con Fuerzas Aéreas",
-            xRatio = 0.38f,
-            yRatio = 0.52f,
-            reportedBy = "Pana Wilmer",
-            reportedMinutesAgo = 8,
-            confirmations = 9,
-            userConfirmed = false
-        ),
-        CommunityAlert(
-            id = "alert_3",
-            type = CommunityAlertType.POTHOLE,
-            title = "Hueco en canal derecho",
-            description = "Hundimiento en asfalto después de la pasarela. Precaución a motos.",
-            locationName = "Av. Constitución cerca del Terminal Central",
-            xRatio = 0.46f,
-            yRatio = 0.70f,
-            reportedBy = "Pana Richard (Taxi)",
-            reportedMinutesAgo = 16,
-            confirmations = 15,
-            userConfirmed = false
-        ),
-        CommunityAlert(
-            id = "alert_4",
-            type = CommunityAlertType.GAS_STATION,
-            title = "Bomba E/S Bermúdez Surtidor Activo",
-            description = "Gasolina subsidiada e internacional surtiendo rápido sin cola kilométrica.",
-            locationName = "E/S Bermúdez con Av. Los Cedros",
-            xRatio = 0.76f,
-            yRatio = 0.58f,
-            reportedBy = "Pana Carlos",
-            reportedMinutesAgo = 11,
-            confirmations = 21,
-            userConfirmed = false
-        )
-    ),
     val locationSuggestions: List<LocationSuggestion> = listOf(
         LocationSuggestion("sug_1", "C.C. Las Américas", "Av. Las Delicias • Zona Comercial y Gastronómica", "Centro Comercial", 3.2, 7, 1.80, 10.2612, -67.5991, "🔥 Top Pana", "aragua", "Maracay"),
         LocationSuggestion("sug_2", "C.C. Parque Aragua", "Av. Bolívar Este • Bancos e Hiper Jumbo", "Centro Comercial", 1.8, 4, 1.40, 10.2458, -67.5855, "📍 Más Cercano", "aragua", "Maracay"),
@@ -454,11 +383,7 @@ data class LlegateUiState(
         LocationSuggestion("sug_9", "Terminal Big Low Center", "San Diego • Salidas nacionales y buses", "Terminal", 5.2, 10, 2.40, 10.2100, -67.9600, "🚌 Terminal", "carabobo", "Valencia"),
         LocationSuggestion("sug_10", "Sambil Chacao", "Av. Libertador • Metro Chacao", "Centro Comercial", 3.0, 8, 2.00, 10.4905, -66.8601, "🔥 Top Capital", "capital", "Chacao")
     ),
-    val selectedMapAlert: CommunityAlert? = null,
-    val selectedVehicle: NearbyVehicle? = null,
-    val showReportDialog: Boolean = false,
     val showFullMapExpanded: Boolean = false,
-    val filterAlertCategory: CommunityAlertType? = null
 ) {
     val currentState: StateRegion
         get() = availableStates.firstOrNull { it.id == selectedStateId } ?: availableStates[0]
@@ -474,9 +399,6 @@ data class LlegateUiState(
     val currentSuggestions: List<LocationSuggestion>
         get() = locationSuggestions.filter { it.stateId.equals(selectedStateId, ignoreCase = true) }
             .ifEmpty { locationSuggestions.filter { it.stateId == "aragua" } }
-
-    val filteredAlerts: List<CommunityAlert>
-        get() = if (filterAlertCategory == null) communityAlerts else communityAlerts.filter { it.type == filterAlertCategory }
 
     val currentSafeMeetingPoints: List<SafeMeetingPoint>
         get() = when (selectedStateId) {
@@ -1381,71 +1303,7 @@ class LlegateViewModel(
         }
     }
 
-    // MODERN DYNAMIC GPS & COMMUNITY ROAD METHODS
-    fun setMapDisplayMode(mode: MapDisplayMode) {
-        _uiState.update { it.copy(mapDisplayMode = mode) }
-    }
-
-    fun selectMapAlert(alert: CommunityAlert?) {
-        _uiState.update { it.copy(selectedMapAlert = alert, selectedVehicle = null) }
-    }
-
-    fun selectVehicle(vehicle: NearbyVehicle?) {
-        _uiState.update { it.copy(selectedVehicle = vehicle, selectedMapAlert = null) }
-    }
-
-    fun confirmCommunityAlert(alertId: String) {
-        _uiState.update { state ->
-            val updated = state.communityAlerts.map { alert ->
-                if (alert.id == alertId) {
-                    val count = if (alert.userConfirmed) alert.confirmations - 1 else alert.confirmations + 1
-                    alert.copy(confirmations = count, userConfirmed = !alert.userConfirmed)
-                } else alert
-            }
-            state.copy(
-                communityAlerts = updated,
-                statusMessage = "¡Gracias pana! Alerta verificada en la vía 🇻🇪"
-            )
-        }
-    }
-
-    fun dismissCommunityAlert(alertId: String) {
-        _uiState.update { state ->
-            state.copy(
-                communityAlerts = state.communityAlerts.filterNot { it.id == alertId },
-                selectedMapAlert = null,
-                statusMessage = "Reportado como vía despejada"
-            )
-        }
-    }
-
-    fun showReportModal(show: Boolean) {
-        _uiState.update { it.copy(showReportDialog = show) }
-    }
-
-    fun submitCommunityReport(type: CommunityAlertType, note: String, locationName: String) {
-        val newAlert = CommunityAlert(
-            id = "alert_${System.currentTimeMillis()}",
-            type = type,
-            title = type.title,
-            description = note.ifBlank { "Reportado recientemente por un pana en la vía." },
-            locationName = locationName.ifBlank { _uiState.value.origin.title },
-            xRatio = 0.50f + ((-8..8).random() / 100f),
-            yRatio = 0.50f + ((-8..8).random() / 100f),
-            reportedBy = "Mi Pana (Tú)",
-            reportedMinutesAgo = 0,
-            confirmations = 1,
-            userConfirmed = true
-        )
-        _uiState.update { state ->
-            state.copy(
-                communityAlerts = listOf(newAlert) + state.communityAlerts,
-                showReportDialog = false,
-                statusMessage = "¡Alerta publicada! Avisando a los panas en la zona 🚦"
-            )
-        }
-    }
-
+    // CONTROLES DEL MAPA
     fun selectSuggestion(suggestion: LocationSuggestion) {
         val dest = LocationPoint(
             title = suggestion.title,
@@ -1469,15 +1327,6 @@ class LlegateViewModel(
     }
 
     fun recenterMapOnUser() {
-        _uiState.update {
-            it.copy(
-                statusMessage = "GPS Centrado en ${it.origin.title} (±${it.gpsTelemetry.accuracyMeters}m)"
-            )
-        }
-    }
-
-    fun filterAlertCategory(category: CommunityAlertType?) {
-        _uiState.update { it.copy(filterAlertCategory = category) }
+        _uiState.update { it.copy(statusMessage = "Mapa centrado en ${it.origin.title}") }
     }
 }
-

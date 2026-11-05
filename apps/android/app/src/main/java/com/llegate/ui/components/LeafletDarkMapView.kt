@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.llegate.model.LocationPoint
-import com.llegate.model.ServiceType
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
@@ -72,8 +71,6 @@ import com.llegate.ui.theme.Stone100
 import com.llegate.ui.theme.Stone400
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.Locale
 
 /**
@@ -100,29 +97,6 @@ fun LeafletDarkMapView(
     LaunchedEffect(origin.lat, origin.lng, destination.lat, destination.lng, isMapLoaded) {
         if (isMapLoaded && webViewInstance != null) {
             val script = "if (window.updateRoute) { window.updateRoute(${origin.lat}, ${origin.lng}, ${destination.lat}, ${destination.lng}, '${origin.title.replace("'", "\\'")}', '${destination.title.replace("'", "\\'")}'); }"
-            webViewInstance?.evaluateJavascript(script, null)
-        }
-    }
-
-    // Update nearby vehicles on the map
-    LaunchedEffect(uiState.nearbyVehicles.size, isMapLoaded) {
-        if (isMapLoaded && webViewInstance != null) {
-            val jsonArray = JSONArray()
-            uiState.nearbyVehicles.forEach { v ->
-                val vLat = origin.lat + (v.yRatio - 0.5) * 0.03
-                val vLng = origin.lng + (v.xRatio - 0.5) * 0.03
-                val obj = JSONObject().apply {
-                    put("id", v.id)
-                    put("type", if (v.serviceType == ServiceType.MOTO) "moto" else "car")
-                    put("lat", vLat)
-                    put("lng", vLng)
-                    put("bearing", v.bearingDegrees)
-                    put("driver", v.driverName)
-                    put("vehicle", v.vehicleModel)
-                }
-                jsonArray.put(obj)
-            }
-            val script = "if (window.updateVehicles) { window.updateVehicles(${jsonArray}); }"
             webViewInstance?.evaluateJavascript(script, null)
         }
     }

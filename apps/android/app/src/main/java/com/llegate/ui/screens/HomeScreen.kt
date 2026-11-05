@@ -96,7 +96,6 @@ import com.llegate.network.EstadoPago
 import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
-import com.llegate.ui.components.CommunityReportDialog
 import com.llegate.ui.components.LeafletDarkMapView
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
@@ -827,13 +826,9 @@ fun HomeScreen(
                 )
             }
 
-            // LIVE COMMUNITY ROAD INCIDENTS SECTION
+            // ALERTAS DE LA COMUNIDAD (AÚN SIN ENDPOINT: SE ANUNCIA, NO SE INVENTA)
             item {
-                CommunityAlertsSection(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    modifier = Modifier.padding(top = 6.dp)
-                )
+                CommunityAlertsSection(modifier = Modifier.padding(top = 6.dp))
             }
 
             // RESUMEN DE LOS VIAJES QUE CONTESTA GET /trips
@@ -1515,15 +1510,6 @@ fun HomeScreen(
         )
     }
 
-    // MODAL: REPORT COMMUNITY ALERT
-    CommunityReportDialog(
-        isOpen = uiState.showReportDialog,
-        onDismiss = { viewModel.showReportModal(false) },
-        onSubmit = { type, note, loc ->
-            viewModel.submitCommunityReport(type, note, loc)
-        },
-        defaultLocation = uiState.origin.title
-    )
 }
 
 /**
