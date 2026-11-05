@@ -38,7 +38,9 @@ import com.llegate.network.MetodoPagoDisponible
 import com.llegate.network.Movimiento
 import com.llegate.network.Pago
 import com.llegate.network.PagoRepository
+import com.llegate.network.TripRepository
 import com.llegate.network.Usuario
+import com.llegate.network.Viaje
 import com.llegate.network.WalletRepository
 import com.llegate.util.aE164Venezuela
 import com.llegate.util.digitos
@@ -390,6 +392,7 @@ data class LlegateUiState(
     val cuenta: Usuario? = null,
     val billetera: Billetera? = null,
     val movimientos: List<Movimiento> = emptyList(),
+    val viajes: List<Viaje> = emptyList(),
     val pagos: List<Pago> = emptyList(),
     val metodosRecarga: List<MetodoPagoDisponible> = emptyList(),
     val cargandoBilletera: Boolean = false,
@@ -542,7 +545,8 @@ class LlegateViewModel(
     private val auth: AuthRepository,
     private val configRepo: ConfigRepository = ConfigRepository(),
     private val walletRepo: WalletRepository = WalletRepository(auth.http),
-    private val pagoRepo: PagoRepository = PagoRepository(auth.http)
+    private val pagoRepo: PagoRepository = PagoRepository(auth.http),
+    private val tripRepo: TripRepository = TripRepository(auth.http)
 ) : ViewModel() {
 
     private val bcvRateService = BcvRateService()
@@ -730,6 +734,21 @@ class LlegateViewModel(
             _uiState.update { it.copy(cargandoBilletera = false) }
             if (!silencioso) avisar(fallo.message ?: FALLA_GENERICO)
         }
+        refrescarViajes()
+    }
+
+    /**
+     * El historial y el viaje abierto salen de `/trips`. Si la llamada falla se queda
+     * con lo que ya tenía: un problema leyendo viajes no puede tapar el saldo.
+     */
+    private suspend fun refrescarViajes() {
+        val viajes = try {
+            tripRepo.listar()
+        } catch (fallo: Exception) {
+            if (fallo is CancellationException) throw fallo
+            return
+        }
+        _uiState.update { it.copy(viajes = viajes) }
     }
 
     /** La hoja de recarga siempre devuelve a la de cuenta: son dos pasos del mismo viaje. */

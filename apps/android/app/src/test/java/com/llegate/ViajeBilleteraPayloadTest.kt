@@ -1,14 +1,17 @@
 package com.llegate
 
 import com.llegate.network.EstadoViaje
+import com.llegate.network.TripRepository
 import com.llegate.network.billeteraFrom
 import com.llegate.network.estadoViajeDe
 import com.llegate.network.movimientoFrom
 import com.llegate.network.viajeFrom
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -50,6 +53,46 @@ class ViajeBilleteraPayloadTest {
     assertEquals("8b1c0000-0000-0000-0000-000000000000", viaje.conductorId)
     assertNull("distancia_km es nullable", viaje.distanciaKm)
     assertEquals("la API a veces serializa numeric como texto", 6.30, viaje.precioUsd, 0.0)
+    assertEquals("04/11/2026", viaje.fechaTexto)
+
+    val conductor = viaje.conductor!!
+    assertEquals("Carlos Conductor", conductor.nombre)
+    assertEquals("+584141111112", conductor.telefono)
+    assertEquals("AB123CD", conductor.placa)
+    assertEquals("Toyota Corolla", "${conductor.marca} ${conductor.modelo}")
+    assertTrue("un piloto aprobado se marca como verificado", conductor.verificado)
+    assertTrue("un viaje en curso sigue abierto", viaje.abierto)
+  }
+
+  @Test
+  fun `un viaje recien pedido no tiene piloto y esta abierto`() {
+    val viaje = viajeFrom(JSONObject(VIAJE_RECIEN).getJSONObject("viaje"))
+
+    assertNull(viaje.conductor)
+    assertTrue(viaje.abierto)
+  }
+
+  @Test
+  fun `un viaje terminado ya no esta abierto`() {
+    val viaje = viajeFrom(JSONObject(VIAJE_FINALIZADO).getJSONObject("viaje"))
+
+    assertEquals(false, viaje.abierto)
+    assertNull("la API no siempre manda el piloto en el detalle", viaje.conductor)
+  }
+
+  @Test
+  fun `el historial se lee en GET trips con la sesion de la app`() = runBlocking {
+    val api = ApiFalsa(respuestas = mapOf("/trips" to JSONObject(LISTA_VIAJES)))
+
+    val viajes = TripRepository(clienteAutorizado(api)).listar()
+
+    assertEquals(listOf("/trips"), api.llamadas.map { it.first })
+    assertEquals("access-de-prueba", api.tokens.first())
+    assertEquals(2, viajes.size)
+    assertEquals(listOf(EstadoViaje.EN_CURSO, EstadoViaje.CANCELADO), viajes.map { it.estado })
+    assertEquals("AB123CD", viajes[0].conductor?.placa)
+    assertNull(viajes[1].conductor)
+    assertEquals(listOf(true, false), viajes.map { it.abierto })
   }
 
   @Test
@@ -184,7 +227,24 @@ class ViajeBilleteraPayloadTest {
       {"ok":true,"viaje":{"id":"7c9d0000-0000-0000-0000-000000000000",
         "conductor_id":"8b1c0000-0000-0000-0000-000000000000","estado":"en_curso",
         "origen":"Oslo","destino":"Calle Páez","distancia_km":null,
-        "precio_usd":"6.30","metodo_pago":"pago_movil","comision_usd":null}}
+        "precio_usd":"6.30","metodo_pago":"pago_movil","comision_usd":null,
+        "created_at":"2026-11-04T09:40:00Z",
+        "conductor":{"nombre":"Carlos Conductor","telefono":"+584141111112","placa":"AB123CD",
+                     "tipo_vehiculo":"carro","marca":"Toyota","modelo":"Corolla",
+                     "verificacion":"aprobado"}}}
+    """
+
+    val LISTA_VIAJES = """
+      {"ok":true,"viajes":[
+        {"id":"7c9d0000-0000-0000-0000-000000000000","estado":"en_curso","origen":"Oslo",
+         "destino":"Calle Páez","precio_usd":6.3,"metodo_pago":"pago_movil",
+         "conductor_id":"8b1c0000-0000-0000-0000-000000000000","created_at":"2026-11-04T09:40:00Z",
+         "conductor":{"nombre":"Carlos Conductor","telefono":"+584141111112","placa":"AB123CD",
+                      "tipo_vehiculo":"carro","marca":"Toyota","modelo":"Corolla","verificacion":"aprobado"}},
+        {"id":"3f2a0000-0000-0000-0000-000000000000","estado":"cancelado","origen":"Chacao",
+         "destino":"Sabana Grande","precio_usd":5,"metodo_pago":"saldo","conductor_id":null,
+         "created_at":"2026-11-03T18:00:00Z","conductor":null}
+      ]}
     """
 
     val BILLETERA_PILOTO = """

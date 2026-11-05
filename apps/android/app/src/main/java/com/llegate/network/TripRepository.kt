@@ -1,5 +1,6 @@
 package com.llegate.network
 
+import com.llegate.util.fechaCorta
 import org.json.JSONObject
 
 /** Estados de `public.estado_viaje`; `DESCONOCIDO` solo si la API manda algo nuevo. */
@@ -15,6 +16,17 @@ enum class EstadoViaje {
 internal fun estadoViajeDe(valor: String?): EstadoViaje =
   EstadoViaje.entries.firstOrNull { it.name == valor?.uppercase() } ?: EstadoViaje.DESCONOCIDO
 
+/** El piloto que tomó el viaje: lo justo para llamarlo y reconocerlo en la calle. */
+data class ConductorAsignado(
+  val nombre: String,
+  val telefono: String?,
+  val placa: String?,
+  val tipoVehiculo: String?,
+  val marca: String?,
+  val modelo: String?,
+  val verificado: Boolean
+)
+
 data class Viaje(
   val id: String,
   val estado: EstadoViaje,
@@ -24,8 +36,29 @@ data class Viaje(
   val precioUsd: Double,
   val metodoPago: String,
   val comisionUsd: Double?,
-  val conductorId: String?
-)
+  val conductorId: String?,
+  val conductor: ConductorAsignado?,
+  val creadoEn: String?
+) {
+  /** Un viaje sigue vivo mientras no termine ni se cancele: es el que la app debe seguir. */
+  val abierto: Boolean
+    get() = estado == EstadoViaje.SOLICITADO || estado == EstadoViaje.ACEPTADO || estado == EstadoViaje.EN_CURSO
+
+  val fechaTexto: String
+    get() = fechaCorta(creadoEn)
+}
+
+internal fun conductorFrom(json: JSONObject?): ConductorAsignado? = json?.let {
+  ConductorAsignado(
+    nombre = it.stringOr("nombre"),
+    telefono = it.stringOrNull("telefono"),
+    placa = it.stringOrNull("placa"),
+    tipoVehiculo = it.stringOrNull("tipo_vehiculo"),
+    marca = it.stringOrNull("marca"),
+    modelo = it.stringOrNull("modelo"),
+    verificado = it.stringOrNull("verificacion") == "aprobado"
+  )
+}
 
 internal fun viajeFrom(json: JSONObject): Viaje = Viaje(
   id = json.stringOr("id"),
@@ -36,7 +69,9 @@ internal fun viajeFrom(json: JSONObject): Viaje = Viaje(
   precioUsd = json.doubleOr("precio_usd"),
   metodoPago = json.stringOr("metodo_pago", "efectivo"),
   comisionUsd = json.doubleOrNull("comision_usd"),
-  conductorId = json.stringOrNull("conductor_id")
+  conductorId = json.stringOrNull("conductor_id"),
+  conductor = conductorFrom(json.optJSONObject("conductor")),
+  creadoEn = json.stringOrNull("created_at")
 )
 
 class TripRepository(private val http: AuthorizedClient) {
@@ -61,6 +96,10 @@ class TripRepository(private val http: AuthorizedClient) {
 
   suspend fun consultar(id: String): Viaje =
     viajeFrom(http.get("/trips/$id").getJSONObject("viaje"))
+
+  /** Mis viajes como pasajero, del más nuevo al más viejo: historial y viaje abierto. */
+  suspend fun listar(): List<Viaje> =
+    http.get("/trips").optJSONArray("viajes").listar(::viajeFrom)
 
   suspend fun cancelar(id: String, motivo: String? = null): EstadoViaje =
     accion("/trips/$id/cancelar", JSONObject().apply { if (!motivo.isNullOrBlank()) put("motivo", motivo) })
