@@ -906,10 +906,11 @@ arriba está `GET /health/db`.
 
 Ajustes pendientes antes de abrirlo al público:
 
-- **Código OTP:** con `OTP_LOG_EN_DESARROLLO=1` el código aparece en los logs
-  del servicio (`[otp] +58...: 123456`). Configura `WHATSAPP_TOKEN` +
-  `WHATSAPP_PHONE_ID` o `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` +
-  `TWILIO_FROM` y borra esa variable para enviar códigos de verdad.
+- **Código OTP:** resuelto. El envío va por WhatsApp y `OTP_LOG_EN_DESARROLLO`
+  está en `"0"` en `render.yaml`, así que el código ya no aparece en los logs.
+  Si Meta fallara, el log deja el motivo (`[otp] fallo de envío: …`) sin
+  registrar el código. Se comprueba con `GET /health/otp`, que responde
+  `canal: "whatsapp"` y `log: { activo: false }`.
 - **Documentos:** `STORAGE_DRIVER=local` no sobrevive a un reinicio en Render.
   Configura `R2_*` y cambia a `r2` para que las fotos de los pilotos no se
   pierdan.

@@ -32,10 +32,11 @@ services:
         value: https://llegate-app-web.onrender.com,https://llegate.app,https://www.llegate.app
       - key: PUBLIC_API_URL
         value: https://llegate-app-api.onrender.com
-      # Mientras no haya WhatsApp o Twilio, el código OTP sale en los logs de
-      # Render. Quitar esta variable cuando esté configurado el envío real.
+      # El OTP ya se entrega por WhatsApp, así que el código no debe quedar en
+      # los logs. Si Meta falla, el log muestra el motivo ("[otp] fallo de
+      # envío") sin registrar el código.
       - key: OTP_LOG_EN_DESARROLLO
-        value: "1"
+        value: "0"
       - key: STORAGE_DRIVER
         value: local
 
