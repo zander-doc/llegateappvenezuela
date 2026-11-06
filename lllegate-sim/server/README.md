@@ -92,6 +92,25 @@ El saldo, el rol y el estado del piloto son los mismos en ambos clientes.
 
 Para un pasajero, `conductor` es `null` y `puede_pedir_viajes` es `true`.
 
+### Editar la cuenta
+
+`PATCH /auth/perfil` (con el `access_token` en `Authorization: Bearer`) acepta
+`nombre`, `estado`, `ciudad` y `whatsapp`, todos opcionales pero nunca vacíos:
+un cuerpo sin campos devuelve `422`. Escribe sobre la propia fila de
+`public.usuarios` (`where id = <uid del token>`) y responde con el mismo
+envoltorio de `GET /auth/me`, así que el cliente solo pinta la respuesta.
+
+No se aceptan `rol`, `saldo_billetera` ni `telefono`: el rol lo define el
+equipo y el teléfono es la identidad de la cuenta. Aunque lleguen en el cuerpo,
+el esquema los descarta antes de tocar la base.
+
+```bash
+curl -X PATCH http://localhost:3000/auth/perfil \
+  -H "Authorization: Bearer $ACCESS" \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Zander","estado":"Miranda","ciudad":"Chacao"}'
+```
+
 ### Los precios que ve la app
 
 `GET /config/app` (público, sin sesión y sin tocar la base) entrega los servicios,
@@ -167,6 +186,7 @@ vuelve a ejecutar `npm run build`.
 | POST | `/auth/refresh` | público | Renueva la sesión con `refresh_token` |
 | POST | `/auth/logout` | autenticado | Cierra la sesión de este dispositivo |
 | GET | `/auth/me` | autenticado | Perfil unificado, estado del piloto, saldo y capacidades |
+| PATCH | `/auth/perfil` | autenticado | Cambia nombre, estado, ciudad y WhatsApp de la propia cuenta |
 | POST | `/drivers/me` | conductor | Registra o reenvía datos del conductor |
 | GET | `/drivers/me` | conductor | Estado de verificación, riesgo y documentos |
 | POST | `/drivers/me/documentos` | conductor | Sube un documento (base64), calcula hash y OCR |

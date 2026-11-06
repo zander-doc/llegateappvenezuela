@@ -9,10 +9,10 @@ import {
 } from "../auth/cuentas.js";
 import { generarCodigo, hashCodigo } from "../auth/tokens.js";
 import { config } from "../config.js";
-import { fila } from "../db.js";
+import { fila, filas } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
-import { otpRequestSchema, otpVerifySchema, refreshTokenSchema } from "../schemas.js";
+import { otpRequestSchema, otpVerifySchema, perfilPatchSchema, refreshTokenSchema } from "../schemas.js";
 import { canalOtp, enviarCodigoOtp } from "../security/otp-delivery.js";
 import { hitRateLimit, resetRateLimit } from "../security/rateLimit.js";
 
@@ -92,6 +92,43 @@ const PERFIL_COLUMNS = [
   "puede_pedir_viajes",
   "puede_conducir",
 ].join(", ");
+
+// GET /me y PATCH /auth/perfil responden con el mismo envoltorio, así que el
+// cliente no tiene dos caminos para leer la cuenta.
+async function leerPerfil(usuarioId) {
+  const perfil = await fila(`select ${PERFIL_COLUMNS} from public.perfil_usuario where id = $1`, [usuarioId]);
+
+  if (!perfil) throw new HttpError(404, "perfil_no_encontrado", "El perfil aún no está creado");
+
+  const {
+    es_conductor,
+    tipo_vehiculo,
+    placa,
+    verificacion,
+    estado_conductor,
+    motivo_rechazo,
+    verificado_en,
+    puede_pedir_viajes,
+    puede_conducir,
+    ...usuario
+  } = perfil;
+
+  return {
+    ok: true,
+    usuario,
+    conductor: es_conductor
+      ? {
+          tipo_vehiculo,
+          placa,
+          verificacion,
+          estado: estado_conductor,
+          motivo_rechazo,
+          verificado_en,
+        }
+      : null,
+    capacidades: { puede_pedir_viajes, puede_conducir },
+  };
+}
 
 authRouter.post(
   "/otp",
@@ -186,40 +223,33 @@ authRouter.get(
   "/me",
   requireUser,
   asyncHandler(async (req, res) => {
-    const perfil = await fila(
-      `select ${PERFIL_COLUMNS} from public.perfil_usuario where id = $1`,
-      [req.user.id],
+    res.json(await leerPerfil(req.user.id));
+  }),
+);
+
+authRouter.patch(
+  "/perfil",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const cambios = parse(perfilPatchSchema, req.body);
+
+    await filas(
+      `update public.usuarios
+          set nombre = coalesce($2, nombre),
+              estado = coalesce($3, estado),
+              ciudad = coalesce($4, ciudad),
+              whatsapp = coalesce($5, whatsapp),
+              updated_at = now()
+        where id = $1`,
+      [
+        req.user.id,
+        cambios.nombre ?? null,
+        cambios.estado ?? null,
+        cambios.ciudad ?? null,
+        cambios.whatsapp ?? null,
+      ],
     );
 
-    if (!perfil) throw new HttpError(404, "perfil_no_encontrado", "El perfil aún no está creado");
-
-    const {
-      es_conductor,
-      tipo_vehiculo,
-      placa,
-      verificacion,
-      estado_conductor,
-      motivo_rechazo,
-      verificado_en,
-      puede_pedir_viajes,
-      puede_conducir,
-      ...usuario
-    } = perfil;
-
-    res.json({
-      ok: true,
-      usuario,
-      conductor: es_conductor
-        ? {
-            tipo_vehiculo,
-            placa,
-            verificacion,
-            estado: estado_conductor,
-            motivo_rechazo,
-            verificado_en,
-          }
-        : null,
-      capacidades: { puede_pedir_viajes, puede_conducir },
-    });
+    res.json(await leerPerfil(req.user.id));
   }),
 );

@@ -25,6 +25,8 @@ export interface Perfil {
   telefonoVerificado: boolean;
   email: string | null;
   whatsapp: string | null;
+  estado: string | null;
+  ciudad: string | null;
   saldoBilletera: number;
 }
 
@@ -139,6 +141,8 @@ interface MeResponse {
     telefono_verificado: boolean;
     email: string | null;
     whatsapp: string | null;
+    estado: string | null;
+    ciudad: string | null;
     saldo_billetera: number | string;
   };
   conductor: {
@@ -153,7 +157,7 @@ interface MeResponse {
 }
 
 interface RequestOptions {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH";
   body?: unknown;
   token?: string;
 }
@@ -322,6 +326,8 @@ function mapCuenta(data: MeResponse): Cuenta {
       telefonoVerificado: Boolean(usuario.telefono_verificado),
       email: usuario.email,
       whatsapp: usuario.whatsapp,
+      estado: usuario.estado ?? null,
+      ciudad: usuario.ciudad ?? null,
       saldoBilletera: Number(usuario.saldo_billetera ?? 0),
     },
     conductor: data.conductor
@@ -345,6 +351,29 @@ export async function getCuenta(): Promise<Cuenta> {
   const token = await accessToken();
   try {
     const data = await request<MeResponse>("/auth/me", { token });
+    return mapCuenta(data);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) clearSession();
+    throw error;
+  }
+}
+
+export async function updatePerfil(input: {
+  nombre?: string;
+  estado?: string;
+  ciudad?: string;
+  whatsapp?: string;
+}): Promise<Cuenta> {
+  const token = await accessToken();
+  const body = Object.fromEntries(
+    Object.entries(input).filter(([, valor]) => typeof valor === "string" && valor.trim().length > 0),
+  );
+  if (Object.keys(body).length === 0) {
+    throw new ApiError("sin_cambios", 422, "No hay ningún dato nuevo que guardar.");
+  }
+
+  try {
+    const data = await request<MeResponse>("/auth/perfil", { method: "PATCH", token, body });
     return mapCuenta(data);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) clearSession();

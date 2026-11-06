@@ -44,6 +44,8 @@ const ADMIN: api.Cuenta = {
     telefonoVerificado: true,
     email: null,
     whatsapp: null,
+    estado: "Miranda",
+    ciudad: "Chacao",
     saldoBilletera: 0,
   },
   conductor: null,

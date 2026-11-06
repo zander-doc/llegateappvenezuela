@@ -45,6 +45,8 @@ const CUENTA: api.Cuenta = {
     telefonoVerificado: true,
     email: null,
     whatsapp: null,
+    estado: "Carabobo",
+    ciudad: "Valencia",
     saldoBilletera: 2,
   },
   conductor: null,

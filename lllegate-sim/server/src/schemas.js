@@ -46,6 +46,20 @@ export const refreshTokenSchema = z.object({
     .max(4096, "Refresh token inválido"),
 });
 
+// PATCH /auth/perfil: solo campos que la persona puede editar de su propia
+// cuenta. El rol, el saldo y el teléfono verificado no se aceptan aquí.
+export const perfilPatchSchema = z
+  .object({
+    nombre: z.string().trim().min(2, "El nombre necesita al menos 2 letras").max(120).optional(),
+    estado: z.string().trim().min(2, "Elige tu estado").max(60).optional(),
+    ciudad: z.string().trim().min(2, "Elige tu ciudad").max(120).optional(),
+    whatsapp: telefono.optional(),
+  })
+  .refine((cambios) => Object.values(cambios).some((valor) => valor !== undefined), {
+    message: "Envía al menos un dato para cambiar",
+    path: ["perfil"],
+  });
+
 export const driverDetailsSchema = z.object({
   cedula: z
     .string()

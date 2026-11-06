@@ -26,6 +26,7 @@ vi.mock("../lib/api", () => {
     getCuenta: vi.fn(),
     requestOtp: vi.fn(),
     verifyOtp: vi.fn(),
+    updatePerfil: vi.fn(),
     logout: vi.fn(),
     getWallet: vi.fn(),
     getPaymentMethods: vi.fn(),
@@ -47,6 +48,8 @@ const CUENTA: api.Cuenta = {
     telefonoVerificado: true,
     email: null,
     whatsapp: "+584141234567",
+    estado: "Aragua",
+    ciudad: "Maracay",
     saldoBilletera: 9.9,
   },
   conductor: null,
@@ -85,6 +88,7 @@ beforeEach(() => {
   vi.mocked(api.getCuenta).mockResolvedValue(CUENTA);
   vi.mocked(api.requestOtp).mockResolvedValue("Código enviado por WhatsApp");
   vi.mocked(api.verifyOtp).mockResolvedValue(CUENTA);
+  vi.mocked(api.updatePerfil).mockResolvedValue(CUENTA);
   vi.mocked(api.logout).mockResolvedValue();
   vi.mocked(api.getWallet).mockResolvedValue(BILLETERA);
   vi.mocked(api.getPaymentMethods).mockResolvedValue([
@@ -208,5 +212,43 @@ describe("RealAuth", () => {
 
     expect(await screen.findByRole("heading", { name: "Entra con tu teléfono." })).toBeInTheDocument();
     expect(api.logout).toHaveBeenCalled();
+  });
+
+  it("deja editar el nombre y la ciudad desde la cuenta", async () => {
+    vi.mocked(api.loadSession).mockReturnValue({ access_token: "a", refresh_token: "r", expires_at: 1 });
+    vi.mocked(api.updatePerfil).mockResolvedValue({
+      ...CUENTA,
+      usuario: { ...CUENTA.usuario, nombre: "Zander", estado: "Miranda", ciudad: "Chacao" },
+    });
+    renderAuth();
+    await screen.findByRole("heading", { name: "Listo, María." });
+
+    fireEvent.click(screen.getByRole("button", { name: /editar mi nombre/i }));
+
+    const nombre = await screen.findByLabelText("Nombre");
+    expect(nombre).toHaveValue("María Rodríguez");
+    expect(screen.getByLabelText("Estado") as HTMLSelectElement).toHaveValue("Aragua");
+    expect(screen.getByLabelText("Ciudad") as HTMLSelectElement).toHaveValue("Maracay");
+
+    fireEvent.change(nombre, { target: { value: "Zander" } });
+    fireEvent.change(screen.getByLabelText("Estado"), { target: { value: "Miranda" } });
+    fireEvent.click(screen.getByRole("button", { name: /guardar cambios/i }));
+
+    expect(await screen.findByRole("heading", { name: "Listo, Zander." })).toBeInTheDocument();
+    expect(api.updatePerfil).toHaveBeenCalledWith({ nombre: "Zander", estado: "Miranda", ciudad: "Chacao" });
+    expect(screen.getByText("Chacao, Miranda")).toBeInTheDocument();
+  });
+
+  it("avisa si el nombre nuevo no sirve", async () => {
+    vi.mocked(api.loadSession).mockReturnValue({ access_token: "a", refresh_token: "r", expires_at: 1 });
+    renderAuth();
+    await screen.findByRole("heading", { name: "Listo, María." });
+
+    fireEvent.click(screen.getByRole("button", { name: /editar mi nombre/i }));
+    fireEvent.change(await screen.findByLabelText("Nombre"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: /guardar cambios/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("al menos 3 letras");
+    expect(api.updatePerfil).not.toHaveBeenCalled();
   });
 });

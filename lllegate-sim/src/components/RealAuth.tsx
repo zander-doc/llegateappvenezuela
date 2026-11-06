@@ -8,6 +8,7 @@ import {
   LogOut,
   MapPin,
   MessageSquareText,
+  Pencil,
   Phone,
   ShieldCheck,
   Smartphone,
@@ -26,6 +27,7 @@ import {
   logout,
   maskPhone,
   requestOtp,
+  updatePerfil,
   verifyOtp,
   type Cuenta,
   type Rol,
@@ -80,6 +82,13 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
   const [revisando, setRevisando] = useState(() => loadSession() !== null);
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  const [editando, setEditando] = useState(false);
+  const [formNombre, setFormNombre] = useState("");
+  const [formEstado, setFormEstado] = useState(ESTADOS[0].name);
+  const [formCiudad, setFormCiudad] = useState(ESTADOS[0].cities[0]);
+  const [guardando, setGuardando] = useState(false);
+  const [errorPerfil, setErrorPerfil] = useState("");
+  const [avisoPerfil, setAvisoPerfil] = useState("");
 
   const telefonoId = useId();
   const nombreId = useId();
@@ -87,6 +96,9 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
   const ciudadId = useId();
   const consentId = useId();
   const codigoId = useId();
+  const editarNombreId = useId();
+  const editarEstadoId = useId();
+  const editarCiudadId = useId();
 
   const e164 = toVenezuelanE164(telefono);
 
@@ -217,6 +229,9 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
     setConsent(false);
     setAviso("");
     setError("");
+    setEditando(false);
+    setAvisoPerfil("");
+    setErrorPerfil("");
     setCargando(false);
   }
 
@@ -225,6 +240,52 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
       setCuenta(await getCuenta());
     } catch {
       // Si la sesión venció, el propio cliente de la API la limpia.
+    }
+  }
+
+  function abrirEdicion() {
+    if (!cuenta) return;
+    const guardado = ESTADOS.find((item) => item.name === cuenta.usuario.estado) ?? ESTADOS[0];
+    const ciudadGuardada = cuenta.usuario.ciudad;
+    setFormNombre(cuenta.usuario.nombre);
+    setFormEstado(guardado.name);
+    setFormCiudad(
+      ciudadGuardada && guardado.cities.includes(ciudadGuardada) ? ciudadGuardada : guardado.cities[0],
+    );
+    setErrorPerfil("");
+    setAvisoPerfil("");
+    setEditando(true);
+  }
+
+  async function guardarPerfil(event: FormEvent) {
+    event.preventDefault();
+    setErrorPerfil("");
+
+    if (!isPersonName(formNombre)) {
+      setErrorPerfil("Escribe un nombre de al menos 3 letras, sin números.");
+      return;
+    }
+    if (!formEstado || !formCiudad) {
+      setErrorPerfil("Elige tu estado y tu ciudad.");
+      return;
+    }
+
+    setGuardando(true);
+    try {
+      const actual = await updatePerfil({
+        nombre: formNombre.trim(),
+        estado: formEstado,
+        ciudad: formCiudad,
+      });
+      setCuenta(actual);
+      setEditando(false);
+      setAvisoPerfil("Listo: tu nombre y tu ciudad quedaron guardados en la cuenta real.");
+    } catch (fallo) {
+      setErrorPerfil(
+        fallo instanceof ApiError ? fallo.message : "No pudimos guardar tus datos. Intenta de nuevo.",
+      );
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -276,6 +337,13 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
             <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500">Saldo</dt>
             <dd className="mt-1 text-[13px] text-ink-200">{formatUSD(usuario.saldoBilletera)}</dd>
           </div>
+          <div className="rounded-xl border border-asphalt-800 bg-asphalt-950/70 p-3 sm:col-span-2">
+            <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500">Ubicación</dt>
+            <dd className="mt-1 flex items-center gap-1.5 text-[13px] text-ink-200">
+              <MapPin className="h-3.5 w-3.5 text-brand-400" aria-hidden="true" />
+              {usuario.ciudad || usuario.estado ? `${usuario.ciudad ?? ""}, ${usuario.estado ?? ""}` : "Sin indicar"}
+            </dd>
+          </div>
         </dl>
 
         <p className="mx-auto mt-3 max-w-md text-left text-[11.5px] leading-relaxed text-ink-500">
@@ -285,6 +353,129 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
               ? `Tu registro de piloto está ${conductor.verificacion ?? "pendiente"} de verificación.`
               : "Como pasajero puedes pedir mototaxi, taxi pana y delivery desde la app."}
         </p>
+
+        {editando ? (
+          <form
+            className="mx-auto mt-5 max-w-md text-left"
+            onSubmit={guardarPerfil}
+            noValidate
+            aria-label="Editar mis datos"
+          >
+            <div className="rounded-2xl border border-asphalt-800 bg-asphalt-950/70 p-4">
+              <label htmlFor={editarNombreId} className="label">
+                Nombre
+              </label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                <input
+                  id={editarNombreId}
+                  name="nombre"
+                  autoComplete="name"
+                  maxLength={120}
+                  value={formNombre}
+                  onChange={(event) => setFormNombre(event.target.value)}
+                  className="field pl-10"
+                  placeholder="Cómo te llamamos"
+                />
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor={editarEstadoId} className="label">
+                    Estado
+                  </label>
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                    <select
+                      id={editarEstadoId}
+                      name="estado"
+                      value={formEstado}
+                      onChange={(event) => {
+                        const elegido = event.target.value;
+                        setFormEstado(elegido);
+                        setFormCiudad(ESTADOS.find((item) => item.name === elegido)?.cities[0] ?? "");
+                      }}
+                      className="field appearance-none pl-10 pr-10"
+                    >
+                      {ESTADOS.map((item) => (
+                        <option key={item.name} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor={editarCiudadId} className="label">
+                    Ciudad
+                  </label>
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                    <select
+                      id={editarCiudadId}
+                      name="ciudad"
+                      value={formCiudad}
+                      onChange={(event) => setFormCiudad(event.target.value)}
+                      className="field appearance-none pl-10 pr-10"
+                    >
+                      {(ESTADOS.find((item) => item.name === formEstado)?.cities ?? []).map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                  </div>
+                </div>
+              </div>
+
+              <p className="mt-3 text-[11.5px] leading-relaxed text-ink-500">
+                El teléfono y el rol no se editan aquí: el teléfono es tu identidad y el rol lo define el equipo de
+                Llégate.
+              </p>
+
+              {errorPerfil && (
+                <p
+                  role="alert"
+                  className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-[12.5px] leading-relaxed text-red-300"
+                >
+                  {errorPerfil}
+                </p>
+              )}
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <Button type="submit" disabled={guardando} aria-busy={guardando}>
+                  {guardando ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Guardando…
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" /> Guardar cambios
+                    </>
+                  )}
+                </Button>
+                <Button variant="secondary" onClick={() => setEditando(false)} disabled={guardando}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </form>
+        ) : (
+          <div className="mx-auto mt-4 max-w-md text-center">
+            <button
+              type="button"
+              onClick={abrirEdicion}
+              className="inline-flex min-h-[40px] items-center gap-1.5 text-[12.5px] font-semibold text-brand-400 transition hover:text-brand-300"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Editar mi nombre y mi ciudad
+            </button>
+            {avisoPerfil && (
+              <p className="mt-1 text-[12px] leading-relaxed text-emerald-300">{avisoPerfil}</p>
+            )}
+          </div>
+        )}
 
         <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
           <Button to="/app">

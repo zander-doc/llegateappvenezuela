@@ -262,6 +262,51 @@ test("el registro guarda el estado y la ciudad del pasajero", async () => {
   assert.equal(perfil.cuerpo.usuario.ciudad, "Maracaibo");
 });
 
+test("PATCH /auth/perfil edita nombre y ubicación sin exponer rol ni saldo", async () => {
+  const telefono = "+584147777778";
+  const tokens = await entrar(telefono, { nombre: "Luis Pineda", estado: "Zulia", ciudad: "Maracaibo" });
+  const acceso = tokens.access_token;
+
+  const sinSesion = await pedir("PATCH", "/auth/perfil", { cuerpo: { nombre: "Otra Persona" } });
+  assert.equal(sinSesion.status, 401);
+
+  const vacio = await pedir("PATCH", "/auth/perfil", { token: acceso, cuerpo: {} });
+  assert.equal(vacio.status, 422, JSON.stringify(vacio.cuerpo));
+
+  const corto = await pedir("PATCH", "/auth/perfil", { token: acceso, cuerpo: { nombre: "L" } });
+  assert.equal(corto.status, 422);
+
+  const malo = await pedir("PATCH", "/auth/perfil", { token: acceso, cuerpo: { whatsapp: "0412 1234567" } });
+  assert.equal(malo.status, 422);
+
+  // rol y saldo no están en el esquema: se descartan antes de llegar a la base.
+  const contrabando = await pedir("PATCH", "/auth/perfil", {
+    token: acceso,
+    cuerpo: { nombre: "Luis A. Pineda", rol: "admin", saldo_billetera: 999 },
+  });
+  assert.equal(contrabando.status, 200, JSON.stringify(contrabando.cuerpo));
+  assert.equal(contrabando.cuerpo.usuario.nombre, "Luis A. Pineda");
+  assert.equal(contrabando.cuerpo.usuario.rol, "cliente");
+
+  const ubicacion = await pedir("PATCH", "/auth/perfil", {
+    token: acceso,
+    cuerpo: { estado: "Miranda", ciudad: "Chacao", whatsapp: "+584121234567" },
+  });
+  assert.equal(ubicacion.status, 200, JSON.stringify(ubicacion.cuerpo));
+  assert.equal(ubicacion.cuerpo.usuario.estado, "Miranda");
+  assert.equal(ubicacion.cuerpo.usuario.ciudad, "Chacao");
+  assert.equal(ubicacion.cuerpo.usuario.whatsapp, "+584121234567");
+
+  const guardado = await sql(
+    "select nombre, rol, saldo_billetera, estado, ciudad, whatsapp from public.usuarios where id = $1",
+    [contrabando.cuerpo.usuario.id],
+  );
+  assert.equal(guardado[0].nombre, "Luis A. Pineda");
+  assert.equal(guardado[0].rol, "cliente");
+  assert.equal(Number(guardado[0].saldo_billetera), 0);
+  assert.equal(guardado[0].ciudad, "Chacao");
+});
+
 test("refresh rota el token y logout revoca solo esa sesión", async () => {
   const sinToken = await pedir("GET", "/auth/me");
   assert.equal(sinToken.status, 401);
