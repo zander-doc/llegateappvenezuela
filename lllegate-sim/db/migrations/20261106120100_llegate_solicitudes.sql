@@ -11,19 +11,8 @@
 --
 -- El formulario es público, así que la tabla solo acepta `insert` desde `anon`
 -- con estado `nueva`: quien envía no puede leer ni editar lo que otros
--- enviaron. Ver y clasificar es solo del rol admin.
-
-create type public.tipo_solicitud as enum (
-  'contacto',
-  'empresa',
-  'aliado',
-  'lanzamiento',
-  'conductor',
-  'cobertura',
-  'plan'
-);
-
-create type public.estado_solicitud as enum ('nueva', 'en_curso', 'respondida', 'archivada');
+-- enviaron. Ver y clasificar es solo del rol admin. Los tipos viven en la
+-- migración anterior (`...120000_llegate_solicitudes_tipos.sql`).
 
 -- ---------------------------------------------------------------------------
 -- Bandeja de solicitudes

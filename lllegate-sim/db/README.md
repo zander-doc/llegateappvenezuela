@@ -21,7 +21,8 @@ esta aplicación.
 | `20261030150000_llegate_identidad_unificada.sql` | Vista `perfil_usuario` compartida por web y app; sincroniza WhatsApp al confirmar el teléfono |
 | `20261031120000_llegate_pagos.sql` | Intenciones de recarga (`pagos`), confirmación con clave de servidor y acreditación idempotente |
 | `20261031160000_llegate_verificacion_antifraude.sql` | Documentos con hash único, OCR, puntaje de riesgo explicable, eventos de seguridad y RPC de envío de verificación |
-| `20261106120000_llegate_solicitudes.sql` | Bandeja de los formularios públicos (`solicitudes`), sus tipos/estados, fecha de gestión y RLS de solo-lectura para administración |
+| `20261106120000_llegate_solicitudes_tipos.sql` | Tipos `tipo_solicitud` y `estado_solicitud` de la bandeja |
+| `20261106120100_llegate_solicitudes.sql` | Tabla `solicitudes`, fecha de gestión, índices, RLS y grants |
 
 Se aplican **en orden**. La forma recomendada es el aplicador del API, que no
 necesita `psql` (lee `DATABASE_URL` de `server/.env`):
@@ -47,9 +48,12 @@ O pega cada archivo en el SQL Editor de Neon, en orden por nombre. La primera
 migración crea los roles del clúster; es idempotente, así que puede correrse en
 un proyecto donde ya existan.
 
-Las migraciones que crean tipos (`...130000` y `...140000`) están separadas de
-las que los usan (`...130100` y `...140100`) a propósito: PostgreSQL no permite
-usar un valor de enum nuevo en la misma transacción que lo crea. No las fusiones.
+Las migraciones que crean tipos (`...130000`, `...140000` y
+`...120000_llegate_solicitudes_tipos`) están separadas de las que los usan
+(`...130100`, `...140100` y `...120100_llegate_solicitudes`) a propósito:
+PostgreSQL no permite usar un valor de enum nuevo en la misma transacción que lo
+crea, y `server/scripts/migrate.mjs` envuelve **cada archivo** en una transacción.
+No las fusiones.
 
 ## Requisitos del proyecto
 
