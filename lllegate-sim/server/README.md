@@ -173,6 +173,50 @@ CORS_ORIGIN=http://localhost:5174,http://localhost:5173
 Vite inyecta `VITE_API_URL` al compilar: si cambias la URL o publicas la web,
 vuelve a ejecutar `npm run build`.
 
+### Los formularios de la web (bandeja de solicitudes)
+
+Los formularios que no necesitan cuenta —`/ayuda`, `/empresas`,
+`/nosotros/aliados`, `/cobertura`, `/pasajeros/club-vip`, el wizard de
+conductores y la lista de espera de la app— entran por
+`POST /solicitudes` a la tabla `public.solicitudes`.
+
+- `tipo` es uno de `contacto`, `empresa`, `aliado`, `lanzamiento`, `conductor`,
+  `cobertura`, `plan`. El contexto del formulario (tema, organización,
+  plataforma, servicio, plan) viaja en `datos`, un objeto de valores cortos.
+- `contacto` se exige como correo o teléfono E.164. La web normaliza
+  `0414 1234567` a `+584141234567` antes de enviarlo
+  (`contactoParaSolicitud` en `src/lib/validation.ts`).
+- No hay sesión de por medio: el visitante deja su contacto justo para que le
+  respondamos. Por eso el endpoint está limitado por conexión
+  (`SOLICITUDES_MAX_POR_IP`) y por contacto repetido
+  (`SOLICITUDES_MAX_POR_CONTACTO`) dentro de `SOLICITUDES_VENTANA_MINUTOS`; al
+  pasarse responde `429` con `Retry-After`.
+- RLS: `anon` y `authenticated` solo pueden insertar. La lectura y la clasificación
+  las hace `service_role` a través de `/admin/solicitudes`, así que un visitante
+  no puede leer la bandeja de otra persona.
+- Gestionar una solicitud deja `atendida_en` con la fecha; volverla a `nueva` la
+  borra, porque la restricción `solicitud_gestion_con_fecha` exige fecha a todo
+  estado gestionado.
+
+```bash
+# Un visitante deja su datos de contacto
+curl -X POST http://localhost:3000/solicitudes \
+  -H "Content-Type: application/json" \
+  -d '{"tipo":"cobertura","contacto":"+584141234567","ciudad":"Barquisimeto"}'
+
+# Operaciones abre la bandeja y clasifica
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:3000/admin/solicitudes?estado=nueva"
+curl -X POST "http://localhost:3000/admin/solicitudes/$SOLICITUD_ID/estado" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"estado":"respondida","nota":"Aviso enviado por WhatsApp"}'
+```
+
+Sin `VITE_API_URL` la web no tiene a dónde enviar: esos mismos formularios
+siguen guardando en `localStorage` (`llegate_sim_<tipo>`) y avisan de que el
+dato no salió del navegador. El único punto que decide es
+`src/lib/leads.ts: guardarSolicitud`.
+
 ## Endpoints
 
 | Método | Ruta | Quién | Descripción |
@@ -204,6 +248,7 @@ vuelve a ejecutar `npm run build`.
 | POST | `/payments/:id/cancel` | autenticado | Cancela una intención pendiente |
 | POST | `/webhooks/binance-pay` | Binance | Confirma el pago con la firma RSA del webhook |
 | GET | `/files/:token` | público firmado | Descarga un documento con el enlace temporal que genera la API |
+| POST | `/solicitudes` | público | Registra un formulario de la web (`tipo`, `contacto`, nombre, ciudad, mensaje, datos) |
 | POST | `/trips` | cliente | Crea una solicitud de viaje |
 | GET | `/trips` | cliente | Sus viajes, del más nuevo al más viejo (historial y viaje abierto de la app) |
 | GET | `/trips/:id` | participante | Detalle del viaje, con el piloto asignado |
@@ -221,6 +266,8 @@ vuelve a ejecutar `npm run build`.
 | GET | `/admin/conductores?verificacion=pendiente` | admin | Conductores por verificar, ordenados por riesgo |
 | GET | `/admin/conductores/:usuarioId` | admin | Detalle: perfil, documentos firmados, OCR y auditoría |
 | POST | `/admin/conductores/:usuarioId/verificar` | admin | Aprueba o rechaza documentos |
+| GET | `/admin/solicitudes?estado=nueva&tipo=contacto` | admin | Bandeja de formularios (los dos filtros son opcionales) |
+| POST | `/admin/solicitudes/:id/estado` | admin | Clasifica (`nueva`, `en_curso`, `respondida`, `archivada`) y deja nota |
 
 ## Ejemplos
 

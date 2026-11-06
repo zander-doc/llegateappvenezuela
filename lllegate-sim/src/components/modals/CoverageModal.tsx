@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowRight, MapPin } from "lucide-react";
+import { ArrowRight, Loader2, MapPin } from "lucide-react";
 import { Modal } from "../Modal";
-import { Button } from "../ui";
-import { FormSuccess, TextField } from "./shared";
-import { saveDemoLead } from "../../lib/demoStorage";
+import { Button, DemoNote } from "../ui";
+import { FieldError, FormSuccess, TextField } from "./shared";
+import { guardarSolicitud, type DestinoSolicitud } from "../../lib/leads";
+import { realAuthEnabled, solicitudErrorMessage } from "../../lib/api";
 import { isContact } from "../../lib/validation";
 import { useUI } from "../../lib/ui";
 import { COVERAGE_LABEL, HUBS } from "../../data/site";
@@ -18,12 +19,16 @@ export function CoverageModal({ city = "", onClose }: { city?: string; onClose: 
   const [town, setTown] = useState(city);
   const [contact, setContact] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [destino, setDestino] = useState<DestinoSolicitud>("real");
 
   const hub = HUBS.find((h) => h.city.toLowerCase() === town.trim().toLowerCase());
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (enviando) return;
     const next: FieldErrors = {};
     if (!town.trim()) {
       next.town = "Indica tu ciudad o municipio.";
@@ -44,22 +49,51 @@ export function CoverageModal({ city = "", onClose }: { city?: string; onClose: 
       return;
     }
 
-    saveDemoLead("llegate_sim_coverage", { city: town.trim(), contact });
-    setDone(true);
-    notify("Solicitud de cobertura guardada (demo).");
+    setEnviando(true);
+    setError("");
+    try {
+      const donde = await guardarSolicitud(
+        { tipo: "cobertura", contacto: contact, ciudad: town.trim() },
+        { city: town.trim(), contact },
+      );
+      setDestino(donde);
+      setDone(true);
+      notify(
+        donde === "real"
+          ? `Anotamos ${town.trim()} en la bandeja de cobertura.`
+          : "Solicitud de cobertura guardada (demo).",
+      );
+    } catch (fallo) {
+      setError(solicitudErrorMessage(fallo));
+    } finally {
+      setEnviando(false);
+    }
   }
 
   if (done) {
     return (
-      <Modal onClose={onClose} title="Solicitud guardada" eyebrow="Cobertura" size="sm">
+      <Modal
+        onClose={onClose}
+        title={destino === "real" ? "Solicitud recibida" : "Guardado en este navegador"}
+        eyebrow="Cobertura"
+        size="sm"
+      >
         <FormSuccess
           title={`Anotamos ${town}`}
           text={
-            <>
-              En producción te avisaríamos por el correo o teléfono que dejaste cuando abramos operaciones en tu zona.
-              Aquí solo queda anotado en este navegador; puedes revisar las ciudades de lanzamiento y piloto en la
-              página de cobertura.
-            </>
+            destino === "real" ? (
+              <>
+                Ya está en la bandeja de cobertura. Te escribimos por el correo o teléfono que dejaste cuando abramos
+                operaciones en tu zona. Mientras tanto, puedes revisar las ciudades de lanzamiento y piloto en la página
+                de cobertura.
+              </>
+            ) : (
+              <>
+                En producción te avisaríamos por el correo o teléfono que dejaste cuando abramos operaciones en tu zona.
+                Aquí solo queda anotado en este navegador; puedes revisar las ciudades de lanzamiento y piloto en la
+                página de cobertura.
+              </>
+            )
           }
           actions={
             <>
@@ -70,6 +104,11 @@ export function CoverageModal({ city = "", onClose }: { city?: string; onClose: 
                 Cerrar
               </Button>
             </>
+          }
+          note={
+            destino === "demo" ? (
+              <DemoNote>la solicitud solo quedó en este navegador. No se envió ningún dato.</DemoNote>
+            ) : undefined
           }
         />
       </Modal>
@@ -135,12 +174,18 @@ export function CoverageModal({ city = "", onClose }: { city?: string; onClose: 
             if (errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
           }}
           error={errors.contact}
-          hint="Solo para avisarte. En esta demo no se envía fuera del navegador."
+          hint={
+            realAuthEnabled
+              ? "Solo lo usamos para avisarte cuando lleguemos a tu zona."
+              : "Solo para avisarte. En esta demo no se envía fuera del navegador."
+          }
           autoComplete="email"
           required
         />
-        <Button type="submit" full>
-          Avísame cuando lleguen
+        {error && <FieldError>{error}</FieldError>}
+        <Button type="submit" full disabled={enviando} aria-busy={enviando || undefined}>
+          {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {enviando ? "Enviando…" : "Avísame cuando lleguen"}
         </Button>
         <p className="text-center text-[11px] text-ink-500">Solo un mensaje cuando la cobertura esté activa.</p>
       </form>

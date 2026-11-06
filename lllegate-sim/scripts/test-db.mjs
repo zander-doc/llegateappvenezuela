@@ -23,6 +23,7 @@ const pruebas = [
   "30_identidad.sql",
   "40_pagos.sql",
   "50_verificacion.sql",
+  "60_solicitudes.sql",
 ];
 
 const { pg } = await iniciarPostgres({ puerto, base });

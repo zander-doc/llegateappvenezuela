@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowRight, Check, Download, Globe, Play, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowRight, Check, Download, Globe, Loader2, Play, ShieldCheck, Smartphone } from "lucide-react";
 import { Modal } from "../Modal";
 import { Button, DemoNote } from "../ui";
 import { FieldError, FormSuccess, OptionCard, SelectField, TextField } from "./shared";
-import { saveDemoLead } from "../../lib/demoStorage";
+import { guardarSolicitud, type DestinoSolicitud } from "../../lib/leads";
+import { realAuthEnabled, solicitudErrorMessage } from "../../lib/api";
 import { isContact } from "../../lib/validation";
 import { useUI } from "../../lib/ui";
 import { HUBS } from "../../data/site";
@@ -36,12 +37,16 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
   const [city, setCity] = useState(HUBS[0].city);
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [destino, setDestino] = useState<DestinoSolicitud>("real");
 
   const isSignin = intent === "signin";
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (enviando) return;
     const next: FieldErrors = {};
     if (!contact.trim()) {
       next.contact = "Escribe un correo o un número de teléfono.";
@@ -62,16 +67,37 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
       return;
     }
 
-    saveDemoLead("llegate_sim_waitlist", { platform, contact, city, intent: intent ?? "download" });
-    setDone(true);
-    notify("Listo. Guardamos tu aviso en este navegador (demo).");
+    setEnviando(true);
+    setError("");
+    try {
+      const donde = await guardarSolicitud(
+        {
+          tipo: "lanzamiento",
+          contacto: contact,
+          ciudad: city,
+          datos: { plataforma: platform, acceso: isSignin ? "app" : "descarga" },
+        },
+        { platform, contact, city, intent: intent ?? "download" },
+      );
+      setDestino(donde);
+      setDone(true);
+      notify(
+        donde === "real"
+          ? "Listo. Te avisamos desde la bandeja de lanzamiento."
+          : "Listo. Guardamos tu aviso en este navegador (demo).",
+      );
+    } catch (fallo) {
+      setError(solicitudErrorMessage(fallo));
+    } finally {
+      setEnviando(false);
+    }
   }
 
   if (done) {
     return (
       <Modal
         onClose={onClose}
-        title={isSignin ? "Ya casi tienes tu acceso" : "Quedaste en la lista"}
+        title={destino === "real" ? (isSignin ? "Ya casi tienes tu acceso" : "Quedaste en la lista") : "Guardado en este navegador"}
         eyebrow="Lanzamiento"
         size="md"
       >
@@ -80,8 +106,10 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
           text={
             <>
               Anotamos la versión de <strong className="text-white">{platformLabel[platform]}</strong> y tu ciudad (
-              <strong className="text-white">{city}</strong>). En producción te enviaríamos un enlace personal al
-              contacto que dejaste para crear tu cuenta o descargar la app.
+              <strong className="text-white">{city}</strong>).{" "}
+              {destino === "real"
+                ? "Te enviamos el enlace personal al contacto que dejaste para crear tu cuenta o descargar la app."
+                : "En producción te enviaríamos un enlace personal al contacto que dejaste para crear tu cuenta o descargar la app."}
             </>
           }
           actions={
@@ -95,10 +123,12 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
             </>
           }
           note={
-            <DemoNote>
-              el aviso se guardó solo en este navegador. Este prototipo no envía correos, mensajes ni enlaces de
-              descarga, y no hay una app publicada todavía.
-            </DemoNote>
+            destino === "demo" ? (
+              <DemoNote>
+                el aviso se guardó solo en este navegador. Sin backend configurado no enviamos correos, mensajes ni
+                enlaces de descarga.
+              </DemoNote>
+            ) : undefined
           }
         />
       </Modal>
@@ -193,7 +223,7 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
             if (errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
           }}
           error={errors.contact}
-          hint="En esta demo no se envía fuera del navegador."
+          hint={realAuthEnabled ? "Solo lo usamos para avisarte del lanzamiento." : "En esta demo no se envía fuera del navegador."}
           autoComplete="email"
           required
         />
@@ -221,14 +251,19 @@ export function DownloadModal({ intent, onClose }: { intent?: "download" | "sign
           />
           <span>
             Acepto recibir un aviso sobre el lanzamiento de la app. Puedo retirar mi consentimiento cuando quiera.
-            <span className="ml-1 text-ink-500">(En esta demo no se envía nada.)</span>
+            {!realAuthEnabled && <span className="ml-1 text-ink-500">(En esta demo no se envía nada.)</span>}
           </span>
         </label>
         {errors.consent && <FieldError id="download-consent-error">{errors.consent}</FieldError>}
+        {error && <FieldError>{error}</FieldError>}
 
-        <Button type="submit" full>
-          <Download className="h-4 w-4" />
-          {isSignin ? "Enviarme el acceso" : "Avísame cuando esté disponible"}
+        <Button type="submit" full disabled={enviando} aria-busy={enviando || undefined}>
+          {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {enviando
+            ? "Enviando…"
+            : isSignin
+              ? "Enviarme el acceso"
+              : "Avísame cuando esté disponible"}
         </Button>
         <p className="text-center text-[11.5px] text-ink-500">
           Sin spam. Un solo mensaje cuando la app esté lista.

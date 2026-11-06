@@ -13,6 +13,29 @@ const montoUsd = z.coerce
 
 const documento = z.string().trim().min(1, "Falta la ruta del documento").max(300);
 
+// Un formulario público puede quedar en correo o en teléfono E.164: son los dos
+// canales por donde el equipo puede responder.
+const contacto = z
+  .string()
+  .trim()
+  .min(3, "Escribe un correo o un teléfono para responderte")
+  .max(200, "Ese contacto es demasiado largo")
+  .refine(
+    (valor) => /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(valor) || /^\+[1-9]\d{7,14}$/.test(valor),
+    "Escribe un correo (ana@ejemplo.com) o un teléfono con código de país (+584141234567)",
+  );
+
+// Los campos opcionales de los formularios llegan como cadena vacía cuando el
+// visitante no los llena; en la bandeja eso debe ser null, no "".
+function textoOpcional(max, mensaje) {
+  return z
+    .string()
+    .trim()
+    .max(max, mensaje)
+    .optional()
+    .transform((valor) => (valor ? valor : undefined));
+}
+
 const contenidoBase64 = z
   .string()
   .trim()
@@ -148,4 +171,45 @@ export const driverDocumentSchema = z.object({
   tipo: z.enum(["cedula_frente", "cedula_reverso", "licencia", "certificado_medico"]),
   mime: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
   contenido_base64: contenidoBase64,
+});
+
+export const TIPOS_SOLICITUD = [
+  "contacto",
+  "empresa",
+  "aliado",
+  "lanzamiento",
+  "conductor",
+  "cobertura",
+  "plan",
+];
+
+export const tipoSolicitudSchema = z.enum(TIPOS_SOLICITUD, {
+  errorMap: () => ({ message: "Ese tipo de solicitud no existe" }),
+});
+
+// El contexto del formulario (plan, servicio, plataforma) entra como objeto
+// plano de valores cortos: nunca documentos, nunca credenciales.
+const datosSolicitud = z
+  .record(z.string().min(1).max(40), z.union([z.string().trim().max(120), z.number(), z.boolean()]))
+  .refine((datos) => Object.keys(datos).length <= 12, "Demasiados datos adjuntos");
+
+export const solicitudSchema = z.object({
+  tipo: tipoSolicitudSchema,
+  nombre: textoOpcional(120, "Ese nombre es demasiado largo"),
+  contacto,
+  ciudad: textoOpcional(120, "Esa ciudad es demasiado larga"),
+  mensaje: textoOpcional(2000, "El mensaje no puede pasar de 2000 caracteres"),
+  datos: datosSolicitud.optional(),
+  origen: textoOpcional(200, "Ese origen es demasiado largo"),
+});
+
+export const estadoSolicitudSchema = z.enum(["nueva", "en_curso", "respondida", "archivada"], {
+  errorMap: () => ({ message: "Usa nueva, en_curso, respondida o archivada" }),
+});
+
+export const solicitudNotaSchema = textoOpcional(500, "Esa nota es demasiado larga");
+
+export const solicitudEstadoSchema = z.object({
+  estado: estadoSolicitudSchema,
+  nota: solicitudNotaSchema,
 });

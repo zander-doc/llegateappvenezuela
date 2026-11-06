@@ -21,6 +21,7 @@ import {
   SectionHead,
 } from "../components/ui";
 import { useUI } from "../lib/ui";
+import { realAuthEnabled } from "../lib/api";
 import { FAQ_GROUPS } from "../data/faqs";
 
 export function SeguridadPage() {
@@ -203,7 +204,11 @@ export function SeguridadPage() {
             <Button className="mt-5 w-full" onClick={() => openModal({ type: "lead", intent: "contacto" })}>
               Reportar una incidencia <ArrowRight className="h-4 w-4" />
             </Button>
-            <p className="mt-2 text-center text-[10.5px] text-ink-500">Simulación: el reporte no se envía.</p>
+            <p className="mt-2 text-center text-[10.5px] text-ink-500">
+              {realAuthEnabled
+                ? "El reporte entra a la bandeja de operaciones y se da seguimiento."
+                : "Simulación: el reporte no se envía."}
+            </p>
           </div>
         </div>
       </section>

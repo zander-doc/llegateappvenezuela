@@ -1,9 +1,22 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, Clock, Gift, Percent, UserRound, Wallet } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  Clock,
+  Gift,
+  Loader2,
+  Percent,
+  UserRound,
+  Wallet,
+} from "lucide-react";
 import { Modal } from "../Modal";
 import { Button, DemoNote } from "../ui";
 import { FieldError, FormSuccess, OptionCard, SelectField, TextField } from "./shared";
-import { clearDraft, loadDraft, saveDemoLead, saveDraft } from "../../lib/demoStorage";
+import { clearDraft, loadDraft, saveDraft } from "../../lib/demoStorage";
+import { guardarSolicitud, type DestinoSolicitud } from "../../lib/leads";
+import { solicitudErrorMessage } from "../../lib/api";
 import { isPersonName, isVenezuelanPhone } from "../../lib/validation";
 import { PILOT_RULES } from "../../data/prepaid";
 import { formatUSD } from "../../lib/format";
@@ -50,7 +63,10 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
   );
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [destino, setDestino] = useState<DestinoSolicitud>("real");
 
   const selectedService = LAUNCH_SERVICES.find((service) => service.slug === serviceSlug);
 
@@ -93,8 +109,9 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
     setStep((current) => Math.min(3, current + 1));
   }
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (enviando) return;
     if (!consent) {
       setErrors({ consent: "Confirma que la información es tuya y aceptas la verificación." });
       document.getElementById("driver-consent")?.focus();
@@ -102,29 +119,61 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
     }
 
     setErrors({});
-    saveDemoLead("llegate_sim_drivers", {
-      serviceSlug,
-      city,
-      name: name.trim(),
-      experience,
-      plan: "prepago",
-    });
-    clearDraft(DRAFT_KEY);
-    notify("Solicitud de conductor guardada en este navegador (demo).");
-    setDone(true);
+    setEnviando(true);
+    setError("");
+    try {
+      const donde = await guardarSolicitud(
+        {
+          tipo: "conductor",
+          nombre: name.trim(),
+          contacto: phone,
+          ciudad: city,
+          datos: {
+            servicio: selectedService?.name ?? serviceSlug,
+            experiencia: experience,
+            pago: "prepago",
+          },
+        },
+        { serviceSlug, city, name: name.trim(), experience, plan: "prepago" },
+      );
+      clearDraft(DRAFT_KEY);
+      setDestino(donde);
+      setDone(true);
+      notify(
+        donde === "real"
+          ? "Solicitud enviada. Te contactamos para verificar tus documentos."
+          : "Solicitud de conductor guardada en este navegador (demo).",
+      );
+    } catch (fallo) {
+      setError(solicitudErrorMessage(fallo));
+    } finally {
+      setEnviando(false);
+    }
   }
 
   if (done) {
     return (
-      <Modal onClose={onClose} title="Registro de conductor" eyebrow="Simulación" size="md">
+      <Modal
+        onClose={onClose}
+        title="Registro de conductor"
+        eyebrow={destino === "real" ? "Conductores" : "Simulación"}
+        size="md"
+      >
         <FormSuccess
-          title="Tu solicitud quedó guardada"
+          title={destino === "real" ? "Tu solicitud llegó al equipo" : "Tu solicitud quedó guardada"}
           text={
-            <>
-              En un flujo real, el equipo revisaría tus documentos y te contactaría al{" "}
-              <strong className="text-white">{phone}</strong> en un plazo de 48 horas hábiles. Nada de eso ocurre en
-              este prototipo.
-            </>
+            destino === "real" ? (
+              <>
+                Revisamos tus datos y te contactamos al <strong className="text-white">{phone}</strong> en un plazo de
+                48 horas hábiles para la verificación de documentos.
+              </>
+            ) : (
+              <>
+                En un flujo real, el equipo revisaría tus documentos y te contactaría al{" "}
+                <strong className="text-white">{phone}</strong> en un plazo de 48 horas hábiles. Nada de eso ocurre en
+                este prototipo.
+              </>
+            )
           }
           actions={
             <>
@@ -137,10 +186,12 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
             </>
           }
           note={
-            <DemoNote>
-              guardamos solo servicio, ciudad, nombre, experiencia y modelo de pago en este navegador. Tu teléfono no
-              se almacena ni se envía.
-            </DemoNote>
+            destino === "demo" ? (
+              <DemoNote>
+                guardamos solo servicio, ciudad, nombre, experiencia y modelo de pago en este navegador. Tu teléfono no
+                se almacena ni se envía.
+              </DemoNote>
+            ) : undefined
           }
         />
       </Modal>
@@ -360,6 +411,7 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
               </span>
             </label>
             {errors.consent && <FieldError id="driver-consent-error">{errors.consent}</FieldError>}
+            {error && <FieldError>{error}</FieldError>}
           </div>
         )}
 
@@ -383,8 +435,9 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
               Continuar <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button type="submit">
-              Enviar solicitud <ArrowRight className="h-4 w-4" />
+            <Button type="submit" disabled={enviando} aria-busy={enviando || undefined}>
+              {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {enviando ? "Enviando…" : "Enviar solicitud"} {!enviando && <ArrowRight className="h-4 w-4" />}
             </Button>
           )}
         </div>

@@ -23,17 +23,28 @@ describe("LeadModal", () => {
     expect(localStorage.getItem("llegate_sim_contacto")).toBeNull();
   });
 
-  it("guarda el lead sin valores que parecen teléfonos", () => {
+  it("guarda el lead sin valores que parecen teléfonos", async () => {
     renderLead();
 
     fireEvent.change(screen.getByLabelText("Tu nombre"), { target: { value: "María Rodríguez" } });
     fireEvent.change(screen.getByLabelText("Correo o teléfono"), { target: { value: "04141234567" } });
     fireEvent.click(screen.getByRole("button", { name: /enviar mensaje/i }));
 
-    expect(screen.getByText("Mensaje guardado")).toBeInTheDocument();
+    expect(await screen.findByText("Listo, quedó registrado aquí")).toBeInTheDocument();
 
     const stored = JSON.parse(localStorage.getItem("llegate_sim_contacto") ?? "[]") as Record<string, unknown>[];
     expect(stored[0]).toMatchObject({ name: "María Rodríguez" });
     expect(JSON.stringify(stored)).not.toContain("04141234567");
+  });
+
+  it("en demo lo dice en la pantalla: nada salió del navegador", async () => {
+    renderLead();
+
+    fireEvent.change(screen.getByLabelText("Tu nombre"), { target: { value: "María Rodríguez" } });
+    fireEvent.change(screen.getByLabelText("Correo o teléfono"), { target: { value: "ana@ejemplo.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /enviar mensaje/i }));
+
+    expect(await screen.findByText("Guardado en este navegador")).toBeInTheDocument();
+    expect(screen.getByText(/no se envió ningún dato/i)).toBeInTheDocument();
   });
 });

@@ -21,6 +21,7 @@ esta aplicación.
 | `20261030150000_llegate_identidad_unificada.sql` | Vista `perfil_usuario` compartida por web y app; sincroniza WhatsApp al confirmar el teléfono |
 | `20261031120000_llegate_pagos.sql` | Intenciones de recarga (`pagos`), confirmación con clave de servidor y acreditación idempotente |
 | `20261031160000_llegate_verificacion_antifraude.sql` | Documentos con hash único, OCR, puntaje de riesgo explicable, eventos de seguridad y RPC de envío de verificación |
+| `20261106120000_llegate_solicitudes.sql` | Bandeja de los formularios públicos (`solicitudes`), sus tipos/estados, fecha de gestión y RLS de solo-lectura para administración |
 
 Se aplican **en orden**. La forma recomendada es el aplicador del API, que no
 necesita `psql` (lee `DATABASE_URL` de `server/.env`):
@@ -119,6 +120,13 @@ comprueban `auth.uid()` y el rol antes de tocar saldos, verificación o pagos.
   resultado del OCR y datos del proveedor. Se escribe solo por RPC.
 - `eventos_seguridad`: libro de auditoría (`info`, `alerta`, `critico`) legible
   únicamente por administración.
+- `solicitudes`: bandeja de los formularios públicos (contacto, empresa, aliado,
+  lanzamiento, conductor, cobertura, plan). Guarda `tipo`, `estado` (`nueva`,
+  `en_curso`, `respondida`, `archivada`), el contacto para responder, ciudad,
+  mensaje y un `jsonb` con el contexto corto del formulario. `anon` y
+  `authenticated` solo pueden insertar; leer y clasificar es cosa de la API con
+  `service_role`. Pasar a un estado gestionado deja `atendida_en`, y la
+  restricción `solicitud_gestion_con_fecha` no permite gestionadas sin fecha.
 
 ## Identidad única para la web y la app
 
@@ -375,7 +383,11 @@ de `pagos`. `50_verificacion.sql` cubre el expediente incompleto, las
 validaciones del registro, el documento duplicado entre cuentas, el envío sin
 riesgo y el reenvío, el scoring alto por cédula, nombre, confianza y reintentos,
 la aprobación y el rechazo con su auditoría, el bloqueo de reenvío tras aprobar y
-la RLS de `conductores_documentos` y `eventos_seguridad`.
+la RLS de `conductores_documentos` y `eventos_seguridad`. `60_solicitudes.sql`
+cubre el alta anónima del formulario, el `datos` vacío por defecto, el contacto
+obligatorio, la marca de gestión con su fecha, el regreso a `nueva` que la borra,
+la restricción de estado gestionado sin fecha y la RLS de `solicitudes`: el
+visitante inserta pero no lee, y el cliente autenticado tampoco ve la bandeja.
 
 Las pruebas de integración del API (`npm run test:api`) levantan otro PostgreSQL
 embebido, aplican las mismas migraciones y ejercitan los endpoints reales.

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowRight, Check, Crown } from "lucide-react";
+import { ArrowRight, Check, Crown, Loader2 } from "lucide-react";
 import { Modal } from "../Modal";
-import { Button, Money } from "../ui";
-import { FormSuccess, SelectField, TextField } from "./shared";
-import { saveDemoLead } from "../../lib/demoStorage";
+import { Button, DemoNote, Money } from "../ui";
+import { FieldError, FormSuccess, SelectField, TextField } from "./shared";
+import { guardarSolicitud, type DestinoSolicitud } from "../../lib/leads";
+import { realAuthEnabled, solicitudErrorMessage } from "../../lib/api";
 import { isContact, isPersonName } from "../../lib/validation";
 import { VIP_PLAN } from "../../data/plans";
 import { HUBS } from "../../data/site";
@@ -21,10 +22,14 @@ export function PlanModal({ onClose }: { planId: string; onClose: () => void }) 
   const [contact, setContact] = useState("");
   const [city, setCity] = useState("Caracas");
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [destino, setDestino] = useState<DestinoSolicitud>("real");
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (enviando) return;
     const next: FieldErrors = {};
     if (!name.trim()) {
       next.name = "Escribe tu nombre.";
@@ -47,20 +52,47 @@ export function PlanModal({ onClose }: { planId: string; onClose: () => void }) 
       return;
     }
 
-    saveDemoLead("llegate_sim_plans", { planId: plan.id, name: name.trim(), contact, city });
-    notify(`Solicitud del plan ${plan.name} guardada (demo).`);
-    setDone(true);
+    setEnviando(true);
+    setError("");
+    try {
+      const donde = await guardarSolicitud(
+        {
+          tipo: "plan",
+          nombre: name.trim(),
+          contacto: contact,
+          ciudad: city,
+          datos: { plan: plan.id, precio_usd: plan.priceUSD },
+        },
+        { planId: plan.id, name: name.trim(), contact, city },
+      );
+      setDestino(donde);
+      setDone(true);
+      notify(
+        donde === "real"
+          ? `Apuntamos tu interés en ${plan.name}.`
+          : `Solicitud del plan ${plan.name} guardada (demo).`,
+      );
+    } catch (fallo) {
+      setError(solicitudErrorMessage(fallo));
+    } finally {
+      setEnviando(false);
+    }
   }
 
   if (done) {
     return (
-      <Modal onClose={onClose} title="Solicitud guardada" eyebrow={plan.name} size="sm">
+      <Modal
+        onClose={onClose}
+        title={destino === "real" ? "Solicitud recibida" : "Guardado en este navegador"}
+        eyebrow={plan.name}
+        size="sm"
+      >
         <FormSuccess
           title="Listo. Te avisamos al activar el plan"
           text={
             <>
-              En producción, el plan <strong className="text-white">{plan.name}</strong> se activaría desde la app
-              después de confirmar el pago. Aquí no se cobra ni se activa nada.
+              El plan <strong className="text-white">{plan.name}</strong> se activa desde la app después de confirmar el
+              pago. {destino === "real" ? "Te escribimos por el contacto que dejaste." : "Aquí no se cobra ni se activa nada."}
             </>
           }
           actions={
@@ -72,6 +104,11 @@ export function PlanModal({ onClose }: { planId: string; onClose: () => void }) 
                 Cerrar
               </Button>
             </>
+          }
+          note={
+            destino === "demo" ? (
+              <DemoNote>la solicitud solo quedó en este navegador. No se envió ningún dato.</DemoNote>
+            ) : undefined
           }
         />
       </Modal>
@@ -130,7 +167,7 @@ export function PlanModal({ onClose }: { planId: string; onClose: () => void }) 
             if (errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
           }}
           error={errors.contact}
-          hint="Solo para avisarte. En esta demo no se envía fuera del navegador."
+          hint={realAuthEnabled ? "Solo lo usamos para avisarte." : "Solo para avisarte. En esta demo no se envía fuera del navegador."}
           placeholder="tucorreo@ejemplo.com"
           autoComplete="email"
           required
@@ -143,12 +180,16 @@ export function PlanModal({ onClose }: { planId: string; onClose: () => void }) 
           ))}
           <option value="Otra ciudad">Otra ciudad</option>
         </SelectField>
-        <Button type="submit" full>
-          Avísame para activarlo
+        {error && <FieldError>{error}</FieldError>}
+        <Button type="submit" full disabled={enviando} aria-busy={enviando || undefined}>
+          {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {enviando ? "Enviando…" : "Avísame para activarlo"}
         </Button>
-        <p className="text-center text-[11px] leading-relaxed text-ink-500">
-          Simulación: no hay cobro, contrato ni activación real.
-        </p>
+        {!realAuthEnabled && (
+          <p className="text-center text-[11px] leading-relaxed text-ink-500">
+            Simulación: no hay cobro, contrato ni activación real.
+          </p>
+        )}
       </form>
     </Modal>
   );

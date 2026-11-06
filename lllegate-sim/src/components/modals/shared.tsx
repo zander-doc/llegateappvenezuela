@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { Button, DemoNote } from "../ui";
+import { Button } from "../ui";
 
 function useFieldIds(id: string | undefined, hint: string | undefined, error: string | undefined) {
   const autoId = useId();
@@ -117,9 +117,9 @@ export function TextAreaField({
   );
 }
 
-export function FieldError({ id, children }: { id: string; children: ReactNode }) {
+export function FieldError({ id, children }: { id?: string; children: ReactNode }) {
   return (
-    <p id={id} className="mt-1.5 text-[11.5px] leading-snug text-red-300">
+    <p id={id} role="alert" className="mt-1.5 text-[11.5px] leading-snug text-red-300">
       {children}
     </p>
   );
@@ -204,9 +204,7 @@ export function FormSuccess({
       <h3 className="heading mt-4 text-[20px] font-bold text-white">{title}</h3>
       <div className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-ink-300">{text}</div>
       {actions && <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">{actions}</div>}
-      <div className="mt-5 text-left">
-        {note ?? <DemoNote>este resultado solo se guarda en tu navegador. No se envió ningún dato.</DemoNote>}
-      </div>
+      {note && <div className="mt-5 text-left">{note}</div>}
     </div>
   );
 }

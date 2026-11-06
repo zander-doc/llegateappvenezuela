@@ -1,5 +1,6 @@
 // Cliente de la API de Llégate para la web. Solo se activa cuando VITE_API_URL
 // apunta a la API real; sin esa variable el sitio sigue en modo demostración.
+import { contactoParaSolicitud } from "./validation";
 
 const rawApiUrl = import.meta.env.VITE_API_URL?.trim() ?? "";
 
@@ -1104,5 +1105,142 @@ export function verificationErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return "No pudimos completar la verificación. Intenta de nuevo.";
   if (error.status === 0 && error.code === "sin_conexion") return error.message;
   const copy = VERIFICATION_ERROR_COPY.find(([pattern]) => pattern.test(`${error.code} ${error.message}`));
+  return copy ? copy[1] : error.message;
+}
+
+// ---------------------------------------------------------------------------
+// Solicitudes de los formularios públicos (leads)
+// ---------------------------------------------------------------------------
+
+export type TipoSolicitud =
+  | "contacto"
+  | "empresa"
+  | "aliado"
+  | "lanzamiento"
+  | "conductor"
+  | "cobertura"
+  | "plan";
+
+export type EstadoSolicitud = "nueva" | "en_curso" | "respondida" | "archivada";
+
+export interface SolicitudInput {
+  tipo: TipoSolicitud;
+  contacto: string;
+  nombre?: string;
+  ciudad?: string;
+  mensaje?: string;
+  datos?: Record<string, string | number | boolean>;
+  origen?: string;
+}
+
+export interface Solicitud {
+  id: string;
+  tipo: TipoSolicitud;
+  estado: EstadoSolicitud;
+  nombre: string | null;
+  contacto: string;
+  ciudad: string | null;
+  mensaje: string | null;
+  datos: Record<string, unknown>;
+  origen: string | null;
+  notaAdmin: string | null;
+  atendidaEn: string | null;
+  createdAt: string | null;
+}
+
+interface SolicitudRow {
+  id: string;
+  tipo: TipoSolicitud;
+  estado: EstadoSolicitud;
+  nombre: string | null;
+  contacto: string;
+  ciudad: string | null;
+  mensaje: string | null;
+  datos?: Record<string, unknown> | null;
+  origen?: string | null;
+  nota_admin?: string | null;
+  atendida_en?: string | null;
+  created_at?: string | null;
+}
+
+function mapSolicitud(row: SolicitudRow): Solicitud {
+  return {
+    id: row.id,
+    tipo: row.tipo,
+    estado: row.estado,
+    nombre: row.nombre ?? null,
+    contacto: row.contacto,
+    ciudad: row.ciudad ?? null,
+    mensaje: row.mensaje ?? null,
+    datos: row.datos && typeof row.datos === "object" ? row.datos : {},
+    origen: row.origen ?? null,
+    notaAdmin: row.nota_admin ?? null,
+    atendidaEn: row.atendida_en ?? null,
+    createdAt: row.created_at ?? null,
+  };
+}
+
+// El POST de solicitudes es público: el visitante deja su contacto justo para
+// que le respondamos, así que no va autenticado. La respuesta solo confirma la
+// fila creada; el resto de la bandeja se lee desde operaciones.
+export async function enviarSolicitud(input: SolicitudInput): Promise<{ id: string; estado: EstadoSolicitud }> {
+  const data = await request<{ ok: boolean; id: string; estado: EstadoSolicitud }>("/solicitudes", {
+    method: "POST",
+    body: {
+      tipo: input.tipo,
+      nombre: input.nombre?.trim() || undefined,
+      contacto: contactoParaSolicitud(input.contacto),
+      ciudad: input.ciudad?.trim() || undefined,
+      mensaje: input.mensaje?.trim() || undefined,
+      datos: input.datos,
+      origen: input.origen ?? (typeof window === "undefined" ? undefined : window.location.pathname),
+    },
+  });
+
+  return { id: data.id, estado: data.estado };
+}
+
+export async function listSolicitudes(
+  filtro: { estado?: EstadoSolicitud; tipo?: TipoSolicitud } = {},
+): Promise<Solicitud[]> {
+  const token = await accessToken();
+  const query = new URLSearchParams();
+  if (filtro.estado) query.set("estado", filtro.estado);
+  if (filtro.tipo) query.set("tipo", filtro.tipo);
+  const qs = query.toString();
+
+  const data = await request<{ ok: boolean; solicitudes: SolicitudRow[] | null }>(
+    `/admin/solicitudes${qs ? `?${qs}` : ""}`,
+    { token },
+  );
+
+  return (data.solicitudes ?? []).map(mapSolicitud);
+}
+
+export async function marcarSolicitud(
+  id: string,
+  estado: EstadoSolicitud,
+  nota?: string,
+): Promise<Solicitud> {
+  const token = await accessToken();
+  const data = await request<{ ok: boolean; solicitud: SolicitudRow }>(
+    `/admin/solicitudes/${encodeURIComponent(id)}/estado`,
+    { method: "POST", token, body: { estado, nota: nota?.trim() || undefined } },
+  );
+
+  return mapSolicitud(data.solicitud);
+}
+
+const SOLICITUD_ERROR_COPY: Array<[RegExp, string]> = [
+  [/demasiados_intentos/, "Ya tenemos varios mensajes tuyos. Espera unos minutos y vuelve a enviarlo."],
+  [/datos_invalidos/, "Revisa el contacto: necesitamos un correo o un teléfono con código de país."],
+  [/sin_sesion|sesion_invalida|NO_AUTORIZADO/, "Tu sesión no permite ver la bandeja. Vuelve a ingresar."],
+  [/solo_admin/, "Esta sección es solo para el equipo de operaciones."],
+];
+
+export function solicitudErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return "No pudimos enviar tu solicitud. Intenta de nuevo.";
+  if (error.code === "sin_conexion") return error.message;
+  const copy = SOLICITUD_ERROR_COPY.find(([pattern]) => pattern.test(`${error.code} ${error.message}`));
   return copy ? copy[1] : error.message;
 }

@@ -34,6 +34,9 @@ process.env.PAGO_MOVIL_CEDULA = "V12345678";
 process.env.PAGO_MOVIL_TITULAR = "Llégate C.A.";
 process.env.PAGO_MOVIL_TASA_BS = "100";
 process.env.NODE_ENV = "test";
+// En pruebas todas las peticiones salen de 127.0.0.1: el límite por conexión
+// se sube para que lo que se mida sea el límite por contacto.
+process.env.SOLICITUDES_MAX_POR_IP = "100";
 
 const CLIENTE = { id: "22222222-2222-2222-2222-222222222222", telefono: "+584141111111" };
 const ADMIN = { id: "33333333-3333-3333-3333-333333333333", telefono: "+584143333333" };
@@ -387,6 +390,109 @@ test("las rutas de administración exigen rol admin", async () => {
     token: admin.access_token,
   });
   assert.equal(filtroInvalido.status, 422);
+});
+
+test("POST /solicitudes guarda el formulario y el admin lo gestiona", async () => {
+  const envio = await pedir("POST", "/solicitudes", {
+    cuerpo: {
+      tipo: "lanzamiento",
+      nombre: "Panita",
+      contacto: "+584149990010",
+      ciudad: "Maracaibo",
+      mensaje: "Avísenme cuando abran en mi ciudad",
+      datos: { plataforma: "android" },
+      origen: "/app",
+    },
+  });
+  assert.equal(envio.status, 201, JSON.stringify(envio.cuerpo));
+  assert.equal(envio.cuerpo.estado, "nueva");
+  const id = envio.cuerpo.id;
+
+  const enBase = await sql(
+    `select tipo, estado, contacto, ciudad, datos ->> 'plataforma' as plataforma, atendida_en
+       from public.solicitudes where id = $1`,
+    [id],
+  );
+  assert.equal(enBase[0].tipo, "lanzamiento");
+  assert.equal(enBase[0].estado, "nueva");
+  assert.equal(enBase[0].plataforma, "android");
+  assert.equal(enBase[0].atendida_en, null);
+
+  const admin = await sesion("admin", ADMIN);
+  const lista = await pedir("GET", "/admin/solicitudes?estado=nueva", { token: admin.access_token });
+  assert.equal(lista.status, 200);
+  assert.ok(lista.cuerpo.solicitudes.some((solicitud) => solicitud.id === id));
+
+  const clasificada = await pedir("POST", `/admin/solicitudes/${id}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "respondida", nota: "Enviado por correo" },
+  });
+  assert.equal(clasificada.status, 200, JSON.stringify(clasificada.cuerpo));
+  assert.equal(clasificada.cuerpo.solicitud.estado, "respondida");
+  assert.ok(clasificada.cuerpo.solicitud.atendida_en, "no quedó la fecha de gestión");
+
+  const trasClasificar = await pedir("GET", "/admin/solicitudes?estado=nueva", {
+    token: admin.access_token,
+  });
+  assert.ok(!trasClasificar.cuerpo.solicitudes.some((solicitud) => solicitud.id === id));
+
+  const fuera = await pedir("POST", `/admin/solicitudes/${id}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "borrada" },
+  });
+  assert.equal(fuera.status, 422);
+
+  const inexistente = await pedir("POST", `/admin/solicitudes/${crypto.randomUUID()}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "archivada" },
+  });
+  assert.equal(inexistente.status, 404);
+  assert.equal(inexistente.cuerpo.error, "solicitud_no_encontrada");
+});
+
+test("POST /solicitudes valida el formulario público", async () => {
+  const sinContacto = await pedir("POST", "/solicitudes", { cuerpo: { tipo: "contacto" } });
+  assert.equal(sinContacto.status, 422);
+  assert.equal(sinContacto.cuerpo.error, "datos_invalidos");
+
+  const contactoMalo = await pedir("POST", "/solicitudes", {
+    cuerpo: { tipo: "contacto", contacto: "hola" },
+  });
+  assert.equal(contactoMalo.status, 422);
+
+  const tipoFalso = await pedir("POST", "/solicitudes", {
+    cuerpo: { tipo: "spam", contacto: "alguien@example.com" },
+  });
+  assert.equal(tipoFalso.status, 422);
+
+  const nada = await pedir("POST", "/solicitudes", { cuerpo: {} });
+  assert.equal(nada.status, 422);
+});
+
+test("POST /solicitudes limita los envíos repetidos de un mismo contacto", async () => {
+  const contacto = "+584149990011";
+
+  for (let intento = 0; intento < 3; intento += 1) {
+    const respuesta = await pedir("POST", "/solicitudes", {
+      cuerpo: { tipo: "cobertura", contacto, mensaje: `Intento ${intento + 1}` },
+    });
+    assert.equal(respuesta.status, 201, JSON.stringify(respuesta.cuerpo));
+  }
+
+  const bloqueado = await pedir("POST", "/solicitudes", {
+    cuerpo: { tipo: "cobertura", contacto },
+  });
+  assert.equal(bloqueado.status, 429);
+  assert.equal(bloqueado.cuerpo.error, "demasiados_intentos");
+  assert.ok(bloqueado.cuerpo.detalles.retry_after > 0);
+  assert.ok(bloqueado.headers.get("retry-after"));
+});
+
+test("un cliente sin rol admin no ve la bandeja de solicitudes", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+  const vedado = await pedir("GET", "/admin/solicitudes", { token: cliente.access_token });
+  assert.equal(vedado.status, 403);
+  assert.equal(vedado.cuerpo.error, "solo_admin");
 });
 
 test("los métodos de pago reflejan la configuración del servidor", async () => {

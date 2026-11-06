@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  contactoParaSolicitud,
   isCedula,
   isContact,
   isEmail,
@@ -42,6 +43,14 @@ describe("validation", () => {
     expect(isContact("0414 1234567")).toBe(true);
     expect(isContact("12345")).toBe(false);
     expect(isContact("   ")).toBe(false);
+  });
+
+  it("deja el contacto en el formato que acepta la bandeja de solicitudes", () => {
+    expect(contactoParaSolicitud(" maria@ejemplo.com ")).toBe("maria@ejemplo.com");
+    expect(contactoParaSolicitud("0414 1234567")).toBe("+584141234567");
+    expect(contactoParaSolicitud("+584141234567")).toBe("+584141234567");
+    expect(contactoParaSolicitud("1 415 555 0123")).toBe("+14155550123");
+    expect(contactoParaSolicitud("donde sea")).toBe("donde sea");
   });
 
   it("valida cédulas venezolanas", () => {

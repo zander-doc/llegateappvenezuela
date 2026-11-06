@@ -19,6 +19,7 @@ import {
   SectionHead,
 } from "../components/ui";
 import { useUI } from "../lib/ui";
+import { realAuthEnabled } from "../lib/api";
 
 const allianceTypes = [
   {
@@ -125,7 +126,9 @@ export function AliadosPage() {
             <Button className="mt-4 w-full" onClick={() => openModal({ type: "lead", intent: "aliado" })}>
               Contar mi idea
             </Button>
-            <p className="mt-2 text-center text-[10px] text-ink-500">Simulación: no se envía información real.</p>
+            <p className="mt-2 text-center text-[10px] text-ink-500">
+              {realAuthEnabled ? "Te respondemos al contacto que dejes." : "Simulación: no se envía información real."}
+            </p>
           </div>
         }
       />

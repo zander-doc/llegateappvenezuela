@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Accordion, Badge, Button, Eyebrow, PageHero, ServiceIcon } from "../components/ui";
 import { useUI } from "../lib/ui";
+import { realAuthEnabled } from "../lib/api";
 import { FAQ_GROUPS } from "../data/faqs";
 import { LAUNCH_SERVICES, UPCOMING_SERVICES, type Service } from "../data/services";
 
@@ -301,7 +302,9 @@ export function AyudaPage() {
               </Button>
             </div>
             <p className="mt-3 text-[11px] text-ink-500">
-              Simulación: el formulario guarda el mensaje solo en este navegador.
+              {realAuthEnabled
+                ? "El mensaje entra directo a la bandeja de atención y te respondemos por el contacto que dejaste."
+                : "Simulación: el formulario guarda el mensaje solo en este navegador."}
             </p>
           </div>
           <div className="card p-5">

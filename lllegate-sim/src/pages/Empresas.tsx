@@ -21,6 +21,7 @@ import {
   SectionHead,
 } from "../components/ui";
 import { useUI } from "../lib/ui";
+import { realAuthEnabled } from "../lib/api";
 import { HUBS } from "../data/site";
 
 const useCases = [
@@ -127,7 +128,9 @@ export function EmpresasPage() {
               Operación con conductores verificados
             </div>
             <p className="mt-3 text-[10.5px] leading-relaxed text-ink-500">
-              Demostración: la solicitud no se envía a un servidor.
+              {realAuthEnabled
+                ? "La solicitud llega al equipo comercial y se responde en un día hábil."
+                : "Demostración: la solicitud no se envía a un servidor."}
             </p>
           </div>
         }

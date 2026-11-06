@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ArrowRight, Building2, Handshake, MessageCircle } from "lucide-react";
+import { ArrowRight, Building2, Handshake, Loader2, MessageCircle } from "lucide-react";
 import { Modal } from "../Modal";
-import { Button } from "../ui";
-import { FormSuccess, SelectField, TextAreaField, TextField } from "./shared";
-import { saveDemoLead } from "../../lib/demoStorage";
+import { Button, DemoNote } from "../ui";
+import { FieldError, FormSuccess, SelectField, TextAreaField, TextField } from "./shared";
+import { guardarSolicitud, type DestinoSolicitud } from "../../lib/leads";
 import { isContact, isPersonName } from "../../lib/validation";
+import { realAuthEnabled, solicitudErrorMessage } from "../../lib/api";
 import { useUI } from "../../lib/ui";
 
 type Intent = "empresa" | "aliado" | "contacto";
@@ -23,6 +24,7 @@ const config: Record<
     submit: string;
     successTitle: string;
     successText: string;
+    successTextDemo: string;
     icon: typeof Building2;
     topics: string[];
     topicLabel: string;
@@ -36,6 +38,8 @@ const config: Record<
     submit: "Solicitar una llamada",
     successTitle: "Recibimos tu solicitud",
     successText:
+      "El equipo comercial te escribe en un día hábil para coordinar una llamada y revisar tu operación.",
+    successTextDemo:
       "En producción, el equipo comercial te escribiría en un día hábil para coordinar una llamada y revisar tu operación.",
     icon: Building2,
     topics: ["Traslados de personal", "Movilidad de clientes", "Eventos", "Delivery recurrente", "Otra necesidad"],
@@ -47,8 +51,9 @@ const config: Record<
     title: "Hablemos de una alianza",
     subtitle: "Marcas, talleres, comercios y medios: si tu audiencia se mueve por Venezuela, hay algo que construir juntos.",
     submit: "Enviar propuesta",
-    successTitle: "Propuesta guardada",
-    successText:
+    successTitle: "Recibimos tu propuesta",
+    successText: "La revisamos y te respondemos por el contacto que dejaste para agendar una conversación.",
+    successTextDemo:
       "En producción, revisaríamos la propuesta y te responderíamos por correo para agendar una conversación.",
     icon: Handshake,
     topics: ["Patrocinio de marca", "Taller o comercio aliado", "Medio o creador de contenido", "Institución", "Otra alianza"],
@@ -60,9 +65,9 @@ const config: Record<
     title: "Escríbenos",
     subtitle: "Cuéntanos qué necesitas y te respondemos por el canal que prefieras.",
     submit: "Enviar mensaje",
-    successTitle: "Mensaje guardado",
-    successText:
-      "En producción, nuestro equipo te respondería en horario de atención, de lunes a sábado.",
+    successTitle: "Mensaje enviado",
+    successText: "Te respondemos por el canal que dejaste, en horario de atención de lunes a sábado.",
+    successTextDemo: "En producción, nuestro equipo te respondería en horario de atención, de lunes a sábado.",
     icon: MessageCircle,
     topics: ["Viajes", "Pagos y tarifas", "Conductores", "Mercado Motor", "Prensa", "Otro"],
     topicLabel: "Tema",
@@ -81,7 +86,10 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
     message: "",
   });
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [destino, setDestino] = useState<DestinoSolicitud>("real");
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -89,8 +97,9 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
     if (key === "contact" && errors.contact) setErrors((current) => ({ ...current, contact: undefined }));
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (enviando) return;
     const next: FieldErrors = {};
     if (!form.name.trim()) {
       next.name = "Escribe tu nombre.";
@@ -113,24 +122,60 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
       return;
     }
 
-    saveDemoLead(`llegate_sim_${intent}`, form);
-    notify("Mensaje guardado en este navegador (demo).");
-    setDone(true);
+    const organizacion = form.org.trim();
+    setEnviando(true);
+    setError("");
+    try {
+      const donde = await guardarSolicitud(
+        {
+          tipo: intent,
+          nombre: form.name.trim(),
+          contacto: form.contact,
+          mensaje: form.message.trim() || undefined,
+          datos: {
+            tema: form.topic,
+            ...(organizacion ? { organizacion } : {}),
+          },
+        },
+        form,
+      );
+      setDestino(donde);
+      setDone(true);
+      notify(
+        donde === "real"
+          ? "Listo. Ya está en la bandeja de Llégate."
+          : "Mensaje guardado en este navegador (demo).",
+      );
+    } catch (fallo) {
+      setError(solicitudErrorMessage(fallo));
+    } finally {
+      setEnviando(false);
+    }
   }
 
   if (done) {
     return (
-      <Modal onClose={onClose} title={c.successTitle} eyebrow={c.eyebrow} size="sm">
+      <Modal
+        onClose={onClose}
+        title={destino === "real" ? c.successTitle : "Guardado en este navegador"}
+        eyebrow={c.eyebrow}
+        size="sm"
+      >
         <FormSuccess
-          title="Listo, quedó registrado aquí"
-          text={c.successText}
-          actions={
-            <Button onClick={onClose}>Cerrar</Button>
+          title={destino === "real" ? "Listo, ya está en la bandeja" : "Listo, quedó registrado aquí"}
+          text={destino === "real" ? c.successText : c.successTextDemo}
+          actions={<Button onClick={onClose}>Cerrar</Button>}
+          note={
+            destino === "demo" ? (
+              <DemoNote>el formulario solo guardó en este navegador. No se envió ningún dato.</DemoNote>
+            ) : undefined
           }
         />
       </Modal>
     );
   }
+
+  const esDemo = !realAuthEnabled;
 
   return (
     <Modal onClose={onClose} title={c.title} subtitle={c.subtitle} eyebrow={c.eyebrow} size="md">
@@ -169,7 +214,7 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
           value={form.contact}
           onChange={(e) => set("contact", e.target.value)}
           error={errors.contact}
-          hint="Solo para responderte. En esta demo no se envía fuera del navegador."
+          hint={esDemo ? "Solo para responderte. En esta demo no se envía fuera del navegador." : "Solo lo usamos para responderte."}
           placeholder="tucorreo@ejemplo.com"
           autoComplete="email"
           required
@@ -189,13 +234,17 @@ export function LeadModal({ intent, onClose }: { intent: Intent; onClose: () => 
               : "Cuéntanos brevemente qué tienes en mente"
           }
         />
-        <Button type="submit" full>
-          <Icon className="h-4 w-4" />
-          {c.submit} <ArrowRight className="h-3.5 w-3.5" />
+        {error && <FieldError>{error}</FieldError>}
+        <Button type="submit" full disabled={enviando} aria-busy={enviando || undefined}>
+          {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+          {enviando ? "Enviando…" : c.submit}
+          {!enviando && <ArrowRight className="h-3.5 w-3.5" />}
         </Button>
-        <p className="text-center text-[11px] leading-relaxed text-ink-500">
-          Simulación: el formulario no envía datos reales.
-        </p>
+        {esDemo && (
+          <p className="text-center text-[11px] leading-relaxed text-ink-500">
+            Simulación: el formulario no envía datos reales.
+          </p>
+        )}
       </form>
     </Modal>
   );

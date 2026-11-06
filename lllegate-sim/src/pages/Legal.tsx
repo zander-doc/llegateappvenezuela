@@ -190,7 +190,7 @@ const DOCS: Doc[] = [
         bullets: [
           "llegate_sesion_v1: tokens de tu sesión real, para no pedirte el código en cada visita. Se borra al cerrar sesión.",
           "llegate_sim_install_bar: recuerda que cerraste la barra de instalación.",
-          "llegate_sim_contacto, llegate_sim_drivers, llegate_sim_cap: datos de los formularios de la demo y del simulador.",
+          "llegate_sim_contacto, llegate_sim_conductor, llegate_sim_cap: datos de los formularios cuando la web funciona sin backend configurado. Con la API activa, esos formularios se envían a la bandeja de operaciones y no se guardan en tu navegador.",
           "llegate_sim_draft:*: borradores del simulador de viaje.",
         ],
       },

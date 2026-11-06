@@ -43,7 +43,7 @@ describe("DriverWizard", () => {
     expect(screen.getByText("2/3")).toBeInTheDocument();
   });
 
-  it("guarda la solicitud sin el teléfono y limpia el borrador", () => {
+  it("guarda la solicitud sin el teléfono y limpia el borrador", async () => {
     renderWizard();
 
     fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
@@ -57,9 +57,9 @@ describe("DriverWizard", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: /enviar solicitud/i }));
 
-    expect(screen.getByText("Tu solicitud quedó guardada")).toBeInTheDocument();
+    expect(await screen.findByText("Tu solicitud quedó guardada")).toBeInTheDocument();
 
-    const stored = JSON.parse(localStorage.getItem("llegate_sim_drivers") ?? "[]") as Record<string, unknown>[];
+    const stored = JSON.parse(localStorage.getItem("llegate_sim_conductor") ?? "[]") as Record<string, unknown>[];
     expect(stored[0]).toMatchObject({ name: "María Rodríguez", plan: "prepago" });
     expect(JSON.stringify(stored)).not.toContain("04141234567");
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();

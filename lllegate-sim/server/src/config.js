@@ -110,6 +110,15 @@ export const config = {
       ventanaMinutos: number("OTP_VENTANA_MINUTOS", 10),
     },
   },
+  solicitudes: {
+    // Los formularios del sitio son públicos: se limita por conexión y por
+    // contacto para que nadie llene la bandeja repitiendo el mismo envío.
+    limits: {
+      porIp: number("SOLICITUDES_MAX_POR_IP", 6),
+      porContacto: number("SOLICITUDES_MAX_POR_CONTACTO", 3),
+      ventanaMinutos: number("SOLICITUDES_VENTANA_MINUTOS", 60),
+    },
+  },
   storage: {
     // "local" guarda en disco (desarrollo y pruebas); "r2" usa Cloudflare R2.
     driver: (text("STORAGE_DRIVER") || "local").toLowerCase(),

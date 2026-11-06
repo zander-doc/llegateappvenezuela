@@ -21,12 +21,25 @@ export function toVenezuelanE164(value: string): string | null {
   return null;
 }
 
+export const E164_RE = /^\+[1-9]\d{7,14}$/;
+
 export function isContact(value: string) {
   const clean = value.trim();
   if (!clean) return false;
   if (isEmail(clean)) return true;
   const digits = normalizeDigits(clean);
   return digits.length >= 7 && digits.length <= 15;
+}
+
+// La API admite el contacto como correo o como E.164; los formularios aceptan
+// "0414 1234567", así que se normaliza aquí en vez de en cada modal.
+export function contactoParaSolicitud(value: string): string {
+  const clean = value.trim();
+  if (isEmail(clean) || E164_RE.test(clean)) return clean;
+  const venezolano = toVenezuelanE164(clean);
+  if (venezolano) return venezolano;
+  const digits = normalizeDigits(clean);
+  return /^[1-9]\d{6,14}$/.test(digits) ? `+${digits}` : clean;
 }
 
 export function isCedula(value: string) {
