@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Download, Mail, MapPin, MessageCircle, Smartphone, Wallet } from "lucide-react";
-import { Logo } from "./Logo";
 import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
 import { useUI } from "../lib/ui";
 import { DEMO_BCV_RATE, formatRate } from "../lib/format";
@@ -60,7 +59,13 @@ export function Footer() {
       <div className="wrap py-12 lg:py-16">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_2fr]">
           <div>
-            <Logo className="h-10" />
+            <img
+  src="/vibe_images/logo-redondo5.png"
+  alt="Llégate App — Tu carrera con panas"
+  className="h-10 w-auto object-contain"
+  width={1200}
+  height={1200}
+/>
             <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-ink-300">
               Movilidad venezolana en una sola app. Arrancamos con mototaxi, taxi y delivery; minivan, autobús y
               carga llegan en próximas fases. Precio claro antes de subir y pago en bolívares o dólares.
