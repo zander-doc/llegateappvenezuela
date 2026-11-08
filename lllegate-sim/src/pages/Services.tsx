@@ -171,7 +171,7 @@ export function ServiceDetailPage() {
 
   if (!service) {
     return (
-      <section className="wrap py-24 text-center">
+      <section className="wrap py-16 text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-400">Servicio</p>
         <h1 className="heading mt-3 text-[34px] font-bold text-white">No encontramos ese servicio</h1>
         <p className="mx-auto mt-2 max-w-md text-[15px] text-ink-300">

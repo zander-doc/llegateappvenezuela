@@ -421,7 +421,7 @@ export function Hero() {
             <button
               type="button"
               onClick={() => openModal({ type: "download" })}
-              className="w-full py-4 px-6 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white font-bold text-lg rounded-2xl shadow-lg shadow-emerald-500/25 transition-all duration-150 flex items-center justify-center gap-3 sm:w-auto sm:max-w-[320px] mx-auto lg:mx-0"
+              className="w-full py-4 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg rounded-2xl shadow-lg shadow-slate-900/20 transition-all duration-150 flex items-center justify-center gap-3 sm:w-auto sm:max-w-[320px] mx-auto lg:mx-0"
             >
               <ArrowRight className="h-5 w-5" />
               <span>Pedir un Llégate</span>

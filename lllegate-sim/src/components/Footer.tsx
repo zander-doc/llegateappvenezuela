@@ -131,7 +131,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col justify-between gap-5 border-t border-white/8 pt-6 sm:flex-row sm:items-center">
+        <div className="mt-6 flex flex-col justify-between gap-5 border-t border-white/8 pt-6 sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-ink-400">
             <span>© 2026 Llégate App</span>
             <span className="hidden text-ink-700 sm:inline">·</span>
