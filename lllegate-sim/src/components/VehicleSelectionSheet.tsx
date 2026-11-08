@@ -25,11 +25,19 @@ const tabServices: Record<Tab, Service[]> = {
   envios: LAUNCH_SERVICES.filter((s) => s.icon === "package" || s.icon === "truck"),
 };
 
+const tabAccent: Record<Tab, string> = {
+  carro: "racing",
+  moto: "emerald",
+  envios: "brand",
+};
+
 export function VehicleSelectionSheet({ onSelect }: { onSelect: (service: Service | null) => void }) {
-  const [activeTab, setActiveTab] = useState<Tab>("carro");
+  const [activeTab, setActiveTab] = useState<Tab>("moto");
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   const services = tabServices[activeTab];
   const Icon = tabIcons[activeTab];
+  const accent = tabAccent[activeTab];
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-asphalt-950">
@@ -57,8 +65,11 @@ export function VehicleSelectionSheet({ onSelect }: { onSelect: (service: Servic
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab as Tab)}
-              className={`flex h-12 shrink-0 items-center justify-center border-b-2 px-4 text-sm font-bold transition ${active ? "border-racing-500 text-white" : "border-transparent text-ink-500 hover:text-white hover:bg-white/5"}`}
+              onClick={() => {
+                setActiveTab(tab as Tab);
+                setSelectedService(null);
+              }}
+              className={`flex h-12 shrink-0 items-center justify-center border-b-2 px-4 text-sm font-bold transition ${active ? `border-${tabAccent[tab as Tab]}-500 text-white` : "border-transparent text-ink-500 hover:text-white hover:bg-white/5"}`}
             >
               <TabIcon className="h-4 w-4 mr-2" />
               {tabLabels[tab as Tab]}
@@ -83,7 +94,16 @@ export function VehicleSelectionSheet({ onSelect }: { onSelect: (service: Servic
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {services.map((service) => (
-              <VehicleCard key={service.slug} service={service} onSelect={onSelect} />
+              <VehicleCard
+                key={service.slug}
+                service={service}
+                accent={accent}
+                isSelected={selectedService?.slug === service.slug}
+                onSelect={() => {
+                  setSelectedService(service);
+                  onSelect(service);
+                }}
+              />
             ))}
           </div>
         )}
@@ -94,52 +114,48 @@ export function VehicleSelectionSheet({ onSelect }: { onSelect: (service: Servic
 
 interface VehicleCardProps {
   service: Service;
+  accent: string;
+  isSelected: boolean;
   onSelect: (service: Service) => void;
 }
 
-function VehicleCard({ service, onSelect }: VehicleCardProps) {
+function VehicleCard({ service, accent, isSelected, onSelect }: VehicleCardProps) {
   const rateUSD = service.minFareUSD;
 
   return (
     <div
-      className="card card-hover group relative flex flex-col overflow-hidden border border-white/10 bg-asphalt-900/80 rounded-2xl p-5"
-      onClick={() => onSelect(service)}
+      className={`cursor-pointer transition-all duration-200 rounded-2xl p-4 flex items-center justify-between group ${
+        isSelected
+          ? `border-2 border-${accent}-500 bg-${accent}-50/50 shadow-lg shadow-${accent}-500/15`
+          : "border border-white/10 bg-asphalt-900/80 hover:border-white/20 hover:bg-asphalt-850/80"
+      }`}
+      onClick={onSelect}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onSelect(service)}
     >
-
-      <div className="relative flex items-start justify-between mb-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-brand-400 transition group-hover:border-brand-500/40 group-hover:bg-brand-500/10">
+      {/* Lado izquierdo: icono e información */}
+      <div className="flex items-center gap-3">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+          isSelected
+            ? `bg-${accent}-500 text-asphalt-950`
+            : `bg-${accent}-500/10 text-${accent}-600 border border-${accent}-500/20`
+        }`}
+        >
           <ServiceIcon icon={service.icon as any} className="h-6 w-6" />
         </div>
-        <span className="mono text-[11px] font-medium text-ink-600">0{service.routes.length}</span>
-      </div>
-
-      <h3 className="heading relative mt-0 mb-1.5 text-[20px] font-bold text-white">{service.name}</h3>
-      <p className="relative mb-4 text-[13.5px] leading-snug text-ink-300">{service.short}</p>
-
-      <div className="relative mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-ink-400">
-        <span className="inline-flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5" /> {service.eta}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5" /> {service.capacity}
-        </span>
-      </div>
-
-      <div className="relative mt-4 border-t border-white/8 pt-4">
-        <div className="flex items-baseline gap-1 mb-2">
-          <span className="text-2xl font-bold text-white">${rateUSD.toFixed(2)}</span>
-          <span className="text-[13px] font-semibold text-ink-400">USD</span>
+        <div className="min-w-0">
+          <h4 className={`font-bold ${isSelected ? "text-white" : "text-ink-100"}`}>{service.name}</h4>
+          <p className={`text-xs ${isSelected ? "text-ink-400" : "text-ink-500"}`}>{service.eta}</p>
         </div>
-        <p className="text-[12px] font-medium text-racing-500">{formatBs(rateUSD, 887.3)}</p>
       </div>
 
-      <div className="mt-auto flex items-end justify-between border-t border-white/8 pt-4">
-        <Button variant="yellow" size="sm" full>
-          Solicitar <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
+      {/* Lado derecho: precio destacado */}
+      <div className="text-right">
+        <span className={`font-extrabold ${isSelected ? "text-white" : "text-ink-900"}`}>
+          {formatBs(rateUSD, 887.3)}
+        </span>
+        <p className={`text-xs ${isSelected ? "text-ink-400" : "text-ink-500"}`}>USD {rateUSD.toFixed(2)}</p>
       </div>
     </div>
   );
