@@ -60,7 +60,7 @@ export function Footer() {
         <div className="grid gap-10 lg:grid-cols-[1.4fr_2fr]">
           <div>
             <img
-  src="/vibe_images/logo-redondo5.png"
+  src="/assets/marca/llegateapp-redondo.png"
   alt="Llégate App — Tu carrera con panas"
   className="h-10 w-auto object-contain"
   width={1200}
