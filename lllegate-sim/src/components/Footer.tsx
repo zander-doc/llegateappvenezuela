@@ -157,15 +157,6 @@ export function Footer() {
           no tiene negocios publicados y el mapa de cobertura es de ejemplo.
         </p>
       </div>
-
-      <div
-        aria-hidden="true"
-        className="pointer-events-none select-none overflow-hidden px-4 text-center"
-      >
-        <span className="display block translate-y-[18%] text-[clamp(90px,17vw,240px)] leading-none text-white/[0.035]">
-          Llégate
-        </span>
-      </div>
     </footer>
   );
 }
