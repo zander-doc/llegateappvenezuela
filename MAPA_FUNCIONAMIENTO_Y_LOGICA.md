@@ -224,6 +224,31 @@ Web/App → GET /negocios muestra solo estado='publicado'
 
 ---
 
+
+---
+
+## 6. Integración Híbrida y Seguridad Avanzada
+
+### 6.1 Flujo de Recarga Híbrida (Físico ↔ Digital)
+El sistema soporta nativamente el modelo de negocio de la AppBoutique física mediante el endpoint `POST /wallet/recargar`. Este permite que un operador autorizado (rol `admin`) procese pagos en efectivo o vía Pago Móvil desde una tablet o PC en el mostrador.
+- **Seguridad Transaccional:** Utiliza transacciones atómicas (`BEGIN`/`COMMIT`/`ROLLBACK`) con bloqueo de fila (`FOR UPDATE`) para evitar condiciones de carrera.
+- **Auditoría:** Registra la transacción en `public.transacciones_billetera` con tipo `ajuste` (para cumplir con los constraints de métodos de pago), auditando el `created_by` y `aprobada_por`.
+- **Sincronización:** Al confirmarse, el `saldo_billetera` en `public.usuarios` se actualiza instantáneamente, reflejándose en tiempo real tanto en la app móvil como en la web.
+
+### 6.2 Seguridad: Validación JWT y Row Level Security (RLS)
+La API aplica una defensa en profundidad:
+1. Validación estricta de payloads de entrada mediante **Zod** (UUIDs, montos máximos, tipos de dato).
+2. La API valida el token JWT en cada solicitud para identificar al usuario y su rol.
+3. Las consultas inyectan parámetros de forma segura para prevenir inyecciones SQL, complementado con políticas RLS en PostgreSQL para asegurar que las filas solo sean accesibles por el propietario o roles administrativos.
+
+### 6.3 Integración Nativa: WebView y JavaScript Bridge
+La app móvil (`apps/android/`) utiliza un WebView con un **Puente JavaScript (JS Bridge)** en Kotlin. Esto permite que la interfaz web solicite funcionalidades nativas del dispositivo Android, específicamente:
+- Activación y lectura de coordenadas GPS para el rastreo de viajes.
+- Apertura de la cámara nativa para la captura de documentos (licencia, fotos del vehículo).
+- Registro del dispositivo para la recepción de Notificaciones Push.
+
+---
+
 ## 12. Siguiente paso sugerido
 
 Revisar este mapa con el equipo y, una vez validado, proceder a:
