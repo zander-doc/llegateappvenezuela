@@ -387,7 +387,11 @@ export function Hero() {
       <div className="wrap relative z-10 grid flex-1 items-center gap-6 pb-8 pt-7 sm:pt-12 lg:grid-cols-[1.04fr_0.96fr] lg:items-start lg:gap-8 lg:pb-9 lg:pt-9">
         <Stagger gap={0.14}>
           <StaggerItem>
-            <Logo className="mx-auto h-12 sm:h-14 lg:mx-0 lg:h-[68px]" link={false} />
+            <Logo
+            forma="logo2"
+            className="mx-auto h-[110px] sm:h-[130px] lg:mx-0 lg:h-[150px]"
+            link={false}
+          />
           </StaggerItem>
           <StaggerItem>
             <Badge tone="brand" className="mb-3 mt-4 uppercase tracking-[0.16em] lg:mb-4 lg:mt-5">

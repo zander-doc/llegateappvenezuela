@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 const MARCA = {
   horizontal: { src: "/assets/marca/llegateapp-horizontal.png", width: 1250, height: 400 },
   redondo: { src: "/assets/marca/llegateapp-redondo.png", width: 1200, height: 1200 },
+  logo2: { src: "/assets/marca/logo-2.png", width: 1200, height: 1200 },
 } as const;
 
 export function Logo({
