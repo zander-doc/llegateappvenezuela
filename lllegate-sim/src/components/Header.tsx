@@ -70,7 +70,7 @@ export function Header() {
               Piloto cerrado
             </span>
             <span className="text-ink-700" aria-hidden="true">·</span>
-            <span>{realAuthEnabled ? "Cuenta real activa" : "Datos de ejemplo"}</span>
+            <span>{realAuthEnabled ? "Cuenta real activa" : "strategic and technical system +plusmax"}</span>
           </div>
           <div className="flex items-center gap-1">
             <Link

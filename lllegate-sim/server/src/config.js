@@ -119,6 +119,16 @@ export const config = {
       ventanaMinutos: number("SOLICITUDES_VENTANA_MINUTOS", 60),
     },
   },
+  mercado: {
+    // Publicar un negocio pasa por revisión, así que el formulario admite menos
+    // envíos que el de contacto: un comercio no manda la misma ficha cinco veces.
+    limits: {
+      porIp: number("NEGOCIOS_MAX_POR_IP", 4),
+      porContacto: number("NEGOCIOS_MAX_POR_CONTACTO", 2),
+      ventanaMinutos: number("NEGOCIOS_VENTANA_MINUTOS", 360),
+    },
+    listadoMax: number("NEGOCIOS_LISTADO_MAXIMO", 60),
+  },
   storage: {
     // "local" guarda en disco (desarrollo y pruebas); "r2" usa Cloudflare R2.
     driver: (text("STORAGE_DRIVER") || "local").toLowerCase(),

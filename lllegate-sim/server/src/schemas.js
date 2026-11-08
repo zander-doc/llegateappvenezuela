@@ -213,3 +213,76 @@ export const solicitudEstadoSchema = z.object({
   estado: estadoSolicitudSchema,
   nota: solicitudNotaSchema,
 });
+
+// ---------------------------------------------------------------------------
+// Vitrina del Mercado Motor
+// ---------------------------------------------------------------------------
+
+// Son las seis categorías que la propia página promete; el slug viaja en texto
+// y no en un enum para que añadir una categoría no exija una migración.
+export const CATEGORIAS_NEGOCIO = [
+  "repuestos",
+  "talleres",
+  "cauchos",
+  "gruas",
+  "lubricantes",
+  "accesorios",
+];
+
+export const categoriaNegocioSchema = z.enum(CATEGORIAS_NEGOCIO, {
+  errorMap: () => ({ message: "Elige una de las categorías de la vitrina" }),
+});
+
+const enlaceNegocio = z
+  .string()
+  .trim()
+  .max(300, "Ese enlace es demasiado largo")
+  .refine((valor) => valor === "" || /^https?:\/\/[^\s]+\.[^\s]{2,}$/.test(valor), {
+    message: "Escribe el enlace completo, por ejemplo https://instagram.com/tu-taller",
+  })
+  .transform((valor) => (valor ? valor : undefined))
+  .optional();
+
+export const negocioSchema = z.object({
+  nombre: z.string().trim().min(3, "Escribe el nombre del negocio").max(120),
+  categoria: categoriaNegocioSchema,
+  ciudad: z.string().trim().min(2, "Indica la ciudad del negocio").max(80),
+  zona: textoOpcional(120, "Esa zona es demasiado larga"),
+  direccion: textoOpcional(240, "Esa dirección es demasiado larga"),
+  horario: textoOpcional(240, "Ese horario es demasiado largo"),
+  oferta: textoOpcional(500, "La oferta no puede pasar de 500 caracteres"),
+  descripcion: textoOpcional(2000, "La descripción no puede pasar de 2000 caracteres"),
+  sitio: enlaceNegocio,
+  contacto,
+  telefono_publico: textoOpcional(40, "Ese teléfono visible es demasiado largo"),
+});
+
+export const estadoNegocioSchema = z.enum(
+  ["pendiente", "publicado", "rechazado", "archivado"],
+  { errorMap: () => ({ message: "Usa pendiente, publicado, rechazado o archivado" }) },
+);
+
+export const negocioEstadoSchema = z
+  .object({
+    estado: estadoNegocioSchema,
+    // El rechazo se publica en la ficha del dueño: sin motivo no hay rechazo.
+    motivo: textoOpcional(300, "Ese motivo es demasiado largo"),
+    nota: solicitudNotaSchema,
+    verificado: z.boolean().optional(),
+  })
+  .refine((valor) => valor.estado !== "rechazado" || (valor.motivo ?? "").length >= 3, {
+    message: "Explica por qué se rechaza la ficha",
+    path: ["motivo"],
+  });
+
+export const negociosQuerySchema = z.object({
+  categoria: categoriaNegocioSchema.optional(),
+  ciudad: textoOpcional(80, "Esa ciudad es demasiado larga"),
+  q: textoOpcional(80, "Esa búsqueda es demasiado larga"),
+  limite: z.coerce
+    .number()
+    .int("El límite debe ser un número entero")
+    .min(1)
+    .max(100, "La vitrina entrega máximo 100 fichas por página")
+    .optional(),
+});

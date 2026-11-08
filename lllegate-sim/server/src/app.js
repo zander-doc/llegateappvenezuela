@@ -10,6 +10,7 @@ import { driverDocumentsRouter, driversRouter } from "./routes/drivers.js";
 import { filesRouter } from "./routes/files.js";
 import { paymentsRouter } from "./routes/payments.js";
 import { solicitudesRouter } from "./routes/solicitudes.js";
+import { negociosRouter } from "./routes/negocios.js";
 import { tripsRouter } from "./routes/trips.js";
 import { walletRouter } from "./routes/wallet.js";
 import { webhooksRouter } from "./routes/webhooks.js";
@@ -88,6 +89,8 @@ app.use("/trips", tripsRouter);
 // Formularios del sitio: contacto, empresas, aliados, aviso de lanzamiento,
 // postulación de piloto, cobertura e interés por un plan.
 app.use("/solicitudes", solicitudesRouter);
+// Vitrina del Mercado Motor: se leen las fichas publicadas y se proponen nuevas.
+app.use("/negocios", negociosRouter);
 app.use("/admin", adminRouter);
 // Enlaces firmados de descarga de documentos (sin sesión, con vencimiento).
 app.use("/files", filesRouter);

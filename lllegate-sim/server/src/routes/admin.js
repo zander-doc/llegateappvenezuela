@@ -3,8 +3,10 @@ import { fila, filas, rpc } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireAdmin, requireUser } from "../middleware.js";
 import {
+  estadoNegocioSchema,
   estadoSolicitudSchema,
   estadoVerificacionSchema,
+  negocioEstadoSchema,
   rejectSchema,
   solicitudEstadoSchema,
   tipoSolicitudSchema,
@@ -278,5 +280,60 @@ adminRouter.post(
     }
 
     res.json({ ok: true, solicitud: actualizada });
+  }),
+);
+
+adminRouter.get(
+  "/negocios",
+  asyncHandler(async (req, res) => {
+    const estado = parse(estadoNegocioSchema, req.query.estado ?? "pendiente", "estado");
+    const negocios = await filas(
+      `select id, slug, nombre, categoria, estado, ciudad, zona, direccion, horario,
+              oferta, descripcion, sitio, contacto, telefono_publico, verificado,
+              motivo_rechazo, nota_admin, publicada_en, created_at, updated_at
+         from public.negocios
+        where estado = $1::public.estado_negocio
+        order by created_at asc
+        limit 200`,
+      [estado],
+    );
+
+    res.json({ ok: true, negocios });
+  }),
+);
+
+adminRouter.post(
+  "/negocios/:id/estado",
+  asyncHandler(async (req, res) => {
+    const id = parse(uuidSchema, req.params.id, "id");
+    const body = parse(negocioEstadoSchema, req.body);
+
+    // Publicar deja la fecha; cualquier otro estado la borra, porque la
+    // restricción de la tabla solo admite `publicada_en` en fichas publicadas.
+    // El sello Verificado solo se mueve si el cuerpo lo trae explícito.
+    const actualizado = await fila(
+      `update public.negocios
+          set estado = $2::public.estado_negocio,
+              motivo_rechazo = case
+                when $2::public.estado_negocio = 'rechazado' then $3
+                else null
+              end,
+              nota_admin = coalesce($4, nota_admin),
+              verificado = coalesce($5::boolean, verificado),
+              publicada_en = case
+                when $2::public.estado_negocio = 'publicado' then coalesce(publicada_en, now())
+                else null
+              end
+        where id = $1
+        returning id, slug, nombre, categoria, estado, ciudad, verificado,
+                  motivo_rechazo, nota_admin, publicada_en`,
+      [id, body.estado, body.motivo ?? null, body.nota ?? null, body.verificado ?? null],
+    );
+
+    if (!actualizado) {
+      throw new HttpError(404, "negocio_no_encontrado", "Esa ficha ya no está en la cola");
+    }
+
+    res.json({ ok: true, negocio: actualizado });
   }),
 );

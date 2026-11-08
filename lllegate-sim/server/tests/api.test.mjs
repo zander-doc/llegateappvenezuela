@@ -37,6 +37,7 @@ process.env.NODE_ENV = "test";
 // En pruebas todas las peticiones salen de 127.0.0.1: el límite por conexión
 // se sube para que lo que se mida sea el límite por contacto.
 process.env.SOLICITUDES_MAX_POR_IP = "100";
+process.env.NEGOCIOS_MAX_POR_IP = "100";
 
 const CLIENTE = { id: "22222222-2222-2222-2222-222222222222", telefono: "+584141111111" };
 const ADMIN = { id: "33333333-3333-3333-3333-333333333333", telefono: "+584143333333" };
@@ -493,6 +494,233 @@ test("un cliente sin rol admin no ve la bandeja de solicitudes", async () => {
   const vedado = await pedir("GET", "/admin/solicitudes", { token: cliente.access_token });
   assert.equal(vedado.status, 403);
   assert.equal(vedado.cuerpo.error, "solo_admin");
+});
+
+test("POST /negocios propone una ficha que solo se ve cuando operaciones la publica", async () => {
+  const propuesta = await pedir("POST", "/negocios", {
+    cuerpo: {
+      nombre: "Taller El Guaire",
+      categoria: "talleres",
+      ciudad: "Caracas",
+      zona: "Valles del Tuy",
+      direccion: "Av. Principal, local 3",
+      horario: "Lun a sáb 8am-6pm",
+      oferta: "Afinación de motor con repuestos originales",
+      descripcion: "Taller familiar con doce años en la zona.",
+      sitio: "https://instagram.com/el-guaire",
+      contacto: "+584149990020",
+      telefono_publico: "+584149990020",
+    },
+  });
+  assert.equal(propuesta.status, 201, JSON.stringify(propuesta.cuerpo));
+  assert.equal(propuesta.cuerpo.estado, "pendiente");
+  assert.equal(propuesta.cuerpo.slug, "taller-el-guaire");
+  const id = propuesta.cuerpo.id;
+
+  const enBase = await sql(
+    `select estado, verificado, publicada_en, usuario_id, categoria
+       from public.negocios where id = $1`,
+    [id],
+  );
+  assert.equal(enBase[0].estado, "pendiente");
+  assert.equal(enBase[0].verificado, false);
+  assert.equal(enBase[0].publicada_en, null);
+  assert.equal(enBase[0].usuario_id, null);
+
+  // Nada pendiente llega a la vitrina.
+  const vitrina = await pedir("GET", "/negocios");
+  assert.equal(vitrina.status, 200);
+  assert.ok(!vitrina.cuerpo.negocios.some((negocio) => negocio.slug === "taller-el-guaire"));
+
+  const detalle = await pedir("GET", "/negocios/taller-el-guaire");
+  assert.equal(detalle.status, 404);
+  assert.equal(detalle.cuerpo.error, "negocio_no_encontrado");
+
+  const admin = await sesion("admin", ADMIN);
+
+  const cola = await pedir("GET", "/admin/negocios?estado=pendiente", { token: admin.access_token });
+  assert.equal(cola.status, 200);
+  assert.ok(cola.cuerpo.negocios.some((negocio) => negocio.id === id));
+
+  // Sin motivo no hay rechazo.
+  const rechazoCorto = await pedir("POST", `/admin/negocios/${id}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "rechazado" },
+  });
+  assert.equal(rechazoCorto.status, 422);
+
+  const devuelta = await pedir("POST", `/admin/negocios/${id}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "rechazado", motivo: "Falta la dirección exacta" },
+  });
+  assert.equal(devuelta.status, 200, JSON.stringify(devuelta.cuerpo));
+  assert.equal(devuelta.cuerpo.negocio.motivo_rechazo, "Falta la dirección exacta");
+
+  const publicada = await pedir("POST", `/admin/negocios/${id}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "publicado", verificado: true, nota: "Llamamos al dueño, todo ok" },
+  });
+  assert.equal(publicada.status, 200, JSON.stringify(publicada.cuerpo));
+  assert.equal(publicada.cuerpo.negocio.estado, "publicado");
+  assert.equal(publicada.cuerpo.negocio.verificado, true);
+  assert.ok(publicada.cuerpo.negocio.publicada_en, "no quedó la fecha de publicación");
+
+  const trasPublicar = await pedir("GET", "/negocios?categoria=talleres&ciudad=caracas");
+  assert.equal(trasPublicar.status, 200);
+  const enVitrina = trasPublicar.cuerpo.negocios.find((negocio) => negocio.slug === "taller-el-guaire");
+  assert.ok(enVitrina, "la ficha publicada no aparece en la vitrina");
+  assert.equal(enVitrina.verificado, true);
+  assert.equal(enVitrina.telefono_publico, "+584149990020");
+  // El contacto privado del dueño y las notas internas nunca salen de la vitrina.
+  assert.equal(enVitrina.contacto, undefined);
+  assert.equal(enVitrina.nota_admin, undefined);
+  assert.equal(enVitrina.motivo_rechazo, undefined);
+  assert.equal(trasPublicar.cuerpo.categorias.talleres >= 1, true);
+
+  const ficha = await pedir("GET", "/negocios/taller-el-guaire");
+  assert.equal(ficha.status, 200);
+  assert.equal(ficha.cuerpo.negocio.oferta, "Afinación de motor con repuestos originales");
+
+  const archivada = await pedir("POST", `/admin/negocios/${id}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "archivado" },
+  });
+  assert.equal(archivada.status, 200);
+  assert.equal(archivada.cuerpo.negocio.publicada_en, null);
+
+  const despuesDeArchivar = await pedir("GET", "/negocios");
+  assert.ok(!despuesDeArchivar.cuerpo.negocios.some((negocio) => negocio.slug === "taller-el-guaire"));
+
+  const inexistente = await pedir("POST", `/admin/negocios/${crypto.randomUUID()}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "publicado" },
+  });
+  assert.equal(inexistente.status, 404);
+  assert.equal(inexistente.cuerpo.error, "negocio_no_encontrado");
+});
+
+test("POST /negocios deja el nombre repetido en un slug distinto", async () => {
+  const primera = await pedir("POST", "/negocios", {
+    cuerpo: {
+      nombre: "Repuestos Central",
+      categoria: "repuestos",
+      ciudad: "Valencia",
+      contacto: "central1@example.com",
+    },
+  });
+  assert.equal(primera.status, 201, JSON.stringify(primera.cuerpo));
+
+  const segunda = await pedir("POST", "/negocios", {
+    cuerpo: {
+      nombre: "Repuestos Central",
+      categoria: "repuestos",
+      ciudad: "Maracay",
+      contacto: "central2@example.com",
+    },
+  });
+  assert.equal(segunda.status, 201, JSON.stringify(segunda.cuerpo));
+  assert.equal(segunda.cuerpo.slug, "repuestos-central-2");
+});
+
+test("POST /negocios valida la propuesta pública", async () => {
+  const sinNombre = await pedir("POST", "/negocios", {
+    cuerpo: { categoria: "talleres", ciudad: "Caracas", contacto: "taller@example.com" },
+  });
+  assert.equal(sinNombre.status, 422);
+  assert.equal(sinNombre.cuerpo.error, "datos_invalidos");
+
+  const categoriaFalsa = await pedir("POST", "/negocios", {
+    cuerpo: { nombre: "Gomería Rapida", categoria: "lavados", ciudad: "Caracas", contacto: "+584149990021" },
+  });
+  assert.equal(categoriaFalsa.status, 422);
+
+  const sitioMalo = await pedir("POST", "/negocios", {
+    cuerpo: {
+      nombre: "Gomería Rápida",
+      categoria: "cauchos",
+      ciudad: "Caracas",
+      contacto: "+584149990021",
+      sitio: "instagram.com/gomeria",
+    },
+  });
+  assert.equal(sitioMalo.status, 422);
+
+  const admin = await sesion("admin", ADMIN);
+  const estadoFalso = await pedir("POST", `/admin/negocios/${crypto.randomUUID()}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "borrador" },
+  });
+  assert.equal(estadoFalso.status, 422);
+});
+
+test("POST /negocios limita las propuestas repetidas de un mismo contacto", async () => {
+  const contacto = "dueno-repetido@example.com";
+
+  const primera = await pedir("POST", "/negocios", {
+    cuerpo: { nombre: "Cauchos Norte", categoria: "cauchos", ciudad: "Barquisimeto", contacto },
+  });
+  assert.equal(primera.status, 201, JSON.stringify(primera.cuerpo));
+
+  const segunda = await pedir("POST", "/negocios", {
+    cuerpo: { nombre: "Cauchos Sur", categoria: "cauchos", ciudad: "Barquisimeto", contacto },
+  });
+  assert.equal(segunda.status, 201, JSON.stringify(segunda.cuerpo));
+
+  const bloqueado = await pedir("POST", "/negocios", {
+    cuerpo: { nombre: "Cauchos Este", categoria: "cauchos", ciudad: "Barquisimeto", contacto },
+  });
+  assert.equal(bloqueado.status, 429);
+  assert.equal(bloqueado.cuerpo.error, "demasiados_intentos");
+  assert.ok(bloqueado.headers.get("retry-after"));
+});
+
+test("un cliente sin rol admin no gestiona la cola de negocios", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+
+  const lista = await pedir("GET", "/admin/negocios", { token: cliente.access_token });
+  assert.equal(lista.status, 403);
+  assert.equal(lista.cuerpo.error, "solo_admin");
+
+  const movimiento = await pedir("POST", `/admin/negocios/${crypto.randomUUID()}/estado`, {
+    token: cliente.access_token,
+    cuerpo: { estado: "publicado" },
+  });
+  assert.equal(movimiento.status, 403);
+});
+
+test("la vitrina busca por texto y respeta el límite", async () => {
+  const propuesta = await pedir("POST", "/negocios", {
+    cuerpo: {
+      nombre: "Lubricantes Rapidos Barinas",
+      categoria: "lubricantes",
+      ciudad: "Barinas",
+      oferta: "Cambio de aceite en 20 minutos",
+      contacto: "+584149990022",
+    },
+  });
+  assert.equal(propuesta.status, 201, JSON.stringify(propuesta.cuerpo));
+
+  const admin = await sesion("admin", ADMIN);
+  const publicada = await pedir("POST", `/admin/negocios/${propuesta.cuerpo.id}/estado`, {
+    token: admin.access_token,
+    cuerpo: { estado: "publicado" },
+  });
+  assert.equal(publicada.status, 200, JSON.stringify(publicada.cuerpo));
+
+  const porTexto = await pedir("GET", "/negocios?q=cambio%20de%20aceite");
+  assert.equal(porTexto.status, 200);
+  assert.ok(porTexto.cuerpo.negocios.some((negocio) => negocio.slug === "lubricantes-rapidos-barinas"));
+
+  const limite = await pedir("GET", "/negocios?limite=1");
+  assert.equal(limite.status, 200);
+  assert.equal(limite.cuerpo.negocios.length, 1);
+  assert.ok(limite.cuerpo.total >= 1);
+
+  const limiteFalso = await pedir("GET", "/negocios?limite=0");
+  assert.equal(limiteFalso.status, 422);
+
+  const categoriaFalsa = await pedir("GET", "/negocios?categoria=noexiste");
+  assert.equal(categoriaFalsa.status, 422);
 });
 
 test("los métodos de pago reflejan la configuración del servidor", async () => {

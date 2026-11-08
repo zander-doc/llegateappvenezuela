@@ -1244,3 +1244,234 @@ export function solicitudErrorMessage(error: unknown): string {
   const copy = SOLICITUD_ERROR_COPY.find(([pattern]) => pattern.test(`${error.code} ${error.message}`));
   return copy ? copy[1] : error.message;
 }
+
+// ---------------------------------------------------------------------------
+// Vitrina del Mercado Motor
+// ---------------------------------------------------------------------------
+
+export type CategoriaNegocio = "repuestos" | "talleres" | "cauchos" | "gruas" | "lubricantes" | "accesorios";
+
+export type EstadoNegocio = "pendiente" | "publicado" | "rechazado" | "archivado";
+
+export const CATEGORIAS_NEGOCIO: CategoriaNegocio[] = [
+  "repuestos",
+  "talleres",
+  "cauchos",
+  "gruas",
+  "lubricantes",
+  "accesorios",
+];
+
+export const CATEGORIA_LABEL: Record<CategoriaNegocio, string> = {
+  repuestos: "Repuestos",
+  talleres: "Talleres",
+  cauchos: "Cauchos",
+  gruas: "Grúas",
+  lubricantes: "Lubricantes",
+  accesorios: "Accesorios",
+};
+
+export interface Negocio {
+  id: string;
+  slug: string;
+  nombre: string;
+  categoria: CategoriaNegocio;
+  estado: EstadoNegocio;
+  ciudad: string;
+  zona: string | null;
+  direccion: string | null;
+  horario: string | null;
+  oferta: string | null;
+  descripcion: string | null;
+  sitio: string | null;
+  telefonoPublico: string | null;
+  verificado: boolean;
+  publicadaEn: string | null;
+}
+
+// Lo que ve operaciones de una ficha en revisión: el contacto privado del dueño
+// y sus notas nunca salen en la vitrina pública.
+export interface NegocioCola extends Negocio {
+  contacto: string;
+  motivoRechazo: string | null;
+  notaAdmin: string | null;
+  createdAt: string | null;
+}
+
+export interface NegocioInput {
+  nombre: string;
+  categoria: CategoriaNegocio;
+  ciudad: string;
+  zona?: string;
+  direccion?: string;
+  horario?: string;
+  oferta?: string;
+  descripcion?: string;
+  sitio?: string;
+  contacto: string;
+  telefonoPublico?: string;
+}
+
+interface NegocioRow {
+  id: string;
+  slug: string;
+  nombre: string;
+  categoria: CategoriaNegocio;
+  estado?: EstadoNegocio;
+  ciudad: string;
+  zona?: string | null;
+  direccion?: string | null;
+  horario?: string | null;
+  oferta?: string | null;
+  descripcion?: string | null;
+  sitio?: string | null;
+  telefono_publico?: string | null;
+  verificado: boolean;
+  publicada_en?: string | null;
+  contacto?: string;
+  motivo_rechazo?: string | null;
+  nota_admin?: string | null;
+  created_at?: string | null;
+}
+
+function mapNegocio(row: NegocioRow): Negocio {
+  return {
+    id: row.id,
+    slug: row.slug,
+    nombre: row.nombre,
+    categoria: row.categoria,
+    estado: row.estado ?? "publicado",
+    ciudad: row.ciudad,
+    zona: row.zona ?? null,
+    direccion: row.direccion ?? null,
+    horario: row.horario ?? null,
+    oferta: row.oferta ?? null,
+    descripcion: row.descripcion ?? null,
+    sitio: row.sitio ?? null,
+    telefonoPublico: row.telefono_publico ?? null,
+    verificado: Boolean(row.verificado),
+    publicadaEn: row.publicada_en ?? null,
+  };
+}
+
+export interface VitrinaNegocios {
+  total: number;
+  negocios: Negocio[];
+  categorias: Partial<Record<CategoriaNegocio, number>>;
+}
+
+// La vitrina es pública: se lee sin sesión y solo devuelve fichas publicadas.
+export async function listNegocios(
+  filtro: { categoria?: CategoriaNegocio; ciudad?: string; q?: string; limite?: number } = {},
+): Promise<VitrinaNegocios> {
+  const query = new URLSearchParams();
+  if (filtro.categoria) query.set("categoria", filtro.categoria);
+  if (filtro.ciudad) query.set("ciudad", filtro.ciudad);
+  if (filtro.q) query.set("q", filtro.q);
+  if (filtro.limite) query.set("limite", String(filtro.limite));
+  const qs = query.toString();
+
+  const data = await request<{
+    ok: boolean;
+    total: number;
+    negocios: NegocioRow[] | null;
+    categorias?: Record<string, number> | null;
+  }>(`/negocios${qs ? `?${qs}` : ""}`);
+
+  return {
+    total: data.total ?? 0,
+    negocios: (data.negocios ?? []).map(mapNegocio),
+    categorias: (data.categorias ?? {}) as Partial<Record<CategoriaNegocio, number>>,
+  };
+}
+
+export async function getNegocio(slug: string): Promise<Negocio> {
+  const data = await request<{ ok: boolean; negocio: NegocioRow }>(
+    `/negocios/${encodeURIComponent(slug)}`,
+  );
+
+  return mapNegocio(data.negocio);
+}
+
+// El formulario público crea una ficha pendiente: nunca decide el estado ni el
+// sello Verificado, así que el cuerpo no puede traerlos.
+export async function crearNegocio(input: NegocioInput): Promise<{ id: string; slug: string }> {
+  const data = await request<{ ok: boolean; id: string; slug: string; estado: EstadoNegocio }>("/negocios", {
+    method: "POST",
+    body: {
+      nombre: input.nombre.trim(),
+      categoria: input.categoria,
+      ciudad: input.ciudad.trim(),
+      zona: input.zona?.trim() || undefined,
+      direccion: input.direccion?.trim() || undefined,
+      horario: input.horario?.trim() || undefined,
+      oferta: input.oferta?.trim() || undefined,
+      descripcion: input.descripcion?.trim() || undefined,
+      sitio: input.sitio?.trim() || undefined,
+      contacto: contactoParaSolicitud(input.contacto),
+      telefono_publico: input.telefonoPublico?.trim() || undefined,
+    },
+  });
+
+  return { id: data.id, slug: data.slug };
+}
+
+export async function listNegociosCola(estado: EstadoNegocio = "pendiente"): Promise<NegocioCola[]> {
+  const token = await accessToken();
+  const data = await request<{ ok: boolean; negocios: NegocioRow[] | null }>(
+    `/admin/negocios?estado=${encodeURIComponent(estado)}`,
+    { token },
+  );
+
+  return (data.negocios ?? []).map((row) => ({
+    ...mapNegocio(row),
+    contacto: row.contacto ?? "",
+    motivoRechazo: row.motivo_rechazo ?? null,
+    notaAdmin: row.nota_admin ?? null,
+    createdAt: row.created_at ?? null,
+  }));
+}
+
+export async function marcarNegocio(
+  id: string,
+  estado: EstadoNegocio,
+  extra: { motivo?: string; nota?: string; verificado?: boolean } = {},
+): Promise<NegocioCola> {
+  const token = await accessToken();
+  const data = await request<{ ok: boolean; negocio: NegocioRow }>(
+    `/admin/negocios/${encodeURIComponent(id)}/estado`,
+    {
+      method: "POST",
+      token,
+      body: {
+        estado,
+        motivo: extra.motivo?.trim() || undefined,
+        nota: extra.nota?.trim() || undefined,
+        verificado: extra.verificado,
+      },
+    },
+  );
+
+  return {
+    ...mapNegocio(data.negocio),
+    contacto: data.negocio.contacto ?? "",
+    motivoRechazo: data.negocio.motivo_rechazo ?? null,
+    notaAdmin: data.negocio.nota_admin ?? null,
+    createdAt: null,
+  };
+}
+
+const NEGOCIO_ERROR_COPY: Array<[RegExp, string]> = [
+  [/demasiados_intentos/, "Ya recibimos varias fichas tuyas. Espera un poco y vuelve a intentarlo."],
+  [/datos_invalidos/, "Revisa los datos: nombre, categoría, ciudad y un contacto para confirmarte la propiedad."],
+  [/negocio_no_encontrado/, "Esa ficha ya no está publicada."],
+  [/sin_sesion|sesion_invalida|NO_AUTORIZADO/, "Tu sesión no permite gestionar fichas. Vuelve a ingresar."],
+  [/solo_admin/, "Esta sección es solo para el equipo de operaciones."],
+];
+
+export function negocioErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return "No pudimos trabajar con esa ficha. Intenta de nuevo.";
+  if (error.status === 0 && error.code === "sin_conexion") return error.message;
+  const copy = NEGOCIO_ERROR_COPY.find(([pattern]) => pattern.test(`${error.code} ${error.message}`));
+  return copy ? copy[1] : error.message;
+}
