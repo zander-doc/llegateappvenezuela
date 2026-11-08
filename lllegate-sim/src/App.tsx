@@ -5,6 +5,9 @@ import { Layout } from "./components/Layout";
 import { UIProvider } from "./lib/ui";
 import { PilotWalletProvider } from "./lib/pilotWallet";
 import { HomePage } from "./pages/Home";
+import { WalletScreen } from "./pages/WalletScreen";
+import { HistoryScreen } from "./pages/HistoryScreen";
+import { ProfileScreen } from "./pages/ProfileScreen";
 
 const ServiciosPage = lazy(() => import("./pages/Services").then((m) => ({ default: m.ServiciosPage })));
 const ServiceDetailPage = lazy(() => import("./pages/Services").then((m) => ({ default: m.ServiceDetailPage })));
@@ -45,6 +48,9 @@ export default function App() {
             <Routes>
               <Route element={<Layout />}>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/billetera" element={<WalletScreen />} />
+                <Route path="/historial" element={<HistoryScreen />} />
+                <Route path="/perfil" element={<ProfileScreen />} />
                 <Route path="/servicios" element={<ServiciosPage />} />
                 <Route path="/servicios/:slug" element={<ServiceDetailPage />} />
                 <Route path="/tarifas" element={<TarifasPage />} />
@@ -78,3 +84,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+

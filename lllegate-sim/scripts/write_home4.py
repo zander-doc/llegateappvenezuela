@@ -1,0 +1,28 @@
+path = "C:/Users/alexg/Documents/Qoder/2026-10-27/a2bce96f/lllegate-sim/src/pages/Home.tsx"
+
+with open(path, "a", encoding="utf-8") as f:
+    print('', file=f)
+    print('      {/* FAQ */}', file=f)
+    print('      <section className="wrap px-4 py-14 sm:py-20">', file=f)
+    print('        <SectionHead', file=f)
+    print('          kicker="Preguntas frecuentes"', file=f)
+    print('          title={', file=f)
+    print('            <>', file=f)
+    print('              Todo lo que necesitas saber.', file=f)
+    print('              <br className="hidden sm:block" /> Sin complicación.', file=f)
+    print('            </>', file=f)
+    print('          }', file=f)
+    print('          text="Si tu duda no está aquí, el centro de ayuda está organizado por tema: viajes, pagos, conductores, app y mercado."', file=f)
+    print('          action={', file=f)
+    print('            <Button variant="secondary" to="/ayuda" className="mt-5">', file=f)
+    print('              Centro de ayuda <ArrowRight className="h-4 w-4" />', file=f)
+    print('            </Button>', file=f)
+    print('          }', file=f)
+    print('        />', file=f)
+    print('        <div className="mt-8 max-w-3xl">', file=f)
+    print('          <Accordion items={homeFaqItems} />', file=f)
+    print('        </div>', file=f)
+    print('      </section>', file=f)
+    print('', file=f)
+
+print("Part 4 done")

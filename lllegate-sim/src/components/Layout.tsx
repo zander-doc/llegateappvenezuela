@@ -4,6 +4,7 @@ import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { InstallBar, ScrollManager, Toasts } from "./Shell";
 import { ModalHost } from "./ModalHost";
+import { NavigationBar } from "./NavigationBar";
 
 export function Layout() {
   return (
@@ -29,9 +30,11 @@ export function Layout() {
         </Suspense>
       </main>
       <Footer />
+      <NavigationBar />
       <InstallBar />
       <ModalHost />
       <Toasts />
     </div>
   );
 }
+
