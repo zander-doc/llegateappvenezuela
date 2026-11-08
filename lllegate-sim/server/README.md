@@ -257,6 +257,18 @@ dato no salió del navegador. El único punto que decide es
 | POST | `/trips/:id/finalizar` | conductor | Captura la reserva y cobra la comisión (efectivo) |
 | POST | `/trips/:id/cancelar` | participante | Cancela el viaje y libera la reserva |
 | POST | `/trips/:id/pagar-saldo` | cliente | Paga el viaje en curso con el saldo de su billetera |
+| POST | `/scheduled-rides` | cliente | Persiste una solicitud para una fecha futura |
+| GET | `/scheduled-rides` | cliente | Lista las solicitudes programadas propias, por fecha |
+| GET | `/scheduled-rides/:id` | cliente | Consulta una solicitud propia |
+| POST | `/scheduled-rides/:id/cancel` | cliente | Cancela una solicitud que siga programada |
+| GET | `/api/favoritos/direcciones` | autenticado | Lista las direcciones favoritas propias |
+| POST | `/api/favoritos/direcciones` | autenticado | Guarda o actualiza una dirección por etiqueta (`etiqueta`, `direccion_texto`, `lat`, `lng`) |
+| DELETE | `/api/favoritos/direcciones/:id` | autenticado | Elimina una dirección favorita propia |
+| GET | `/api/favoritos/conductores` | autenticado | Lista los pilotos favoritos propios |
+| POST | `/api/favoritos/conductores` | autenticado | Guarda un piloto registrado (`conductor_id`) |
+| DELETE | `/api/favoritos/conductores/:conductorId` | autenticado | Quita un piloto de favoritos |
+| GET | `/api/referidos` | autenticado | Código propio, conteo de invitados y bonos acreditados |
+| POST | `/api/referidos/aplicar` | cliente | Aplica el código de un invitador antes de su primera carrera |
 | GET | `/admin/recargas?estado=pendiente` | admin | Recargas por revisar |
 | POST | `/admin/recargas/:id/aprobar` | admin | Acredita el saldo |
 | POST | `/admin/recargas/:id/rechazar` | admin | Rechaza con motivo |
@@ -268,6 +280,32 @@ dato no salió del navegador. El único punto que decide es
 | POST | `/admin/conductores/:usuarioId/verificar` | admin | Aprueba o rechaza documentos |
 | GET | `/admin/solicitudes?estado=nueva&tipo=contacto` | admin | Bandeja de formularios (los dos filtros son opcionales) |
 | POST | `/admin/solicitudes/:id/estado` | admin | Clasifica (`nueva`, `en_curso`, `respondida`, `archivada`) y deja nota |
+
+### Viajes programados
+
+`POST /scheduled-rides` requiere `origen`, `destino`, `servicio`
+(`mototaxi`, `taxi-pana` o `delivery`), `programado_para` como fecha ISO 8601
+futura con zona horaria y `precio_usd`. Acepta además `metodo_pago`,
+`distancia_km` y pares opcionales `origen_lat`/`origen_lng` y
+`destino_lat`/`destino_lng`. La API persiste y devuelve el estado
+`programado`; `POST /scheduled-rides/:id/cancel` cambia el estado a
+`cancelado`. Estos endpoints no asignan un conductor ni convierten la
+solicitud automáticamente en un viaje inmediato.
+
+### Favoritos y referidos
+
+Las rutas de favoritos guardan direcciones con coordenadas y pilotos registrados
+para que el pasajero los gestione desde su perfil. Guardar un piloto favorito no
+altera la asignación: los viajes siguen disponibles para el primer conductor que
+los acepte.
+
+El código personal está disponible en `GET /api/referidos`. Un pasajero aplica
+un código con `POST /api/referidos/aplicar` y el invitado debe hacerlo antes de
+tener una carrera finalizada. Cuando una carrera de ese invitado pasa a
+`finalizado` con un conductor asignado, PostgreSQL acredita $5 USD al invitado y
+$5 USD al anfitrión mediante movimientos de billetera; cancelaciones y carreras
+sin conductor no generan el bono. El estado del referido y una restricción única
+evitan acreditarlo más de una vez.
 
 ## Ejemplos
 

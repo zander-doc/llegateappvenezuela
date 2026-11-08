@@ -1158,3 +1158,206 @@ test("un viaje con saldo se acepta, inicia y cobra con la comisión del 10%", as
   assert.equal(historialPiloto.status, 200);
   assert.deepEqual(historialPiloto.cuerpo.viajes, []);
 });
+
+test("los viajes programados se guardan, respetan su dueño y se pueden cancelar", async () => {
+  const cliente = await sesion("cliente", CLIENTE);
+  const otroCliente = await sesion("admin", ADMIN);
+  const programadoPara = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const cuerpo = {
+    origen: "Plaza Bolívar de Maracay",
+    destino: "Terminal Central",
+    origen_lat: 10.248,
+    origen_lng: -67.6,
+    destino_lat: 10.2425,
+    destino_lng: -67.595,
+    servicio: "taxi-pana",
+    programado_para: programadoPara,
+    distancia_km: 2.4,
+    precio_usd: 4.25,
+    metodo_pago: "efectivo",
+  };
+
+  const noAutenticado = await pedir("GET", "/scheduled-rides");
+  assert.equal(noAutenticado.status, 401);
+
+  const creacion = await pedir("POST", "/scheduled-rides", {
+    token: cliente.access_token,
+    cuerpo,
+  });
+  assert.equal(creacion.status, 201);
+  const viaje = creacion.cuerpo.viaje_programado;
+  assert.equal(viaje.estado, "programado");
+  assert.equal(viaje.servicio, "taxi-pana");
+  assert.equal(viaje.origen_lat, 10.248);
+  assert.equal(viaje.destino_lng, -67.595);
+  assert.equal(viaje.precio_usd, 4.25);
+  assert.equal(viaje.cancelado_en, null);
+
+  const listado = await pedir("GET", "/scheduled-rides", { token: cliente.access_token });
+  assert.deepEqual(listado.cuerpo.viajes_programados.map((item) => item.id), [viaje.id]);
+
+  const detallePropio = await pedir("GET", `/scheduled-rides/${viaje.id}`, {
+    token: cliente.access_token,
+  });
+  assert.equal(detallePropio.status, 200);
+  assert.equal(detallePropio.cuerpo.viaje_programado.id, viaje.id);
+
+  const detalleAjeno = await pedir("GET", `/scheduled-rides/${viaje.id}`, {
+    token: otroCliente.access_token,
+  });
+  assert.equal(detalleAjeno.status, 404);
+
+  const fechaPasada = await pedir("POST", "/scheduled-rides", {
+    token: cliente.access_token,
+    cuerpo: { ...cuerpo, programado_para: new Date(Date.now() - 60_000).toISOString() },
+  });
+  assert.equal(fechaPasada.status, 422);
+
+  const coordenadaIncompleta = await pedir("POST", "/scheduled-rides", {
+    token: cliente.access_token,
+    cuerpo: { ...cuerpo, origen_lng: undefined },
+  });
+  assert.equal(coordenadaIncompleta.status, 422);
+
+  const cancelacion = await pedir("POST", `/scheduled-rides/${viaje.id}/cancel`, {
+    token: cliente.access_token,
+  });
+  assert.equal(cancelacion.status, 200);
+  assert.equal(cancelacion.cuerpo.viaje_programado.estado, "cancelado");
+  assert.ok(cancelacion.cuerpo.viaje_programado.cancelado_en);
+
+  const cancelarDeNuevo = await pedir("POST", `/scheduled-rides/${viaje.id}/cancel`, {
+    token: cliente.access_token,
+  });
+  assert.equal(cancelarDeNuevo.status, 409);
+
+  const valorPersistido = await sql(
+    "select estado, servicio from public.viajes_programados where id = $1",
+    [viaje.id],
+  );
+  assert.deepEqual(valorPersistido, [{ estado: "cancelado", servicio: "taxi-pana" }]);
+});
+
+test("las direcciones y los conductores favoritos solo se gestionan por su pasajero", async () => {
+  const cliente = await sesion("cliente-favoritos", CLIENTE);
+  const admin = await sesion("admin-favoritos", ADMIN);
+
+  const direccion = await pedir("POST", "/api/favoritos/direcciones", {
+    token: cliente.access_token,
+    cuerpo: { etiqueta: "Casa", direccion_texto: "Av. Bolívar, Maracay", lat: 10.25, lng: -67.58 },
+  });
+  assert.equal(direccion.status, 201);
+  const direccionId = direccion.cuerpo.direccion.id;
+
+  const actualizada = await pedir("POST", "/api/favoritos/direcciones", {
+    token: cliente.access_token,
+    cuerpo: { etiqueta: "casa", direccion_texto: "Av. Bolívar Este, Maracay", lat: 10.26, lng: -67.59 },
+  });
+  assert.equal(actualizada.status, 201);
+  assert.equal(actualizada.cuerpo.direccion.id, direccionId);
+  assert.equal(actualizada.cuerpo.direccion.direccion_texto, "Av. Bolívar Este, Maracay");
+
+  const direcciones = await pedir("GET", "/api/favoritos/direcciones", { token: cliente.access_token });
+  assert.equal(direcciones.cuerpo.direcciones.length, 1);
+  assert.equal(direcciones.cuerpo.direcciones[0].etiqueta, "casa");
+
+  const favorito = await pedir("POST", "/api/favoritos/conductores", {
+    token: cliente.access_token,
+    cuerpo: { conductor_id: PILOTO.id },
+  });
+  assert.equal(favorito.status, 201);
+
+  const conductores = await pedir("GET", "/api/favoritos/conductores", { token: cliente.access_token });
+  assert.deepEqual(conductores.cuerpo.conductores.map((item) => item.conductor_id), [PILOTO.id]);
+  assert.equal(conductores.cuerpo.conductores[0].nombre, "Carlos Conductor");
+
+  const favoritosAjeno = await pedir("GET", "/api/favoritos/conductores", { token: admin.access_token });
+  assert.deepEqual(favoritosAjeno.cuerpo.conductores, []);
+
+  const direccionAjena = await pedir("DELETE", `/api/favoritos/direcciones/${direccionId}`, {
+    token: admin.access_token,
+  });
+  assert.equal(direccionAjena.status, 404);
+
+  const conductorBorrado = await pedir("DELETE", `/api/favoritos/conductores/${PILOTO.id}`, {
+    token: cliente.access_token,
+  });
+  assert.equal(conductorBorrado.status, 200);
+
+  const direccionBorrada = await pedir("DELETE", `/api/favoritos/direcciones/${direccionId}`, {
+    token: cliente.access_token,
+  });
+  assert.equal(direccionBorrada.status, 200);
+});
+
+test("el referido bonifica una sola vez $5 al anfitrión y al invitado en la primera carrera", async () => {
+  const anfitrion = await sesion("anfitrion-referido", { telefono: "+584149999990" });
+  const invitadoCuenta = { telefono: "+584149999991" };
+  const invitado = await sesion("invitado-referido", invitadoCuenta);
+  const piloto = await sesion("piloto-referido", PILOTO);
+
+  const resumenAntes = await pedir("GET", "/api/referidos", { token: anfitrion.access_token });
+  assert.equal(resumenAntes.status, 200);
+  assert.match(resumenAntes.cuerpo.resumen.codigo_referido, /^LLEGATE-[0-9A-F]{32}$/);
+
+  const autoReferido = await pedir("POST", "/api/referidos/aplicar", {
+    token: anfitrion.access_token,
+    cuerpo: { codigo_referido: resumenAntes.cuerpo.resumen.codigo_referido },
+  });
+  assert.equal(autoReferido.status, 400);
+
+  const aplicado = await pedir("POST", "/api/referidos/aplicar", {
+    token: invitado.access_token,
+    cuerpo: { codigo_referido: resumenAntes.cuerpo.resumen.codigo_referido.toLowerCase() },
+  });
+  assert.equal(aplicado.status, 201, JSON.stringify(aplicado.cuerpo));
+  assert.equal(aplicado.cuerpo.estado, "pendiente");
+
+  const repetido = await pedir("POST", "/api/referidos/aplicar", {
+    token: invitado.access_token,
+    cuerpo: { codigo_referido: resumenAntes.cuerpo.resumen.codigo_referido },
+  });
+  assert.equal(repetido.status, 400);
+
+  const saldoAntes = await sql(
+    "select id, saldo_billetera from public.usuarios where id = any($1::uuid[]) order by id",
+    [[anfitrion.usuario.id, invitado.usuario.id]],
+  );
+  const viajeCreado = await pedir("POST", "/trips", {
+    token: invitado.access_token,
+    cuerpo: { origen: "Plaza Bolívar", destino: "Terminal Central", precio_usd: 5, metodo_pago: "efectivo" },
+  });
+  assert.equal(viajeCreado.status, 201);
+  const viajeId = viajeCreado.cuerpo.viaje.id;
+
+  const aceptado = await pedir("POST", `/trips/${viajeId}/aceptar`, { token: piloto.access_token });
+  assert.equal(aceptado.status, 200);
+  const iniciado = await pedir("POST", `/trips/${viajeId}/iniciar`, { token: piloto.access_token });
+  assert.equal(iniciado.status, 200);
+  const finalizado = await pedir("POST", `/trips/${viajeId}/finalizar`, { token: piloto.access_token });
+  assert.equal(finalizado.status, 200, JSON.stringify(finalizado.cuerpo));
+
+  const saldoDespues = await sql(
+    "select id, saldo_billetera from public.usuarios where id = any($1::uuid[]) order by id",
+    [[anfitrion.usuario.id, invitado.usuario.id]],
+  );
+  assert.deepEqual(
+    saldoDespues.map((fila, index) => Number(fila.saldo_billetera) - Number(saldoAntes[index].saldo_billetera)),
+    [5, 5],
+  );
+
+  const bonos = await sql(
+    `select usuario_id, monto_usd, referido_id
+       from public.transacciones_billetera
+      where referido_id = $1
+      order by usuario_id`,
+    [aplicado.cuerpo.referido_id],
+  );
+  assert.equal(bonos.length, 2);
+  assert.deepEqual(bonos.map((bono) => Number(bono.monto_usd)), [5, 5]);
+
+  const resumenDespues = await pedir("GET", "/api/referidos", { token: anfitrion.access_token });
+  assert.equal(resumenDespues.cuerpo.resumen.invitados, 1);
+  assert.equal(resumenDespues.cuerpo.resumen.invitados_bonificados, 1);
+  assert.equal(Number(resumenDespues.cuerpo.resumen.bono_acumulado_usd), 5);
+});

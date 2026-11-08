@@ -148,6 +148,11 @@ fun HomeScreen(
 
     // FULLSCREEN MAP MODE
     if (uiState.showFullMapExpanded) {
+        val selectedEstimate = when (uiState.selectedService) {
+            ServiceType.MOTO -> uiState.motoEstimate
+            ServiceType.CAR -> uiState.carEstimate
+            ServiceType.DELIVERY -> uiState.deliveryEstimate
+        }
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -179,17 +184,95 @@ fun HomeScreen(
                     )
                 }
             }
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Asphalt950.copy(alpha = 0.96f),
+                border = BorderStroke(1.dp, Asphalt700),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 38.dp)
+                    .testTag("map_destination_confirmation")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "DESTINO SELECCIONADO",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Emerald500
+                    )
+                    Text(
+                        text = uiState.destination.title,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Stone100,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = uiState.destination.subtitle,
+                        fontSize = 12.sp,
+                        color = Stone300,
+                        maxLines = 2
+                    )
+                    Text(
+                        text = uiState.routeDistanceKm?.let {
+                            "Ruta por calles: ${String.format(java.util.Locale.US, "%.1f", it)} km"
+                        } ?: "Estimación preliminar; esperando la ruta por calles.",
+                        fontSize = 11.sp,
+                        color = Stone400
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedEstimate?.let { usdConSigno(it.priceUsd) }
+                                ?: "Calculando tarifa…",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            color = RacingYellow500
+                        )
+                        Text(
+                            text = uiState.selectedService.colloquialTitle,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Stone300
+                        )
+                    }
+                    Button(
+                        onClick = { viewModel.openBooking(uiState.selectedService) },
+                        enabled = selectedEstimate != null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("map_continue_to_booking"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RacingYellow500,
+                            contentColor = Asphalt950,
+                            disabledContainerColor = Asphalt700,
+                            disabledContentColor = Stone400
+                        )
+                    ) {
+                        Text("Continuar con este destino", fontWeight = FontWeight.Black)
+                    }
+                }
+            }
         }
         return
     }
 
-    // MAIN SCREEN WITH LARGE LEAFLET DARK MATTER MAP AND FLOATING CONTROLS
+    // Main screen with the interactive dark map and floating controls.
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Asphalt950)
     ) {
-        // 1. LARGE LIVE LEAFLET + CARTODB DARK MATTER MAP (Top half of the screen)
+        // 1. Live Leaflet map with destination selection and road routing.
         LeafletDarkMapView(
             uiState = uiState,
             viewModel = viewModel,
@@ -1343,6 +1426,22 @@ fun HomeScreen(
                             fontSize = 11.sp,
                             color = RacingRed500
                         )
+                    }
+                    if (cuenta?.rol == "cliente") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = { viewModel.openProfile() },
+                                modifier = Modifier.testTag("open_profile")
+                            ) {
+                                Text("Favoritos", color = NeonOrange400)
+                            }
+                            TextButton(
+                                onClick = { viewModel.openReferrals() },
+                                modifier = Modifier.testTag("open_referrals")
+                            ) {
+                                Text("Invita a tus panas", color = NeonOrange400)
+                            }
+                        }
                     }
                     Text(
                         text = "La comisión del ${comisionTexto(uiState)} se descuenta del saldo al completar cada viaje. " +

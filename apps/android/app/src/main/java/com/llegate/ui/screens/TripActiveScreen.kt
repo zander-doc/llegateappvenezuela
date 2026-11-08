@@ -369,15 +369,16 @@ fun TripActiveScreen(
                 }
             }
 
-            // 2. LA RUTA: mapa si hay coordenadas, texto si la API solo guardó nombres
+            // 2. The assigned trip route, without destination-selection gestures.
             if (trip.origin.tieneCoordenadas && trip.destination.tieneCoordenadas) {
                 item {
                     LeafletDarkMapView(
-                        uiState = uiState,
+                        uiState = uiState.copy(origin = trip.origin, destination = trip.destination),
                         viewModel = viewModel,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(250.dp)
+                            .height(250.dp),
+                        enableDestinationSelection = false
                     )
                 }
             } else {
@@ -389,7 +390,13 @@ fun TripActiveScreen(
             // 3. EL PILOTO QUE LA API ASIGNÓ (o el aviso de que aún no hay)
             if (pana != null) {
                 item {
-                    TarjetaPiloto(trip = trip, pana = pana, viewModel = viewModel, context = context)
+                    TarjetaPiloto(
+                        trip = trip,
+                        pana = pana,
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        context = context
+                    )
                 }
             } else {
                 item {
@@ -597,6 +604,7 @@ private fun TarjetaRutaTexto(trip: ActiveTrip, modifier: Modifier = Modifier) {
 private fun TarjetaPiloto(
     trip: ActiveTrip,
     pana: DriverProfile,
+    uiState: LlegateUiState,
     viewModel: LlegateViewModel,
     context: Context,
     modifier: Modifier = Modifier
@@ -733,6 +741,20 @@ private fun TarjetaPiloto(
                     color = Stone400,
                     modifier = Modifier.padding(top = 10.dp)
                 )
+            }
+
+            if (trip.currentStep == TripStep.TRIP_COMPLETED && pana.id != null) {
+                val isFavorite = uiState.favoriteDrivers.any { it.id == pana.id }
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = { viewModel.cambiarConductorFavorito(pana.id) },
+                    enabled = !uiState.favoriteRequestInProgress,
+                    modifier = Modifier.fillMaxWidth().testTag("toggle_completed_trip_favorite_driver"),
+                    border = BorderStroke(1.dp, NeonOrange400),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonOrange400)
+                ) {
+                    Text(if (isFavorite) "Quitar de mis pilotos favoritos" else "Guardar como piloto favorito")
+                }
             }
         }
     }

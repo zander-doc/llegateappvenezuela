@@ -113,7 +113,8 @@ fun conductorDe(viaje: Viaje): DriverProfile? = viaje.conductor?.let {
     vehicleModel = listOfNotNull(it.marca, it.modelo).joinToString(" ").ifBlank { null },
     tipoVehiculo = it.tipoVehiculo,
     phone = it.telefono,
-    verified = it.verificado
+    verified = it.verificado,
+    id = viaje.conductorId
   )
 }
 

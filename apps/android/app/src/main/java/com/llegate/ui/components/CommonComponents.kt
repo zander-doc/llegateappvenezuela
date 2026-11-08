@@ -43,6 +43,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
 import com.llegate.R
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -206,3 +207,16 @@ fun DriverAvatarBadge(
         }
     }
 }
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F172A)
+@Composable
+fun VenezuelanPlateBadgePreview() {
+    VenezuelanPlateBadge(plate = "AB123CD")
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F172A)
+@Composable
+fun DriverAvatarBadgePreview() {
+    DriverAvatarBadge(initials = "JR", isVerified = true)
+}
+

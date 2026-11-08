@@ -151,7 +151,8 @@ data class DriverProfile(
     val vehicleModel: String?,
     val tipoVehiculo: String?,
     val phone: String?,
-    val verified: Boolean
+    val verified: Boolean,
+    val id: String? = null
 )
 
 enum class TripStep {

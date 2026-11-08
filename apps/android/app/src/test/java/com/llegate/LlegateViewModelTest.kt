@@ -126,6 +126,19 @@ class LlegateViewModelTest {
   }
 
   @Test
+  fun `la estimacion usa la distancia vial disponible y vuelve al estimado provisional si falla`() {
+    val viewModel = nuevoViewModel()
+
+    viewModel.updateRoadRouteDistance(8.7)
+    assertEquals(8.7, viewModel.uiState.value.routeDistanceKm!!, 0.0)
+    assertEquals(8.7, viewModel.uiState.value.motoEstimate!!.distanceKm, 0.0)
+
+    viewModel.updateRoadRouteDistance(null)
+    assertNull(viewModel.uiState.value.routeDistanceKm)
+    assertTrue(viewModel.uiState.value.motoEstimate!!.distanceKm != 8.7)
+  }
+
+  @Test
   fun `verify smart location suggestions and 1-tap route selection`() {
     val viewModel = nuevoViewModel()
     val state = viewModel.uiState.value
@@ -203,7 +216,29 @@ class LlegateViewModelTest {
     assertTrue(viaje!!.priceUsd > 0.0)
     assertTrue(viaje.priceBs > 0.0)
   }
+
+  @Test
+  fun `seleccionar destino por coordenadas actualiza la estimacion`() {
+    val viewModel = nuevoViewModel()
+    viewModel.updateOrigin(
+      LocationPoint("Origen", "Maracay", 10.2480, -67.6000, stateName = "Aragua", cityName = "Maracay")
+    )
+    val distanciaAnterior = viewModel.uiState.value.motoEstimate!!.distanceKm
+
+    val puntoSeleccionado = LocationPoint(
+      "Punto en el Mapa (10.400, -67.600)",
+      "Maracay, Aragua",
+      10.4000,
+      -67.6000,
+      stateName = "Aragua",
+      cityName = "Maracay"
+    )
+    viewModel.updateDestination(puntoSeleccionado)
+
+    val actualizado = viewModel.uiState.value
+    assertEquals(10.4000, actualizado.destination.lat, 0.0)
+    assertEquals(-67.6000, actualizado.destination.lng, 0.0)
+    assertTrue(actualizado.motoEstimate!!.distanceKm > distanciaAnterior)
+  }
 }
-
-
 

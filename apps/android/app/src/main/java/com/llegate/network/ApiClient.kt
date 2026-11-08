@@ -44,17 +44,25 @@ open class ApiClient(
   open suspend fun post(path: String, body: JSONObject, accessToken: String? = null): JSONObject =
     request(path, body, accessToken)
 
+  open suspend fun delete(path: String, accessToken: String? = null): JSONObject =
+    request(path, null, accessToken, "DELETE")
+
   private suspend fun request(
     path: String,
     body: JSONObject?,
-    accessToken: String?
+    accessToken: String?,
+    method: String = if (body == null) "GET" else "POST"
   ): JSONObject = withContext(Dispatchers.IO) {
     val builder = Request.Builder()
       .url(baseUrl + path)
       .header("User-Agent", ApiConfig.USER_AGENT)
       .header("Accept", "application/json")
     accessToken?.let { builder.header("Authorization", "Bearer $it") }
-    if (body != null) builder.post(body.toString().toRequestBody(ApiConfig.JSON))
+    when (method) {
+      "GET" -> Unit
+      "DELETE" -> builder.delete()
+      else -> builder.post(body.toString().toRequestBody(ApiConfig.JSON))
+    }
 
     try {
       client.newCall(builder.build()).execute().use { response ->

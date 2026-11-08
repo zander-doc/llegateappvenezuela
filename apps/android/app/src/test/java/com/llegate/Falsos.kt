@@ -35,6 +35,11 @@ internal class ApiFalsa(
     tokens.add(accessToken)
     return responder(path, body)
   }
+
+  override suspend fun delete(path: String, accessToken: String?): JSONObject {
+    tokens.add(accessToken)
+    return responder(path, null)
+  }
 }
 
 internal fun storeConSesion(): SessionStore {

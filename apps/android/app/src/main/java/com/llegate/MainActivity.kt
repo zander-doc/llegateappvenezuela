@@ -31,6 +31,8 @@ import com.llegate.network.AuthRepository
 import com.llegate.ui.screens.BookingScreen
 import com.llegate.ui.screens.HomeScreen
 import com.llegate.ui.screens.LoginScreen
+import com.llegate.ui.screens.ProfileScreen
+import com.llegate.ui.screens.ReferralsScreen
 import com.llegate.ui.screens.TripActiveScreen
 import com.llegate.ui.screens.TripHistoryScreen
 import com.llegate.ui.theme.MyApplicationTheme
@@ -90,6 +92,8 @@ fun LlegateApp(viewModel: LlegateViewModel) {
                         AppScreen.BOOKING_DETAILS -> BookingScreen(uiState = uiState, viewModel = viewModel)
                         AppScreen.TRIP_ACTIVE -> TripActiveScreen(uiState = uiState, viewModel = viewModel)
                         AppScreen.TRIP_HISTORY -> TripHistoryScreen(uiState = uiState, viewModel = viewModel)
+                        AppScreen.PROFILE -> ProfileScreen(uiState = uiState, viewModel = viewModel)
+                        AppScreen.REFERRALS -> ReferralsScreen(uiState = uiState, viewModel = viewModel)
                     }
                 }
             }

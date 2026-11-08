@@ -16,6 +16,8 @@ class AuthorizedClient(
 
   suspend fun post(path: String, body: JSONObject): JSONObject = conToken { api.post(path, body, it) }
 
+  suspend fun delete(path: String): JSONObject = conToken { api.delete(path, it) }
+
   private suspend fun conToken(llamada: suspend (String) -> JSONObject): JSONObject {
     val token = store.accessTokenVigente() ?: renovar()?.accessToken ?: throw sinSesion()
     return try {

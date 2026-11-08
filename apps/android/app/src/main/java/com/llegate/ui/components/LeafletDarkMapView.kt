@@ -1,8 +1,8 @@
 package com.llegate.ui.components
 
 import android.annotation.SuppressLint
-import android.content.Context
-import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -12,6 +12,8 @@ import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,7 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CompassCalibration
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Layers
@@ -58,24 +59,23 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.viewinterop.AndroidView
 import com.llegate.model.LocationPoint
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
-import com.llegate.ui.theme.CyanGlow
-import com.llegate.ui.theme.NeonOrange500
+import com.llegate.ui.theme.Emerald500
 import com.llegate.ui.theme.RacingYellow500
 import com.llegate.ui.theme.Stone100
 import com.llegate.ui.theme.Stone400
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
-import java.util.Locale
 
 /**
- * Modern interactive live map powered by Leaflet.js + OpenStreetMap with CartoDB Dark Matter tiles.
- * Tailored for Llégate App's signature high-contrast dark asphalt and vibrant yellow aesthetic.
+ * Leaflet map with Esri dark/imagery layers, visible attribution and real road geometry
+ * from OSRM. Destination selection is disabled while displaying a completed trip.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -84,20 +84,59 @@ fun LeafletDarkMapView(
     viewModel: LlegateViewModel,
     modifier: Modifier = Modifier,
     isExpanded: Boolean = false,
-    onExpandToggle: (() -> Unit)? = null
+    onExpandToggle: (() -> Unit)? = null,
+    enableDestinationSelection: Boolean = true
 ) {
     val context = LocalContext.current
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var isMapLoaded by remember { mutableStateOf(false) }
+    var isSatellite by remember { mutableStateOf(false) }
+    var routeStatus by remember { mutableStateOf("Calculando ruta vial…") }
 
     val origin = uiState.origin
     val destination = uiState.destination
-
     // Update map route when origin or destination changes
-    LaunchedEffect(origin.lat, origin.lng, destination.lat, destination.lng, isMapLoaded) {
+    LaunchedEffect(
+        origin.lat,
+        origin.lng,
+        destination.lat,
+        destination.lng,
+        isMapLoaded
+    ) {
         if (isMapLoaded && webViewInstance != null) {
-            val script = "if (window.updateRoute) { window.updateRoute(${origin.lat}, ${origin.lng}, ${destination.lat}, ${destination.lng}, '${origin.title.replace("'", "\\'")}', '${destination.title.replace("'", "\\'")}'); }"
+            val script = "if (window.updateRoute) { window.updateRoute(${origin.lat}, ${origin.lng}, ${destination.lat}, ${destination.lng}); }"
             webViewInstance?.evaluateJavascript(script, null)
+        }
+    }
+
+    LaunchedEffect(enableDestinationSelection, isMapLoaded) {
+        if (isMapLoaded) {
+            webViewInstance?.evaluateJavascript(
+                "window.setDestinationSelectionEnabled($enableDestinationSelection);",
+                null
+            )
+        }
+    }
+
+    val gpsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.values.any { it }) {
+            viewModel.requestCurrentGpsLocation(context) { point ->
+                webViewInstance?.evaluateJavascript("window.recenterMap(${point.lat}, ${point.lng});", null)
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewInstance?.apply {
+                stopLoading()
+                removeJavascriptInterface("AndroidBridge")
+                destroy()
+            }
+            webViewInstance = null
+            isMapLoaded = false
         }
     }
 
@@ -125,7 +164,6 @@ fun LeafletDarkMapView(
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
-                        databaseEnabled = true
                         cacheMode = WebSettings.LOAD_DEFAULT
                         loadWithOverviewMode = true
                         useWideViewPort = true
@@ -141,34 +179,31 @@ fun LeafletDarkMapView(
                         }
                     }
 
-                    addJavascriptInterface(object : Any() {
-                        @JavascriptInterface
-                        fun onMapClicked(lat: Double, lng: Double) {
-                            // User tapped on the map to set destination
-                            val clickedPoint = LocationPoint(
-                                title = "Punto en el Mapa (${String.format(Locale.US, "%.3f, %.3f", lat, lng)})",
-                                subtitle = "${uiState.selectedCityName}, ${uiState.currentState.name}",
-                                lat = lat,
-                                lng = lng,
-                                stateName = uiState.currentState.name,
-                                cityName = uiState.selectedCityName
-                            )
-                            viewModel.updateDestination(clickedPoint)
-                        }
-
-                        @JavascriptInterface
-                        fun onMarkerClicked(id: String) {
-                            // Safe point or vehicle tapped
-                        }
-                    }, "AndroidBridge")
+                    val mapView = this
+                    addJavascriptInterface(
+                        MapDestinationBridge(
+                            onMapClicked = { lat, lng ->
+                                mapView.post {
+                                    viewModel.updateDestinationFromMap(context, lat, lng)
+                                }
+                            },
+                            onRouteDistance = { distanceKm ->
+                                mapView.post { viewModel.updateRoadRouteDistance(distanceKm) }
+                            },
+                            onRouteStatus = { status ->
+                                mapView.post { routeStatus = status }
+                            }
+                        ),
+                        "AndroidBridge"
+                    )
 
                     val htmlContent = generateLeafletHtml(
                         originLat = origin.lat,
                         originLng = origin.lng,
-                        originTitle = origin.title,
                         destLat = destination.lat,
                         destLng = destination.lng,
-                        destTitle = destination.title
+                        isExpanded = isExpanded,
+                        enableDestinationSelection = enableDestinationSelection
                     )
                     // El HTML es propio y todos sus recursos usan URL absolutas, así que no necesita dominio base.
                     loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
@@ -203,7 +238,7 @@ fun LeafletDarkMapView(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Conectando CartoDB Dark GPS...",
+                        text = "Cargando mapa…",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Stone100
@@ -267,11 +302,27 @@ fun LeafletDarkMapView(
             // RECENTER TO CURRENT GPS LOCATION (TARGET RETICLE)
             Surface(
                 onClick = {
-                    viewModel.requestCurrentGpsLocation(context)
-                    webViewInstance?.evaluateJavascript(
-                        "if (window.recenterMap) { window.recenterMap(${origin.lat}, ${origin.lng}); }",
-                        null
-                    )
+                    val hasFine = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val hasCoarse = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val recenter: (LocationPoint) -> Unit = { point ->
+                        webViewInstance?.evaluateJavascript("window.recenterMap(${point.lat}, ${point.lng});", null)
+                    }
+                    if (hasFine || hasCoarse) {
+                        viewModel.requestCurrentGpsLocation(context, recenter)
+                    } else {
+                        gpsPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
                 },
                 shape = RoundedCornerShape(10.dp),
                 color = Asphalt900.copy(alpha = 0.92f),
@@ -285,6 +336,26 @@ fun LeafletDarkMapView(
                         imageVector = Icons.Default.MyLocation,
                         contentDescription = "Mi ubicación GPS",
                         tint = RacingYellow500,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+            }
+
+            Surface(
+                onClick = {
+                    isSatellite = !isSatellite
+                    webViewInstance?.evaluateJavascript("window.setSatelliteLayer($isSatellite);", null)
+                },
+                shape = RoundedCornerShape(10.dp),
+                color = Asphalt900.copy(alpha = 0.92f),
+                border = BorderStroke(1.dp, Asphalt700),
+                modifier = Modifier.size(40.dp).testTag("map_toggle_layer_button")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Layers,
+                        contentDescription = if (isSatellite) "Mostrar mapa nocturno" else "Mostrar satélite",
+                        tint = if (isSatellite) Emerald500 else Stone100,
                         modifier = Modifier.size(19.dp)
                     )
                 }
@@ -313,31 +384,28 @@ fun LeafletDarkMapView(
             }
         }
 
-        // Subtle live radar telemetry badge on bottom left of map
+        // The destination is visibly editable, and required map attribution stays visible.
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = Asphalt950.copy(alpha = 0.88f),
             border = BorderStroke(1.dp, Asphalt700),
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(10.dp)
+                .padding(start = 10.dp, bottom = 38.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(RacingYellow500)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+            Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                 Text(
-                    text = "CartoDB Dark • ${uiState.currentState.name}",
-                    fontSize = 10.sp,
+                    text = uiState.destination.title,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Stone400
+                    color = Stone100,
+                    maxLines = 1
+                )
+                Text(
+                    text = if (enableDestinationSelection) "Toca el mapa o arrastra el pin para cambiar destino" else routeStatus,
+                    fontSize = 9.sp,
+                    color = if (enableDestinationSelection) Emerald500 else Stone400,
+                    maxLines = 1
                 )
             }
         }
@@ -345,18 +413,18 @@ fun LeafletDarkMapView(
 }
 
 /**
- * Generates pristine HTML template embedding Leaflet 1.9.4 and CartoDB Dark Matter tiles.
+ * Generates the Leaflet map. Street geometry and distance come from OSRM; no
+ * straight-line route is drawn when routing is unavailable.
  */
 private fun generateLeafletHtml(
     originLat: Double,
     originLng: Double,
-    originTitle: String,
     destLat: Double,
     destLng: Double,
-    destTitle: String
+    isExpanded: Boolean,
+    enableDestinationSelection: Boolean
 ): String {
-    val escapedOrigin = originTitle.replace("'", "\\'")
-    val escapedDest = destTitle.replace("'", "\\'")
+    val expandedMapBottomPadding = if (isExpanded) 260 else 72
 
     return """
 <!DOCTYPE html>
@@ -390,7 +458,7 @@ private fun generateLeafletHtml(
             width: 30px;
             height: 30px;
             border-radius: 50%;
-            background: rgba(255, 210, 0, 0.4);
+            background: rgba(0, 209, 157, 0.4);
             animation: pulseAura 1.8s infinite ease-out;
         }
         .origin-core {
@@ -398,25 +466,26 @@ private fun generateLeafletHtml(
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #FFD200;
+            background: #00D19D;
             border: 3px solid #07090C;
-            box-shadow: 0 0 12px #FFD200;
+            box-shadow: 0 0 12px #00D19D;
         }
-        /* Destination Square Marker */
+        /* Destination pin with a bright, high-contrast accent. */
         .dest-marker-container {
+            width: 28px;
+            height: 36px;
             display: flex;
-            align-items: center;
             justify-content: center;
-            width: 24px;
-            height: 24px;
         }
         .dest-core {
-            width: 14px;
-            height: 14px;
-            border-radius: 3px;
-            background: #FFFFFF;
-            border: 3px solid #0D1017;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+            width: 22px;
+            height: 22px;
+            margin-top: 2px;
+            border: 3px solid #F7F9FC;
+            border-radius: 50% 50% 50% 4px;
+            background: #FF3B69;
+            box-shadow: 0 2px 12px rgba(255, 59, 105, .6);
+            transform: rotate(-45deg);
         }
         /* Vehicle Markers */
         .vehicle-marker {
@@ -445,6 +514,12 @@ private fun generateLeafletHtml(
         .leaflet-container {
             background-color: #07090C !important;
         }
+        .leaflet-control-attribution {
+            background: rgba(8, 12, 20, .84) !important;
+            color: #D7DEE8 !important;
+            font-size: 9px !important;
+        }
+        .leaflet-control-attribution a { color: #71DCC0 !important; }
     </style>
 </head>
 <body>
@@ -452,104 +527,204 @@ private fun generateLeafletHtml(
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map, routeGlow, routeLine, originMarker, destMarker, vehiclesLayer;
+        var darkLayer, satelliteLayer, imageryReference, darkReference;
+        var routeRequestTimer, routeTimeoutTimer, routeController, routeSequence = 0;
+        var destinationSelectionEnabled = $enableDestinationSelection;
+        var firstRoute = true;
         var currentOrigin = [$originLat, $originLng];
         var currentDest = [$destLat, $destLng];
 
         function initMap() {
             map = L.map('map', {
                 zoomControl: false,
-                attributionControl: false,
+                attributionControl: true,
                 fadeAnimation: true,
                 inertia: true
             }).setView(currentOrigin, 14);
 
-            // CARTODB DARK MATTER TILES (High contrast dark mode)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd',
-                maxZoom: 19,
-                minZoom: 4
-            }).addTo(map);
-
+            darkLayer = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                {
+                    maxZoom: 19,
+                    attribution: 'Tiles © Esri — Sources: Esri, HERE, Garmin, OpenStreetMap contributors'
+                }
+            );
+            darkReference = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+                { maxZoom: 19, attribution: '' }
+            );
+            satelliteLayer = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                {
+                    maxZoom: 19,
+                    attribution: 'Imagery © Esri, Maxar, Earthstar Geographics and GIS User Community'
+                }
+            );
+            imageryReference = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                { maxZoom: 19, attribution: '' }
+            );
+            darkLayer.addTo(map);
+            darkReference.addTo(map);
             vehiclesLayer = L.layerGroup().addTo(map);
-
-            drawRoute(currentOrigin, currentDest, '$escapedOrigin', '$escapedDest');
+            drawRoute(currentOrigin, currentDest);
 
             map.on('click', function(e) {
-                if (window.AndroidBridge && window.AndroidBridge.onMapClicked) {
-                    window.AndroidBridge.onMapClicked(e.latlng.lat, e.latlng.lng);
+                if (destinationSelectionEnabled) {
+                    selectDestination(e.latlng);
                 }
             });
         }
 
-        function createCurvedRoute(start, end) {
-            var points = [];
-            points.push(start);
-            // Generate intermediate natural curved road points
-            var midLat = (start[0] + end[0]) / 2;
-            var midLng = (start[1] + end[1]) / 2;
-            var offset = 0.003;
-            var wp1 = [start[0] * 0.7 + end[0] * 0.3 + offset * 0.6, start[1] * 0.7 + end[1] * 0.3 - offset * 0.4];
-            var wp2 = [midLat + offset, midLng + offset * 0.5];
-            var wp3 = [start[0] * 0.3 + end[0] * 0.7 - offset * 0.4, start[1] * 0.3 + end[1] * 0.7 + offset * 0.6];
-            points.push(wp1);
-            points.push(wp2);
-            points.push(wp3);
-            points.push(end);
-            return points;
+        function selectDestination(point) {
+            if (window.AndroidBridge && window.AndroidBridge.onMapClicked) {
+                window.AndroidBridge.onMapClicked(point.lat, point.lng);
+            }
         }
 
-        function drawRoute(orig, dest, origTitle, destTitle) {
-            if (routeGlow) map.removeLayer(routeGlow);
-            if (routeLine) map.removeLayer(routeLine);
-            if (originMarker) map.removeLayer(originMarker);
-            if (destMarker) map.removeLayer(destMarker);
-
-            var path = createCurvedRoute(orig, dest);
-
-            // Glowing vibrant yellow route line
-            routeGlow = L.polyline(path, {
-                color: '#FFD200',
-                weight: 10,
-                opacity: 0.32,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }).addTo(map);
-
-            routeLine = L.polyline(path, {
-                color: '#FFD200',
-                weight: 5,
-                opacity: 0.95,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }).addTo(map);
-
-            // Origin marker (Yellow glowing circle)
+        function ensureMarkers(orig, dest) {
             var originIcon = L.divIcon({
                 className: 'origin-div-icon',
                 html: '<div class="origin-marker-container"><div class="origin-pulse"></div><div class="origin-core"></div></div>',
                 iconSize: [32, 32],
                 iconAnchor: [16, 16]
             });
-            originMarker = L.marker(orig, { icon: originIcon }).addTo(map);
-
-            // Destination marker (White/Dark square)
             var destIcon = L.divIcon({
                 className: 'dest-div-icon',
                 html: '<div class="dest-marker-container"><div class="dest-core"></div></div>',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
+                iconSize: [28, 36],
+                iconAnchor: [14, 34]
             });
-            destMarker = L.marker(dest, { icon: destIcon }).addTo(map);
 
-            // Fit bounds with padding so both origin & destination are visible
-            var group = new L.featureGroup([originMarker, destMarker, routeLine]);
-            map.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 15 });
+            if (!originMarker) originMarker = L.marker(orig, { icon: originIcon }).addTo(map);
+            else originMarker.setLatLng(orig).setIcon(originIcon);
+            if (!destMarker) {
+                destMarker = L.marker(dest, {
+                    icon: destIcon,
+                    draggable: destinationSelectionEnabled,
+                    autoPan: true
+                }).addTo(map);
+                destMarker.on('dragend', function() {
+                    if (destinationSelectionEnabled) selectDestination(destMarker.getLatLng());
+                });
+            } else {
+                destMarker.setLatLng(dest).setIcon(destIcon);
+                if (destinationSelectionEnabled) destMarker.dragging.enable();
+                else destMarker.dragging.disable();
+            }
         }
 
-        window.updateRoute = function(oLat, oLng, dLat, dLng, oTitle, dTitle) {
+        function clearRoute() {
+            if (routeGlow) map.removeLayer(routeGlow);
+            if (routeLine) map.removeLayer(routeLine);
+            routeGlow = null;
+            routeLine = null;
+        }
+
+        function updateRouteGeometry() {
+            if (routeController) routeController.abort();
+            var requestSequence = ++routeSequence;
+            clearRoute();
+            if (window.AndroidBridge && window.AndroidBridge.onRouteStatus) {
+                window.AndroidBridge.onRouteStatus('Calculando ruta vial…');
+            }
+            if (!(currentOrigin[0] || currentOrigin[1]) || !(currentDest[0] || currentDest[1])) return;
+
+            routeController = new AbortController();
+            var routeTimedOut = false;
+            clearTimeout(routeTimeoutTimer);
+            routeTimeoutTimer = setTimeout(function() {
+                routeTimedOut = true;
+                routeController.abort();
+            }, 12000);
+            var url = 'https://router.project-osrm.org/route/v1/driving/' +
+                currentOrigin[1] + ',' + currentOrigin[0] + ';' +
+                currentDest[1] + ',' + currentDest[0] +
+                '?overview=full&geometries=geojson&steps=false';
+            fetch(url, { signal: routeController.signal })
+                .then(function(response) {
+                    if (!response.ok) throw new Error('route_http_' + response.status);
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (requestSequence !== routeSequence) return;
+                    clearTimeout(routeTimeoutTimer);
+                    if (!data.routes || !data.routes.length || data.routes[0].geometry.coordinates.length < 2) {
+                        throw new Error('route_not_found');
+                    }
+                    var route = data.routes[0];
+                    var points = route.geometry.coordinates.map(function(point) {
+                        return [point[1], point[0]];
+                    });
+                    routeGlow = L.polyline(points, {
+                        color: '#00D19D', weight: 11, opacity: .28,
+                        lineCap: 'round', lineJoin: 'round'
+                    }).addTo(map);
+                    routeLine = L.polyline(points, {
+                        color: '#42E6B8', weight: 5, opacity: .96,
+                        lineCap: 'round', lineJoin: 'round'
+                    }).addTo(map);
+                    if (window.AndroidBridge && window.AndroidBridge.onRouteDistance) {
+                        window.AndroidBridge.onRouteDistance(route.distance / 1000);
+                    }
+                    if (window.AndroidBridge && window.AndroidBridge.onRouteStatus) {
+                        window.AndroidBridge.onRouteStatus('Ruta por calles');
+                    }
+                })
+                .catch(function(error) {
+                    if (requestSequence !== routeSequence) return;
+                    clearTimeout(routeTimeoutTimer);
+                    if (error.name === 'AbortError' && !routeTimedOut) return;
+                    if (window.AndroidBridge && window.AndroidBridge.onRouteDistance) {
+                        window.AndroidBridge.onRouteUnavailable();
+                    }
+                    if (window.AndroidBridge && window.AndroidBridge.onRouteStatus) {
+                        window.AndroidBridge.onRouteStatus('Ruta vial no disponible');
+                    }
+                });
+        }
+
+        function drawRoute(orig, dest) {
+            ensureMarkers(orig, dest);
+            if (routeRequestTimer) clearTimeout(routeRequestTimer);
+            routeRequestTimer = setTimeout(updateRouteGeometry, 300);
+            if (firstRoute) {
+                map.fitBounds(L.latLngBounds([orig, dest]), {
+                    paddingTopLeft: [72, 72],
+                    paddingBottomRight: [72, $expandedMapBottomPadding],
+                    maxZoom: 15
+                });
+                firstRoute = false;
+            }
+        }
+
+        window.updateRoute = function(oLat, oLng, dLat, dLng) {
             currentOrigin = [oLat, oLng];
             currentDest = [dLat, dLng];
-            drawRoute(currentOrigin, currentDest, oTitle, dTitle);
+            drawRoute(currentOrigin, currentDest);
+        };
+
+        window.setDestinationSelectionEnabled = function(enabled) {
+            destinationSelectionEnabled = !!enabled;
+            if (destMarker) {
+                if (destinationSelectionEnabled) destMarker.dragging.enable();
+                else destMarker.dragging.disable();
+            }
+        };
+
+        window.setSatelliteLayer = function(enabled) {
+            if (!map) return;
+            if (enabled) {
+                map.removeLayer(darkLayer);
+                map.removeLayer(darkReference);
+                satelliteLayer.addTo(map);
+                imageryReference.addTo(map);
+            } else {
+                map.removeLayer(satelliteLayer);
+                map.removeLayer(imageryReference);
+                darkLayer.addTo(map);
+                darkReference.addTo(map);
+            }
         };
 
         window.updateVehicles = function(vehicles) {
@@ -588,4 +763,36 @@ private fun generateLeafletHtml(
 </body>
 </html>
     """.trimIndent()
+}
+
+private class MapDestinationBridge(
+    private val onMapClicked: (Double, Double) -> Unit,
+    private val onRouteDistance: (Double?) -> Unit,
+    private val onRouteStatus: (String) -> Unit
+) {
+    @JavascriptInterface
+    fun onMapClicked(lat: Double, lng: Double) {
+        if (lat.isFinite() && lng.isFinite() && lat in -90.0..90.0 && lng in -180.0..180.0) {
+            onMapClicked.invoke(lat, lng)
+        }
+    }
+
+    @JavascriptInterface
+    fun onRouteDistance(distanceKm: Double) {
+        if (distanceKm.isFinite() && distanceKm > 0.0) onRouteDistance.invoke(distanceKm)
+    }
+
+    @JavascriptInterface
+    fun onRouteUnavailable() {
+        onRouteDistance.invoke(null)
+    }
+
+    @JavascriptInterface
+    fun onRouteStatus(status: String) {
+        val safeStatus = when (status) {
+            "Calculando ruta vial…", "Ruta por calles", "Ruta vial no disponible" -> status
+            else -> "Ruta vial"
+        }
+        onRouteStatus.invoke(safeStatus)
+    }
 }

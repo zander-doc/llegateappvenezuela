@@ -1,12 +1,15 @@
 package com.llegate.viewmodel
 
 import android.annotation.SuppressLint
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.location.Geocoder
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.core.content.ContextCompat
 import com.llegate.model.ActiveTrip
 import com.llegate.model.AutomotivePartner
 import com.llegate.model.CityInfo
@@ -28,14 +31,20 @@ import com.llegate.network.ConfigApp
 import com.llegate.network.ConfigRepository
 import com.llegate.network.EstadoPago
 import com.llegate.network.EstadoViaje
+import com.llegate.network.FavoriteAddress
+import com.llegate.network.FavoriteDriver
+import com.llegate.network.FavoriteRepository
 import com.llegate.network.MetodoPagoDisponible
 import com.llegate.network.Movimiento
 import com.llegate.network.Pago
 import com.llegate.network.PagoRepository
+import com.llegate.network.ReferralSummary
 import com.llegate.network.puntoDeTexto
+import com.llegate.network.ScheduledRideRepository
 import com.llegate.network.TripRepository
 import com.llegate.network.Usuario
 import com.llegate.network.Viaje
+import com.llegate.network.ViajeProgramado
 import com.llegate.network.WalletRepository
 import com.llegate.util.aE164Venezuela
 import com.llegate.util.digitos
@@ -43,7 +52,10 @@ import com.llegate.util.esNombrePersona
 import com.llegate.util.esReferenciaPagoMovil
 import com.llegate.util.usd
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +63,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -62,7 +75,9 @@ enum class AppScreen {
     HOME,
     BOOKING_DETAILS,
     TRIP_ACTIVE,
-    TRIP_HISTORY
+    TRIP_HISTORY,
+    PROFILE,
+    REFERRALS
 }
 
 enum class PasoInicio {
@@ -259,7 +274,7 @@ data class LlegateUiState(
         subtitle = "Maracay, Estado Aragua (Sede Principal Llégate)",
         lat = 10.2458,
         lng = -67.5855,
-        isCurrentGps = true,
+        isCurrentGps = false,
         stateName = "Aragua",
         cityName = "Maracay"
     ),
@@ -271,6 +286,7 @@ data class LlegateUiState(
         stateName = "Aragua",
         cityName = "Maracay"
     ),
+    val routeDistanceKm: Double? = null,
     val showCitySelectorModal: Boolean = false,
     val showStateSelectorModal: Boolean = false,
     val upcomingServices: List<UpcomingService> = listOf(
@@ -351,6 +367,14 @@ data class LlegateUiState(
     val billetera: Billetera? = null,
     val movimientos: List<Movimiento> = emptyList(),
     val viajes: List<Viaje> = emptyList(),
+    val viajesProgramados: List<ViajeProgramado> = emptyList(),
+    val cargandoViajesProgramados: Boolean = false,
+    val favoriteAddresses: List<FavoriteAddress> = emptyList(),
+    val favoriteDrivers: List<FavoriteDriver> = emptyList(),
+    val loadingFavorites: Boolean = false,
+    val referralSummary: ReferralSummary? = null,
+    val referralCodeInput: String = "",
+    val favoriteRequestInProgress: Boolean = false,
     val pagos: List<Pago> = emptyList(),
     val metodosRecarga: List<MetodoPagoDisponible> = emptyList(),
     val cargandoBilletera: Boolean = false,
@@ -438,7 +462,9 @@ class LlegateViewModel(
     private val configRepo: ConfigRepository = ConfigRepository(),
     private val walletRepo: WalletRepository = WalletRepository(auth.http),
     private val pagoRepo: PagoRepository = PagoRepository(auth.http),
-    private val tripRepo: TripRepository = TripRepository(auth.http)
+    private val tripRepo: TripRepository = TripRepository(auth.http),
+    private val scheduledRideRepo: ScheduledRideRepository = ScheduledRideRepository(auth.http),
+    private val favoriteRepo: FavoriteRepository = FavoriteRepository(auth.http)
 ) : ViewModel() {
 
     private val bcvRateService = BcvRateService()
@@ -481,7 +507,11 @@ class LlegateViewModel(
                 null
             }
             _uiState.update { it.copy(cuenta = perfil, revisandoSesion = false) }
-            if (perfil != null) refrescarBilletera(silencioso = true)
+            if (perfil != null) {
+                refrescarBilletera(silencioso = true)
+                refrescarFavoritos()
+                refrescarReferidos()
+            }
         }
     }
 
@@ -578,6 +608,8 @@ class LlegateViewModel(
                         )
                     }
                     refrescarBilletera(silencioso = true)
+                    refrescarFavoritos()
+                    refrescarReferidos()
                 } catch (fallo: ApiException) {
                     avisarInicio(fallo.message ?: FALLA_GENERICO)
                 } catch (fallo: Exception) {
@@ -601,11 +633,18 @@ class LlegateViewModel(
                     movimientos = emptyList(),
                     pagos = emptyList(),
                     viajes = emptyList(),
+                    favoriteAddresses = emptyList(),
+                    favoriteDrivers = emptyList(),
+                    loadingFavorites = false,
+                    referralSummary = null,
+                    referralCodeInput = "",
                     showCuentaModal = false,
                     showRecargaModal = false,
                     pagoEnCurso = null,
                     currentScreen = AppScreen.HOME,
                     activeTrip = null,
+                    viajesProgramados = emptyList(),
+                    cargandoViajesProgramados = false,
                     pasoInicio = PasoInicio.DATOS,
                     codigo = "",
                     nombre = "",
@@ -663,6 +702,91 @@ class LlegateViewModel(
         }
         _uiState.update { it.copy(viajes = viajes) }
         reanudarViajeAbierto(viajes)
+    }
+
+    fun cargarViajesProgramados() {
+        if (!auth.tieneSesion) {
+            avisar("Entra a tu cuenta para consultar tus viajes programados.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(cargandoViajesProgramados = true) }
+            try {
+                val viajesProgramados = scheduledRideRepo.listar()
+                _uiState.update { it.copy(viajesProgramados = viajesProgramados) }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(cargandoViajesProgramados = false) }
+            }
+        }
+    }
+
+    fun programarViaje(programadoPara: String) {
+        val state = _uiState.value
+        if (!auth.tieneSesion) {
+            avisar("Entra a tu cuenta para programar un viaje.")
+            return
+        }
+        val estimate = when (state.selectedService) {
+            ServiceType.MOTO -> state.motoEstimate
+            ServiceType.CAR -> state.carEstimate
+            ServiceType.DELIVERY -> state.deliveryEstimate
+        }
+        if (estimate == null) {
+            avisar("Toca un origen y un destino para conocer la tarifa.")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(cargandoViajesProgramados = true) }
+            try {
+                val viajeProgramado = scheduledRideRepo.crear(
+                    origen = state.origin,
+                    destino = state.destination,
+                    servicio = state.selectedService.slug,
+                    programadoPara = programadoPara,
+                    precioUsd = estimate.priceUsd,
+                    distanciaKm = estimate.distanceKm,
+                    metodoPago = state.selectedPaymentMethod.identifier
+                )
+                _uiState.update {
+                    it.copy(
+                        viajesProgramados = listOf(viajeProgramado) +
+                            it.viajesProgramados.filterNot { existente -> existente.id == viajeProgramado.id },
+                        statusMessage = "Viaje programado guardado."
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(cargandoViajesProgramados = false) }
+            }
+        }
+    }
+
+    fun cancelarViajeProgramado(id: String) {
+        if (!auth.tieneSesion) {
+            avisar("Entra a tu cuenta para cancelar un viaje programado.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val viajeCancelado = scheduledRideRepo.cancelar(id)
+                _uiState.update { state ->
+                    state.copy(
+                        viajesProgramados = state.viajesProgramados.map { viaje ->
+                            if (viaje.id == viajeCancelado.id) viajeCancelado else viaje
+                        }
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
     }
 
     /**
@@ -858,6 +982,7 @@ class LlegateViewModel(
                 selectedCityName = defaultCity,
                 origin = newDefaultOrigin,
                 destination = newDefaultDest,
+                routeDistanceKm = null,
                 showStateSelectorModal = false,
                 statusMessage = "Región: ${state.name} • ${defaultCity}"
             )
@@ -873,6 +998,7 @@ class LlegateViewModel(
                 selectedCityName = city.name,
                 origin = firstPoint,
                 destination = secondPoint,
+                routeDistanceKm = null,
                 showCitySelectorModal = false,
                 statusMessage = "Ciudad fijada: ${city.name}, ${it.currentState.name}"
             )
@@ -892,6 +1018,167 @@ class LlegateViewModel(
     fun openTripHistory() {
         _uiState.update { it.copy(currentScreen = AppScreen.TRIP_HISTORY) }
         viewModelScope.launch { refrescarViajes() }
+    }
+
+    fun openProfile() {
+        _uiState.update { it.copy(currentScreen = AppScreen.PROFILE, showCuentaModal = false) }
+        refrescarFavoritos()
+    }
+
+    fun openReferrals() {
+        _uiState.update { it.copy(currentScreen = AppScreen.REFERRALS, showCuentaModal = false) }
+        refrescarReferidos()
+    }
+
+    fun refrescarFavoritos() {
+        if (!auth.tieneSesion) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingFavorites = true) }
+            try {
+                val addresses = favoriteRepo.addresses()
+                val drivers = favoriteRepo.drivers()
+                _uiState.update {
+                    it.copy(favoriteAddresses = addresses, favoriteDrivers = drivers)
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(loadingFavorites = false) }
+            }
+        }
+    }
+
+    fun guardarDireccionFavorita(etiqueta: String, punto: LocationPoint) {
+        if (etiqueta.isBlank() || !punto.tieneCoordenadas) {
+            avisar("Elige una etiqueta y una ubicación con coordenadas.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(favoriteRequestInProgress = true) }
+            try {
+                val saved = favoriteRepo.saveAddress(etiqueta.trim(), punto)
+                _uiState.update { state ->
+                    state.copy(
+                        favoriteAddresses = (state.favoriteAddresses.filterNot {
+                            it.label.equals(saved.label, ignoreCase = true)
+                        } + saved).sortedBy { it.label.lowercase() },
+                        statusMessage = "Dirección ${saved.label} guardada."
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(favoriteRequestInProgress = false) }
+            }
+        }
+    }
+
+    fun borrarDireccionFavorita(id: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(favoriteRequestInProgress = true) }
+            try {
+                favoriteRepo.deleteAddress(id)
+                _uiState.update { state ->
+                    state.copy(
+                        favoriteAddresses = state.favoriteAddresses.filterNot { it.id == id },
+                        statusMessage = "Dirección favorita eliminada."
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(favoriteRequestInProgress = false) }
+            }
+        }
+    }
+
+    fun cambiarConductorFavorito(id: String) {
+        if (id.isBlank()) {
+            avisar("Este viaje no incluye el identificador del piloto.")
+            return
+        }
+        val yaFavorito = _uiState.value.favoriteDrivers.any { it.id == id }
+        viewModelScope.launch {
+            _uiState.update { it.copy(favoriteRequestInProgress = true) }
+            try {
+                if (yaFavorito) favoriteRepo.deleteDriver(id) else favoriteRepo.addDriver(id)
+                val drivers = favoriteRepo.drivers()
+                _uiState.update {
+                    it.copy(
+                        favoriteDrivers = drivers,
+                        statusMessage = if (yaFavorito) "Piloto eliminado de tus favoritos." else "Piloto guardado en tus favoritos."
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(favoriteRequestInProgress = false) }
+            }
+        }
+    }
+
+    fun onReferralCodeInput(value: String) {
+        _uiState.update { it.copy(referralCodeInput = value.uppercase()) }
+    }
+
+    fun compartirCodigoReferido(context: Context) {
+        val code = _uiState.value.referralSummary?.code ?: return
+        val texto = "¡Épanale! Únete a Llégate con mi código $code y llévate saldo para tus carreras en Maracay y la ARC 🚗💨"
+        val whatsapp = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, texto)
+            setPackage("com.whatsapp")
+        }
+        try {
+            context.startActivity(whatsapp.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: android.content.ActivityNotFoundException) {
+            val compartir = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, texto)
+            }
+            abrir(context, Intent.createChooser(compartir, "Compartir código de Llégate"))
+        } catch (_: SecurityException) {
+            avisar("No pudimos abrir WhatsApp. Inténtalo desde el menú de compartir.")
+        }
+    }
+
+    fun aplicarCodigoReferido() {
+        val code = _uiState.value.referralCodeInput.trim()
+        if (code.isBlank()) {
+            avisar("Escribe el código de tu pana.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(favoriteRequestInProgress = true) }
+            try {
+                favoriteRepo.applyReferral(code)
+                _uiState.update {
+                    it.copy(referralCodeInput = "", statusMessage = "Código aplicado. El bono se acredita al completar tu primera carrera válida.")
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(favoriteRequestInProgress = false) }
+            }
+        }
+    }
+
+    private fun refrescarReferidos() {
+        if (!auth.tieneSesion) return
+        viewModelScope.launch {
+            try {
+                val summary = favoriteRepo.referralSummary()
+                _uiState.update { it.copy(referralSummary = summary) }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
     }
 
     fun fetchBcvExchangeRate(showToast: Boolean = true) {
@@ -937,13 +1224,64 @@ class LlegateViewModel(
     }
 
     fun updateOrigin(newOrigin: LocationPoint) {
-        _uiState.update { it.copy(origin = newOrigin) }
+        _uiState.update { it.copy(origin = newOrigin, routeDistanceKm = null) }
         recalculateEstimates()
     }
 
     fun updateDestination(newDestination: LocationPoint) {
-        _uiState.update { it.copy(destination = newDestination) }
+        _uiState.update { it.copy(destination = newDestination, routeDistanceKm = null) }
         recalculateEstimates()
+    }
+
+    fun updateDestinationFromMap(context: Context, lat: Double, lng: Double) {
+        if (!lat.isFinite() || !lng.isFinite() || lat !in -90.0..90.0 || lng !in -180.0..180.0) return
+        val state = _uiState.value
+        updateDestination(
+            LocationPoint(
+                title = "Destino en el mapa",
+                subtitle = String.format(Locale.US, "%.5f, %.5f", lat, lng),
+                lat = lat,
+                lng = lng,
+                stateName = state.currentState.name,
+                cityName = state.selectedCityName
+            )
+        )
+        viewModelScope.launch {
+            val address = try {
+                withContext(Dispatchers.IO) {
+                    Geocoder(context, Locale.getDefault())
+                        .getFromLocation(lat, lng, 1)
+                        ?.firstOrNull()
+                }
+            } catch (_: Exception) {
+                null
+            } ?: return@launch
+            val title = address.thoroughfare
+                ?: address.featureName
+                ?: address.subLocality
+                ?: address.locality
+                ?: return@launch
+            val subtitle = listOfNotNull(address.subLocality ?: address.locality, address.adminArea)
+                .distinct()
+                .joinToString(", ")
+                .ifBlank { String.format(Locale.US, "%.5f, %.5f", lat, lng) }
+            _uiState.update { current ->
+                if (kotlin.math.abs(current.destination.lat - lat) > 0.000001 ||
+                    kotlin.math.abs(current.destination.lng - lng) > 0.000001
+                ) {
+                    current
+                } else {
+                    current.copy(
+                        destination = current.destination.copy(
+                            title = title,
+                            subtitle = subtitle,
+                            cityName = address.locality ?: current.destination.cityName,
+                            stateName = address.adminArea ?: current.destination.stateName
+                        )
+                    )
+                }
+            }
+        }
     }
 
     fun selectPaymentMethod(method: PaymentMethod) {
@@ -1011,79 +1349,100 @@ class LlegateViewModel(
     }
 
     @SuppressLint("MissingPermission")
-    fun requestCurrentGpsLocation(context: Context) {
+    fun requestCurrentGpsLocation(context: Context, onLocationFound: ((LocationPoint) -> Unit)? = null) {
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasFineLocation && !hasCoarseLocation) {
+            avisar("Permite el acceso a tu ubicación para usar el GPS.")
+            return
+        }
+
         _uiState.update { it.copy(isFetchingGps = true) }
+        val tokenSource = CancellationTokenSource()
         try {
-            val fusedClient = LocationServices.getFusedLocationProviderClient(context)
-            fusedClient.lastLocation.addOnSuccessListener { loc ->
-                if (loc != null) {
-                    val lat = loc.latitude
-                    val lng = loc.longitude
-                    var streetName = "Mi Ubicación Actual"
-                    var locality = "GPS Verificado • Aragua"
-                    try {
-                        val geocoder = Geocoder(context, Locale.getDefault())
-                        val addresses = geocoder.getFromLocation(lat, lng, 1)
-                        if (!addresses.isNullOrEmpty()) {
-                            val addr = addresses[0]
-                            streetName = addr.thoroughfare ?: addr.featureName ?: "Ubicación Actual"
-                            locality = "${addr.subLocality ?: addr.locality ?: _uiState.value.selectedCityName}, ${addr.adminArea ?: _uiState.value.currentState.name}"
+            LocationServices.getFusedLocationProviderClient(context)
+                .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.token)
+                .addOnSuccessListener { location ->
+                    if (location == null) {
+                        _uiState.update {
+                            it.copy(
+                                isFetchingGps = false,
+                                statusMessage = "No se pudo obtener tu ubicación actual. Comprueba el GPS e inténtalo otra vez."
+                            )
                         }
-                    } catch (_: Exception) {
+                        return@addOnSuccessListener
                     }
-                    val newPoint = LocationPoint(
-                        title = streetName,
-                        subtitle = locality,
-                        lat = lat,
-                        lng = lng,
-                        isCurrentGps = true,
-                        stateName = _uiState.value.currentState.name,
-                        cityName = _uiState.value.selectedCityName
-                    )
+
+                    viewModelScope.launch {
+                        val address = try {
+                            withContext(Dispatchers.IO) {
+                                Geocoder(context, Locale.getDefault())
+                                    .getFromLocation(location.latitude, location.longitude, 1)
+                                    ?.firstOrNull()
+                            }
+                        } catch (_: Exception) {
+                            null
+                        }
+                        val state = _uiState.value
+                        val point = LocationPoint(
+                            title = address?.thoroughfare
+                                ?: address?.featureName
+                                ?: "Mi ubicación actual",
+                            subtitle = listOfNotNull(
+                                address?.subLocality ?: address?.locality,
+                                address?.adminArea
+                            ).joinToString(", ").ifBlank {
+                                String.format(Locale.US, "%.5f, %.5f", location.latitude, location.longitude)
+                            },
+                            lat = location.latitude,
+                            lng = location.longitude,
+                            isCurrentGps = true,
+                            stateName = address?.adminArea ?: state.currentState.name,
+                            cityName = address?.locality ?: state.selectedCityName
+                        )
+                        _uiState.update {
+                            it.copy(
+                                origin = point,
+                                isFetchingGps = false,
+                                routeDistanceKm = null,
+                                statusMessage = "Ubicación GPS actualizada."
+                            )
+                        }
+                        recalculateEstimates()
+                        onLocationFound?.invoke(point)
+                    }
+                }
+                .addOnFailureListener { failure ->
                     _uiState.update {
                         it.copy(
-                            origin = newPoint,
                             isFetchingGps = false,
-                            statusMessage = "¡Ubicación GPS detectada, pana!"
+                            statusMessage = failure.localizedMessage
+                                ?: "No pudimos obtener tu ubicación GPS."
                         )
                     }
-                    recalculateEstimates()
-                } else {
-                    fallbackGpsLocation()
-                }
-            }.addOnFailureListener {
-                fallbackGpsLocation()
             }
-        } catch (_: Exception) {
-            fallbackGpsLocation()
+        } catch (failure: SecurityException) {
+            _uiState.update {
+                it.copy(isFetchingGps = false, statusMessage = "Permite el acceso a tu ubicación para usar el GPS.")
+            }
         }
     }
 
-    private fun fallbackGpsLocation() {
-        val currentState = _uiState.value.currentState
-        val currentCity = _uiState.value.currentCity
-        val fallbackPoint = currentCity.points.firstOrNull() ?: LocationPoint(
-            title = "Av. Bolívar Este, Maracay",
-            subtitle = "Maracay, Estado Aragua (Sede Llégate)",
-            lat = 10.2458,
-            lng = -67.5855,
-            isCurrentGps = true,
-            stateName = currentState.name,
-            cityName = currentCity.name
-        )
-        _uiState.update {
-            it.copy(
-                origin = fallbackPoint,
-                isFetchingGps = false,
-                statusMessage = "Ubicación fijada en ${fallbackPoint.title}"
-            )
-        }
+    fun updateRoadRouteDistance(distanceKm: Double?) {
+        if (distanceKm != null && (!distanceKm.isFinite() || distanceKm <= 0.0)) return
+        _uiState.update { it.copy(routeDistanceKm = distanceKm) }
         recalculateEstimates()
     }
 
     private fun recalculateEstimates() {
         val state = _uiState.value
-        val distance = calculateDistanceKm(
+        val distance = state.routeDistanceKm ?: calculateDistanceKm(
             state.origin.lat,
             state.origin.lng,
             state.destination.lat,
@@ -1152,6 +1511,7 @@ class LlegateViewModel(
             it.copy(
                 selectedSafeMeetingPointId = meetingPoint.id,
                 origin = newOrigin,
+                routeDistanceKm = null,
                 statusMessage = "Punto de encuentro seguro: ${meetingPoint.title}"
             )
         }
@@ -1194,6 +1554,7 @@ class LlegateViewModel(
             it.copy(
                 origin = curDest,
                 destination = curOrigin,
+                routeDistanceKm = null,
                 statusMessage = "Ruta invertida: ${curDest.title} ⇄ ${curOrigin.title}"
             )
         }
@@ -1342,6 +1703,7 @@ class LlegateViewModel(
         _uiState.update {
             it.copy(
                 destination = dest,
+                routeDistanceKm = null,
                 statusMessage = "Destino fijado: ${suggestion.title}"
             )
         }

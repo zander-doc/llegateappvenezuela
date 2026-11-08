@@ -150,6 +150,51 @@ export const createTripSchema = z.object({
   metodo_pago: z.enum(["efectivo", "pago_movil", "binance_pay", "saldo"]).default("efectivo"),
 });
 
+const coordenadaLatitud = z.coerce.number().min(-90).max(90);
+const coordenadaLongitud = z.coerce.number().min(-180).max(180);
+
+export const createScheduledRideSchema = z
+  .object({
+    origen: z.string().trim().min(3).max(200),
+    destino: z.string().trim().min(3).max(200),
+    origen_lat: coordenadaLatitud.optional(),
+    origen_lng: coordenadaLongitud.optional(),
+    destino_lat: coordenadaLatitud.optional(),
+    destino_lng: coordenadaLongitud.optional(),
+    servicio: z.enum(["mototaxi", "taxi-pana", "delivery"]),
+    programado_para: z
+      .string()
+      .datetime({ offset: true })
+      .refine((value) => Date.parse(value) > Date.now(), "La fecha debe ser futura"),
+    distancia_km: z.coerce.number().positive().max(500).optional(),
+    precio_usd: montoUsd,
+    metodo_pago: z.enum(["efectivo", "pago_movil", "binance_pay", "saldo"]).default("efectivo"),
+  })
+  .refine(
+    (viaje) =>
+      (viaje.origen_lat === undefined) === (viaje.origen_lng === undefined) &&
+      (viaje.destino_lat === undefined) === (viaje.destino_lng === undefined),
+    {
+      message: "Envía latitud y longitud juntas para cada punto",
+      path: ["coordenadas"],
+    },
+  );
+
+export const favoriteAddressSchema = z.object({
+  etiqueta: z.string().trim().min(1).max(40),
+  direccion_texto: z.string().trim().min(3).max(300),
+  lat: coordenadaLatitud,
+  lng: coordenadaLongitud,
+});
+
+export const favoriteDriverSchema = z.object({
+  conductor_id: uuidSchema,
+});
+
+export const applyReferralSchema = z.object({
+  codigo_referido: z.string().trim().min(8).max(50),
+});
+
 export const rejectSchema = z.object({
   motivo: z.string().trim().min(3, "Explica el motivo del rechazo").max(300),
 });

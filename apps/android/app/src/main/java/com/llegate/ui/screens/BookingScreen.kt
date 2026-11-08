@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,6 +57,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -123,6 +125,8 @@ fun RequestRideScreen(
 
     var originInputText by remember(uiState.origin.title) { mutableStateOf(uiState.origin.title) }
     var destInputText by remember(uiState.destination.title) { mutableStateOf(uiState.destination.title) }
+    var showSaveFavoriteDialog by remember { mutableStateOf(false) }
+    var favoriteAddressLabel by remember { mutableStateOf("") }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -455,8 +459,8 @@ fun RequestRideScreen(
                                 val updatedPoint = LocationPoint(
                                     title = newText,
                                     subtitle = "Destino seleccionado por el usuario",
-                                    lat = uiState.destination.lat,
-                                    lng = uiState.destination.lng,
+                                    lat = 0.0,
+                                    lng = 0.0,
                                     stateName = uiState.currentState.name,
                                     cityName = uiState.selectedCityName
                                 )
@@ -492,6 +496,46 @@ fun RequestRideScreen(
                                 unfocusedContainerColor = Asphalt950
                             )
                         )
+
+                        if (uiState.favoriteAddresses.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("TUS DIRECCIONES", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Stone400)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(uiState.favoriteAddresses, key = { it.id }) { address ->
+                                    Surface(
+                                        onClick = {
+                                            val point = address.asLocationPoint()
+                                            destInputText = point.title
+                                            viewModel.updateDestination(point)
+                                        },
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Asphalt800,
+                                        border = BorderStroke(1.dp, RacingYellow500),
+                                        modifier = Modifier.testTag("favorite_address_${address.id}")
+                                    ) {
+                                        Text(
+                                            address.label,
+                                            color = RacingYellow500,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        TextButton(
+                            onClick = {
+                                favoriteAddressLabel = ""
+                                showSaveFavoriteDialog = true
+                            },
+                            enabled = uiState.destination.tieneCoordenadas &&
+                                destInputText == uiState.destination.title,
+                            modifier = Modifier.testTag("save_favorite_destination")
+                        ) {
+                            Text("Guardar este destino como favorito", color = NeonOrange400, fontSize = 12.sp)
+                        }
 
                         // QUICK SUGGESTION CHIPS FOR DESTINATION
                         Spacer(modifier = Modifier.height(10.dp))
@@ -534,13 +578,15 @@ fun RequestRideScreen(
                                         )
                                     }
                                 }
+
                             }
                         }
                     }
+
                 }
             }
 
-            // 2. LIVE LEAFLET + CARTODB DARK MATTER MAP WITH ROUTE & VEHICLES
+            // 2. Live dark map with road route and destination selection.
             item {
                 Column {
                     LeafletDarkMapView(
@@ -713,7 +759,36 @@ fun RequestRideScreen(
                     }
                 }
             }
+
         }
+    }
+
+    if (showSaveFavoriteDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveFavoriteDialog = false },
+            title = { Text("Guardar dirección favorita") },
+            text = {
+                OutlinedTextField(
+                    value = favoriteAddressLabel,
+                    onValueChange = { favoriteAddressLabel = it },
+                    label = { Text("Etiqueta, por ejemplo Casa") },
+                    singleLine = true,
+                    modifier = Modifier.testTag("favorite_address_label")
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.guardarDireccionFavorita(favoriteAddressLabel, uiState.destination)
+                        showSaveFavoriteDialog = false
+                    },
+                    enabled = favoriteAddressLabel.isNotBlank()
+                ) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveFavoriteDialog = false }) { Text("Cancelar") }
+            }
+        )
     }
 }
 

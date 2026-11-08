@@ -8,7 +8,10 @@ import { authRouter } from "./routes/auth.js";
 import { configRouter } from "./routes/config.js";
 import { driverDocumentsRouter, driversRouter } from "./routes/drivers.js";
 import { filesRouter } from "./routes/files.js";
+import { favoritesRouter } from "./routes/favorites.js";
 import { paymentsRouter } from "./routes/payments.js";
+import { referralsRouter } from "./routes/referrals.js";
+import { scheduledRidesRouter } from "./routes/scheduledRides.js";
 import { solicitudesRouter } from "./routes/solicitudes.js";
 import { negociosRouter } from "./routes/negocios.js";
 import { tripsRouter } from "./routes/trips.js";
@@ -85,6 +88,9 @@ app.use("/config", configRouter);
 app.use("/drivers", driversRouter);
 app.use("/wallet", walletRouter);
 app.use("/payments", paymentsRouter);
+app.use("/scheduled-rides", scheduledRidesRouter);
+app.use("/api/favoritos", favoritesRouter);
+app.use("/api/referidos", referralsRouter);
 app.use("/trips", tripsRouter);
 // Formularios del sitio: contacto, empresas, aliados, aviso de lanzamiento,
 // postulación de piloto, cobertura e interés por un plan.
