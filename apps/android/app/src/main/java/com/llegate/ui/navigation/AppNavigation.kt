@@ -11,8 +11,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +37,7 @@ import com.llegate.ui.screens.TripHistoryScreen
 import com.llegate.ui.theme.NeonOrange500
 import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 object Screen {
@@ -49,27 +53,28 @@ fun AppNavigation(viewModel: LlegateViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val userPreferences = remember { UserPreferencesRepository(context) }
-    val isOnboardingCompleted by userPreferences.isOnboardingCompleted.collectAsState(initial = false)
+    val isOnboardingCompleted by userPreferences.isOnboardingCompleted
+        .map<Boolean, Boolean?> { it }
+        .collectAsState(initial = null)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var introDone by rememberSaveable { mutableStateOf(false) }
 
     NavHost(
         navController = navController,
         startDestination = Screen.SplashIntro
     ) {
         composable(Screen.SplashIntro) {
-            IntroVideoScreen(
-                onIntroFinished = {
-                    if (isOnboardingCompleted) {
-                        navController.navigate(Screen.Home) {
-                            popUpTo(Screen.SplashIntro) { inclusive = true }
-                        }
-                    } else {
-                        navController.navigate(Screen.Onboarding) {
-                            popUpTo(Screen.SplashIntro) { inclusive = true }
-                        }
+            LaunchedEffect(introDone, isOnboardingCompleted) {
+                val onboardingCompleted = isOnboardingCompleted
+                if (introDone && onboardingCompleted != null) {
+                    val destination = if (onboardingCompleted) Screen.Home else Screen.Onboarding
+                    navController.navigate(destination) {
+                        popUpTo(Screen.SplashIntro) { inclusive = true }
                     }
                 }
-            )
+            }
+
+            IntroVideoScreen(onIntroFinished = { introDone = true })
         }
 
         composable(Screen.Onboarding) {

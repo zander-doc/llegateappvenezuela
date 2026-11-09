@@ -2,6 +2,8 @@ package com.llegate.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -66,6 +68,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.llegate.R
+import com.llegate.BuildConfig
 import com.llegate.model.CityInfo
 import com.llegate.model.LocationPoint
 import com.llegate.model.SafeMeetingPoint
@@ -99,6 +103,7 @@ import com.llegate.ui.components.CommunityAlertsSection
 import com.llegate.ui.components.LeafletDarkMapView
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
+import com.llegate.ui.components.UpdateDialog
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -122,9 +127,13 @@ import com.llegate.util.bs
 import com.llegate.util.enmascararTelefono
 import com.llegate.util.usd
 import com.llegate.util.usdConSigno
+import com.llegate.utils.UpdateInfo
+import com.llegate.utils.UpdateManager
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.PasoRecarga
+import org.json.JSONException
+import java.io.IOException
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,6 +146,60 @@ fun HomeScreen(
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var showLocationPickerModal by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+
+    LaunchedEffect(Unit) {
+        try {
+            updateInfo = UpdateManager.checkForUpdates(BuildConfig.VERSION_CODE)
+        } catch (exception: IOException) {
+            Log.e("HomeScreen", "No se pudo consultar si hay actualizaciones.", exception)
+        } catch (exception: JSONException) {
+            Log.e("HomeScreen", "La respuesta de actualización no contiene JSON válido.", exception)
+        } catch (exception: IllegalArgumentException) {
+            Log.e("HomeScreen", "La respuesta de actualización contiene datos inválidos.", exception)
+        }
+    }
+
+    updateInfo?.let { update ->
+        UpdateDialog(
+            versionName = update.versionName,
+            isMandatory = update.isMandatory,
+            onUpdateClick = {
+                try {
+                    val downloadId = UpdateManager.downloadAndInstallApk(context, update.apkUrl)
+                    Log.i("HomeScreen", "Descarga de actualización iniciada: $downloadId")
+                    Toast.makeText(
+                        context,
+                        "Descarga de actualización iniciada.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    updateInfo = null
+                } catch (exception: IllegalArgumentException) {
+                    Log.e("HomeScreen", "La URL del APK de actualización no es válida.", exception)
+                    Toast.makeText(
+                        context,
+                        "No se pudo iniciar la actualización.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } catch (exception: SecurityException) {
+                    Log.e("HomeScreen", "No se permitió iniciar la descarga de actualización.", exception)
+                    Toast.makeText(
+                        context,
+                        "No se pudo iniciar la actualización.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } catch (exception: IllegalStateException) {
+                    Log.e("HomeScreen", "El servicio de descargas no está disponible.", exception)
+                    Toast.makeText(
+                        context,
+                        "No se pudo iniciar la actualización.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            },
+            onDismiss = { updateInfo = null }
+        )
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()

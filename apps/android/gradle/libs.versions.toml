@@ -1,6 +1,7 @@
 [versions]
 agp = "9.5.1"
 coreKtx = "1.18.0"
+coreSplashscreen = "1.0.1"
 datastorePreferences = "1.1.7"
 navigationCompose = "2.8.5"
 junit = "4.13.2"
@@ -19,6 +20,7 @@ robolectric = "4.16.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "testCore" }
