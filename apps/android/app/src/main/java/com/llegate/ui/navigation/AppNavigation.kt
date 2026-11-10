@@ -34,6 +34,7 @@ import com.llegate.ui.screens.LoginScreen
 import com.llegate.ui.screens.OnboardingScreen
 import com.llegate.ui.screens.ProfileScreen
 import com.llegate.ui.screens.ReferralsScreen
+import com.llegate.ui.screens.RoleOnboardingScreen
 import com.llegate.ui.screens.TripActiveScreen
 import com.llegate.ui.screens.TripHistoryScreen
 import com.llegate.ui.screens.WelcomeAuthScreen
@@ -49,9 +50,11 @@ object Screen {
     const val Onboarding = "onboarding"
     const val WelcomeAuth = "welcome_auth"
     const val PhoneAuth = "phone_auth/{role}"
+    const val RoleOnboarding = "role_onboarding/{role}"
     const val Home = "home"
 
     fun phoneAuth(role: String): String = "phone_auth/$role"
+    fun roleOnboarding(role: String): String = "role_onboarding/$role"
 }
 
 @Composable
@@ -133,8 +136,31 @@ fun AppNavigation(viewModel: LlegateViewModel) {
 
             when {
                 uiState.revisandoSesion -> CargandoSesion()
-                uiState.cuenta != null -> RedirectingAfterAuth(navController)
+                uiState.cuenta != null -> RedirectingAfterOtp(navController, role)
                 else -> LoginScreen(uiState = uiState, viewModel = viewModel)
+            }
+        }
+
+        composable(
+            route = Screen.RoleOnboarding,
+            arguments = listOf(navArgument("role") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val role = backStackEntry.arguments?.getString("role").orEmpty()
+            if (uiState.revisandoSesion) {
+                CargandoSesion()
+            } else if (uiState.cuenta == null) {
+                RedirectingTo(navController, Screen.RoleOnboarding, Screen.WelcomeAuth)
+            } else {
+                RoleOnboardingScreen(
+                    selectedRole = role,
+                    onSubmitProfile = viewModel::registrarPerfilConductor,
+                    onRegistrationComplete = {
+                        navController.navigate(Screen.Home) {
+                            popUpTo(Screen.RoleOnboarding) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
         }
 
@@ -177,9 +203,10 @@ private fun RedirectingTo(
 }
 
 @Composable
-private fun RedirectingAfterAuth(navController: NavHostController) {
-    LaunchedEffect(Unit) {
-        navController.navigate(Screen.Home) {
+private fun RedirectingAfterOtp(navController: NavHostController, role: String) {
+    val destination = if (role in DRIVER_ROLES) Screen.roleOnboarding(role) else Screen.Home
+    LaunchedEffect(destination) {
+        navController.navigate(destination) {
             popUpTo(Screen.WelcomeAuth) { inclusive = true }
             launchSingleTop = true
         }
@@ -198,3 +225,4 @@ private const val PASSENGER_ROLE = "pasajero"
 private const val DRIVER_MOTO_ROLE = "driver_moto"
 private const val DRIVER_CAR_ROLE = "driver_car"
 private const val DELIVERY_ROLE = "delivery"
+private val DRIVER_ROLES = setOf(DRIVER_MOTO_ROLE, DRIVER_CAR_ROLE, DELIVERY_ROLE)

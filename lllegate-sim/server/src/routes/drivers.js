@@ -15,7 +15,7 @@ import { extraerTexto } from "../verification/ocr.js";
 export const driversRouter = Router();
 
 const DRIVER_COLUMNS =
-  "usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, anio, cedula_url, licencia_url, certificado_medico_url, verificacion, estado, motivo_rechazo, riesgo_puntaje, riesgo_motivos, enviado_en, intentos_verificacion, created_at";
+  "usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, color, anio, cedula_url, licencia_url, certificado_medico_url, verificacion, estado, motivo_rechazo, riesgo_puntaje, riesgo_motivos, enviado_en, intentos_verificacion, created_at";
 
 const DOCUMENT_COLUMNS = "tipo, mime, bytes, ocr_estado, ocr_confianza, created_at, updated_at";
 
@@ -27,6 +27,7 @@ const CAMPOS_ESCRIBIBLES = [
   "placa",
   "marca",
   "modelo",
+  "color",
   "anio",
   "cedula_url",
   "licencia_url",

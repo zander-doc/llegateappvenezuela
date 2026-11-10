@@ -29,6 +29,7 @@ import com.llegate.network.BcvRateService
 import com.llegate.network.Billetera
 import com.llegate.network.ConfigApp
 import com.llegate.network.ConfigRepository
+import com.llegate.network.DriverRepository
 import com.llegate.network.EstadoPago
 import com.llegate.network.EstadoViaje
 import com.llegate.network.FavoriteAddress
@@ -471,7 +472,8 @@ class LlegateViewModel(
     private val pagoRepo: PagoRepository = PagoRepository(auth.http),
     private val tripRepo: TripRepository = TripRepository(auth.http),
     private val scheduledRideRepo: ScheduledRideRepository = ScheduledRideRepository(auth.http),
-    private val favoriteRepo: FavoriteRepository = FavoriteRepository(auth.http)
+    private val favoriteRepo: FavoriteRepository = FavoriteRepository(auth.http),
+    private val driverRepo: DriverRepository = DriverRepository(auth.http)
 ) : ViewModel() {
 
     private val bcvRateService = BcvRateService()
@@ -674,7 +676,12 @@ class LlegateViewModel(
                     statusMessage = "Sesión cerrada."
                 )
             }
+
         }
+    }
+
+    suspend fun registrarPerfilConductor(datos: Map<String, String>) {
+        driverRepo.registrarPerfil(datos)
     }
 
     // BILLETERA Y RECARGAS: /wallet y /payments, el mismo saldo que ve la web

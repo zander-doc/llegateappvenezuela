@@ -97,6 +97,7 @@ export const driverDetailsSchema = z.object({
     .transform((value) => value.toUpperCase()),
   marca: z.string().trim().min(2).max(60).optional(),
   modelo: z.string().trim().min(1).max(60).optional(),
+  color: textoOpcional(40, "El color no puede superar 40 caracteres"),
   anio: z.coerce
     .number()
     .int()
