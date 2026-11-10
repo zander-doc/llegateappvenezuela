@@ -312,7 +312,10 @@ fun HomeDashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             partners.forEachIndexed { index, partner ->
-                AdBannerCard(partner = partner, accent = partnerAccents[index % partnerAccents.size])
+                AdBannerCard(
+                    partner = partner,
+                    accent = partnerAccents[index % partnerAccents.size]
+                )
             }
         }
 
@@ -363,8 +366,7 @@ private fun AdBannerCard(partner: AutomotivePartner, accent: Color) {
         color = accent,
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
-            .width(240.dp)
-            .height(140.dp)
+            .size(190.dp)
     ) {
         Column(
             modifier = Modifier
