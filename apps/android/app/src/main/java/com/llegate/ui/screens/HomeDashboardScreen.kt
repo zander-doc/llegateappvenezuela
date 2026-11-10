@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.llegate.model.AutomotivePartner
+import com.llegate.ui.components.BottomNavTab
+import com.llegate.ui.components.LlegateBottomNavigationBar
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
@@ -64,17 +67,29 @@ fun HomeDashboardScreen(
     onRechargeClick: () -> Unit,
     onAccountClick: () -> Unit,
     onDriverModeClick: () -> Unit,
+    onTabSelected: (BottomNavTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val firstName = userName.trim().substringBefore(' ').ifBlank { "mi pana" }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Asphalt950)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-    ) {
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = Asphalt950,
+        bottomBar = {
+            LlegateBottomNavigationBar(
+                currentRoute = BottomNavTab.Inicio.route,
+                onTabSelected = onTabSelected
+            )
+        }
+    ) { contentPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Asphalt950)
+                .verticalScroll(rememberScrollState())
+                .padding(contentPadding)
+                .padding(horizontal = 20.dp)
+        ) {
         Spacer(modifier = Modifier.height(20.dp))
 
         Row(
@@ -301,7 +316,8 @@ fun HomeDashboardScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+        }
     }
 }
 

@@ -100,6 +100,7 @@ import com.llegate.network.EstadoPago
 import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
+import com.llegate.ui.components.BottomNavTab
 import com.llegate.ui.components.LeafletDarkMapView
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
@@ -382,7 +383,15 @@ fun HomeScreen(
                 onSearchClick = { viewModel.toggleFullMapExpanded(true) },
                 onRechargeClick = { viewModel.mostrarRecarga(true) },
                 onAccountClick = { viewModel.mostrarCuenta(true) },
-                onDriverModeClick = { viewModel.toggleDriverMode(true) }
+                onDriverModeClick = { viewModel.toggleDriverMode(true) },
+                onTabSelected = { tab ->
+                    when (tab) {
+                        BottomNavTab.Inicio -> viewModel.navigateToHome()
+                        BottomNavTab.Recargas -> viewModel.mostrarRecarga(true)
+                        BottomNavTab.Historial -> viewModel.openTripHistory()
+                        BottomNavTab.Perfil -> viewModel.openProfile()
+                    }
+                }
             )
         } else {
         // 1. Live Leaflet map with destination selection and road routing.
