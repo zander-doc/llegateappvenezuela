@@ -142,6 +142,7 @@ class LlegateViewModelTest {
   @Test
   fun `la estimacion usa la distancia vial disponible y vuelve al estimado provisional si falla`() {
     val viewModel = nuevoViewModel()
+    viewModel.updateDestination(viewModel.uiState.value.currentPopularLocations.first())
 
     viewModel.updateRoadRouteDistance(8.7)
     assertEquals(8.7, viewModel.uiState.value.routeDistanceKm!!, 0.0)
@@ -170,6 +171,7 @@ class LlegateViewModelTest {
   @Test
   fun `verify safe meeting points delivery estimates and driver toggle`() {
     val viewModel = nuevoViewModel()
+    viewModel.updateDestination(viewModel.uiState.value.currentPopularLocations.first())
     val state = viewModel.uiState.value
 
     // Check delivery estimate exists
@@ -203,6 +205,7 @@ class LlegateViewModelTest {
   @Test
   fun `la ruta se invierte y el viaje se pide solo con sesion`() {
     val viewModel = nuevoViewModel()
+    viewModel.updateDestination(viewModel.uiState.value.currentPopularLocations.first())
     viewModel.openBooking(ServiceType.MOTO)
 
     val bookingState = viewModel.uiState.value
@@ -237,6 +240,7 @@ class LlegateViewModelTest {
     viewModel.updateOrigin(
       LocationPoint("Origen", "Maracay", 10.2480, -67.6000, stateName = "Aragua", cityName = "Maracay")
     )
+    viewModel.updateDestination(viewModel.uiState.value.currentPopularLocations.first())
     val distanciaAnterior = viewModel.uiState.value.motoEstimate!!.distanceKm
 
     val puntoSeleccionado = LocationPoint(

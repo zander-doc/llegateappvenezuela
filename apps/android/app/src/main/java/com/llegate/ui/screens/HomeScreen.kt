@@ -353,6 +353,38 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Asphalt950)
     ) {
+        if (!uiState.isDriverMode) {
+            HomeDashboardScreen(
+                userName = uiState.cuenta?.nombre.orEmpty(),
+                userBalance = uiState.billetera?.disponibleUsd
+                    ?: uiState.cuenta?.saldoBilletera
+                    ?: 0.0,
+                partners = uiState.automotivePartners,
+                showDriverMode = uiState.cuenta?.rol == "conductor",
+                onServiceClick = { service ->
+                    when (service) {
+                        "car" -> {
+                            viewModel.selectService(ServiceType.CAR)
+                            viewModel.toggleFullMapExpanded(true)
+                        }
+                        "moto" -> {
+                            viewModel.selectService(ServiceType.MOTO)
+                            viewModel.toggleFullMapExpanded(true)
+                        }
+                        "delivery" -> {
+                            viewModel.selectService(ServiceType.DELIVERY)
+                            viewModel.toggleFullMapExpanded(true)
+                        }
+                        "schedule", "other" -> viewModel.toggleFullMapExpanded(true)
+                        "all" -> viewModel.showCitySelector(true)
+                    }
+                },
+                onSearchClick = { viewModel.toggleFullMapExpanded(true) },
+                onRechargeClick = { viewModel.mostrarRecarga(true) },
+                onAccountClick = { viewModel.mostrarCuenta(true) },
+                onDriverModeClick = { viewModel.toggleDriverMode(true) }
+            )
+        } else {
         // 1. Live Leaflet map with destination selection and road routing.
         LeafletDarkMapView(
             uiState = uiState,
@@ -1189,6 +1221,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
         }
     }
 
