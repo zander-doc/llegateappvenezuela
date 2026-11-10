@@ -22,6 +22,8 @@ import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
 import com.llegate.model.tarifaUsd
 import com.llegate.model.UpcomingService
+import com.llegate.model.VehicleCategory
+import com.llegate.model.VEHICLE_CATEGORIES
 import com.llegate.network.ApiException
 import com.llegate.network.activeTripDe
 import com.llegate.network.AuthRepository
@@ -102,6 +104,7 @@ enum class PasoRecarga {
 data class LlegateUiState(
     val currentScreen: AppScreen = AppScreen.HOME,
     val selectedService: ServiceType = ServiceType.MOTO,
+    val selectedVehicleCategoryId: String? = null,
     // CENTRAL REGION STATES RESTRICTED INITIALLY TO ARAGUA, CARABOBO, GUÁRICO & DISTRITO CAPITAL
     val availableStates: List<StateRegion> = listOf(
         StateRegion(
@@ -286,10 +289,10 @@ data class LlegateUiState(
         cityName = "Maracay"
     ),
     val destination: LocationPoint = LocationPoint(
-        title = "CC Parque Aragua",
-        subtitle = "Av. Bolívar Este, Maracay, Aragua",
-        lat = 10.2465,
-        lng = -67.5800,
+        title = "",
+        subtitle = "",
+        lat = 0.0,
+        lng = 0.0,
         stateName = "Aragua",
         cityName = "Maracay"
     ),
@@ -424,6 +427,23 @@ data class LlegateUiState(
     ),
     val showFullMapExpanded: Boolean = false,
 ) {
+    val selectedVehicleCategory: VehicleCategory?
+        get() = VEHICLE_CATEGORIES.firstOrNull { it.id == selectedVehicleCategoryId }
+
+    val selectedEstimate: PriceEstimate?
+        get() {
+            val estimate = when (selectedService) {
+                ServiceType.MOTO -> motoEstimate
+                ServiceType.CAR -> carEstimate
+                ServiceType.DELIVERY -> deliveryEstimate
+            } ?: return null
+            val category = selectedVehicleCategory
+                ?.takeIf { selectedService != ServiceType.DELIVERY }
+                ?: return estimate
+            val priceBs = (category.priceUsd * bcvExchangeRate * 100).roundToInt() / 100.0
+            return estimate.copy(priceUsd = category.priceUsd, priceBs = priceBs)
+        }
+
     val currentState: StateRegion
         get() = availableStates.firstOrNull { it.id == selectedStateId } ?: availableStates[0]
 
@@ -757,11 +777,7 @@ class LlegateViewModel(
             avisar("Entra a tu cuenta para programar un viaje.")
             return
         }
-        val estimate = when (state.selectedService) {
-            ServiceType.MOTO -> state.motoEstimate
-            ServiceType.CAR -> state.carEstimate
-            ServiceType.DELIVERY -> state.deliveryEstimate
-        }
+        val estimate = state.selectedEstimate
         if (estimate == null) {
             avisar("Toca un origen y un destino para conocer la tarifa.")
             return
@@ -1239,7 +1255,15 @@ class LlegateViewModel(
         _uiState.update { it.copy(selectedService = serviceType) }
     }
 
+    fun selectVehicleCategory(category: VehicleCategory) {
+        _uiState.update { it.copy(selectedVehicleCategoryId = category.id) }
+    }
+
     fun openBooking(serviceType: ServiceType? = null) {
+        if (!_uiState.value.destination.tieneCoordenadas) {
+            avisar("Elige un destino para continuar.")
+            return
+        }
         if (serviceType != null) {
             _uiState.update { it.copy(selectedService = serviceType) }
         }
@@ -1258,6 +1282,24 @@ class LlegateViewModel(
 
     fun updateDestination(newDestination: LocationPoint) {
         _uiState.update { it.copy(destination = newDestination, routeDistanceKm = null) }
+        recalculateEstimates()
+    }
+
+    fun clearDestination() {
+        val state = _uiState.value
+        _uiState.update {
+            it.copy(
+                destination = LocationPoint(
+                    title = "",
+                    subtitle = "",
+                    lat = 0.0,
+                    lng = 0.0,
+                    stateName = state.currentState.name,
+                    cityName = state.selectedCityName
+                ),
+                routeDistanceKm = null
+            )
+        }
         recalculateEstimates()
     }
 
@@ -1470,6 +1512,17 @@ class LlegateViewModel(
 
     private fun recalculateEstimates() {
         val state = _uiState.value
+        if (!state.destination.tieneCoordenadas) {
+            _uiState.update {
+                it.copy(
+                    routeDistanceKm = null,
+                    motoEstimate = null,
+                    carEstimate = null,
+                    deliveryEstimate = null
+                )
+            }
+            return
+        }
         val distance = state.routeDistanceKm ?: calculateDistanceKm(
             state.origin.lat,
             state.origin.lng,
@@ -1599,11 +1652,11 @@ class LlegateViewModel(
             avisar("Entra a tu cuenta para pedir un viaje.")
             return
         }
-        val estimate = when (state.selectedService) {
-            ServiceType.MOTO -> state.motoEstimate
-            ServiceType.CAR -> state.carEstimate
-            ServiceType.DELIVERY -> state.deliveryEstimate
+        if (!state.destination.tieneCoordenadas) {
+            avisar("Elige un destino para pedir el viaje.")
+            return
         }
+        val estimate = state.selectedEstimate
         if (estimate == null) {
             avisar("Toca un origen y un destino para conocer la tarifa.")
             return

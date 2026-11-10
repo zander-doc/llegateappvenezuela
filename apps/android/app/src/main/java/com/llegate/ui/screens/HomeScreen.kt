@@ -104,6 +104,7 @@ import com.llegate.ui.components.LeafletDarkMapView
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
 import com.llegate.ui.components.UpdateDialog
+import com.llegate.ui.components.VehicleCategorySelector
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -202,20 +203,37 @@ fun HomeScreen(
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        viewModel.requestCurrentGpsLocation(context)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.clearDestination()
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasFineLocation || hasCoarseLocation) {
             viewModel.requestCurrentGpsLocation(context)
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
     // FULLSCREEN MAP MODE
     if (uiState.showFullMapExpanded) {
-        val selectedEstimate = when (uiState.selectedService) {
-            ServiceType.MOTO -> uiState.motoEstimate
-            ServiceType.CAR -> uiState.carEstimate
-            ServiceType.DELIVERY -> uiState.deliveryEstimate
-        }
+        val selectedEstimate = uiState.selectedEstimate
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -268,7 +286,7 @@ fun HomeScreen(
                         color = Emerald500
                     )
                     Text(
-                        text = uiState.destination.title,
+                        text = uiState.destination.title.ifBlank { "¿A dónde vas?" },
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Stone100,
@@ -663,7 +681,7 @@ fun HomeScreen(
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    text = uiState.destination.title,
+                                    text = uiState.destination.title.ifBlank { "¿A dónde vas?" },
                                     fontSize = 13.sp,
                                     color = Stone100,
                                     fontWeight = FontWeight.Bold,
@@ -879,10 +897,29 @@ fun HomeScreen(
                 }
             }
 
+            if (uiState.selectedService == ServiceType.MOTO || uiState.selectedService == ServiceType.CAR) {
+                item {
+                    VehicleCategorySelector(
+                        selectedCategoryId = uiState.selectedVehicleCategoryId,
+                        bcvExchangeRate = uiState.bcvExchangeRate,
+                        onCategorySelected = viewModel::selectVehicleCategory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
             // PRIMARY ACTION BUTTON (CONFIRMAR VIAJE / ¡LLÉGATE YA!)
             item {
                 Button(
-                    onClick = { viewModel.openBooking(uiState.selectedService) },
+                    onClick = {
+                        if (uiState.destination.tieneCoordenadas) {
+                            viewModel.openBooking(uiState.selectedService)
+                        } else {
+                            showLocationPickerModal = true
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -896,7 +933,11 @@ fun HomeScreen(
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
                 ) {
                     Text(
-                        text = "¡Llégate ya! • ${uiState.selectedService.colloquialTitle}",
+                        text = if (uiState.destination.tieneCoordenadas) {
+                            "¡Llégate ya! • ${uiState.selectedService.colloquialTitle}"
+                        } else {
+                            "Elige tu destino"
+                        },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Black
                     )

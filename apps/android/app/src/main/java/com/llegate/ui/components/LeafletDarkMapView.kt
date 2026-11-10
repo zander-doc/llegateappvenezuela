@@ -596,21 +596,28 @@ private fun generateLeafletHtml(
                 iconAnchor: [14, 34]
             });
 
-            if (!originMarker) originMarker = L.marker(orig, { icon: originIcon }).addTo(map);
-            else originMarker.setLatLng(orig).setIcon(originIcon);
-            if (!destMarker) {
-                destMarker = L.marker(dest, {
-                    icon: destIcon,
-                    draggable: destinationSelectionEnabled,
-                    autoPan: true
-                }).addTo(map);
-                destMarker.on('dragend', function() {
-                    if (destinationSelectionEnabled) selectDestination(destMarker.getLatLng());
-                });
-            } else {
-                destMarker.setLatLng(dest).setIcon(destIcon);
-                if (destinationSelectionEnabled) destMarker.dragging.enable();
-                else destMarker.dragging.disable();
+            if (orig[0] || orig[1]) {
+                if (!originMarker) originMarker = L.marker(orig, { icon: originIcon }).addTo(map);
+                else originMarker.setLatLng(orig).setIcon(originIcon);
+            }
+            if (dest[0] || dest[1]) {
+                if (!destMarker) {
+                    destMarker = L.marker(dest, {
+                        icon: destIcon,
+                        draggable: destinationSelectionEnabled,
+                        autoPan: true
+                    }).addTo(map);
+                    destMarker.on('dragend', function() {
+                        if (destinationSelectionEnabled) selectDestination(destMarker.getLatLng());
+                    });
+                } else {
+                    destMarker.setLatLng(dest).setIcon(destIcon);
+                    if (destinationSelectionEnabled) destMarker.dragging.enable();
+                    else destMarker.dragging.disable();
+                }
+            } else if (destMarker) {
+                map.removeLayer(destMarker);
+                destMarker = null;
             }
         }
 
@@ -689,11 +696,15 @@ private fun generateLeafletHtml(
             if (routeRequestTimer) clearTimeout(routeRequestTimer);
             routeRequestTimer = setTimeout(updateRouteGeometry, 300);
             if (firstRoute) {
-                map.fitBounds(L.latLngBounds([orig, dest]), {
-                    paddingTopLeft: [72, 72],
-                    paddingBottomRight: [72, $expandedMapBottomPadding],
-                    maxZoom: 15
-                });
+                if (dest[0] || dest[1]) {
+                    map.fitBounds(L.latLngBounds([orig, dest]), {
+                        paddingTopLeft: [72, 72],
+                        paddingBottomRight: [72, $expandedMapBottomPadding],
+                        maxZoom: 15
+                    });
+                } else {
+                    map.setView(orig, 14);
+                }
                 firstRoute = false;
             }
         }
@@ -702,6 +713,7 @@ private fun generateLeafletHtml(
             currentOrigin = [oLat, oLng];
             currentDest = [dLat, dLng];
             drawRoute(currentOrigin, currentDest);
+            if (!(dLat || dLng)) map.setView(currentOrigin, 14);
         };
 
         window.setDestinationSelectionEnabled = function(enabled) {

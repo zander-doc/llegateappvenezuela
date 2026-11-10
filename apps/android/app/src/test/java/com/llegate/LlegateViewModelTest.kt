@@ -47,13 +47,14 @@ class LlegateViewModelTest {
     assertTrue(initialState.currentState.citiesAndTowns.contains("Cagua"))
     assertTrue(initialState.currentState.citiesAndTowns.contains("Turmero"))
     assertTrue(initialState.currentState.citiesAndTowns.contains("La Victoria"))
-    assertNotNull(initialState.motoEstimate)
-    assertNotNull(initialState.carEstimate)
+    assertNull(initialState.motoEstimate)
+    assertNull(initialState.carEstimate)
     assertTrue(initialState.bcvExchangeRate > 100.0)
 
     viewModel.selectState("carabobo")
     assertEquals("carabobo", viewModel.uiState.value.selectedStateId)
 
+    viewModel.updateDestination(viewModel.uiState.value.currentPopularLocations.first())
     viewModel.openBooking(ServiceType.CAR)
     val bookingState = viewModel.uiState.value
     assertEquals(AppScreen.BOOKING_DETAILS, bookingState.currentScreen)
@@ -64,6 +65,19 @@ class LlegateViewModelTest {
     assertEquals(AppScreen.BOOKING_DETAILS, sinSesion.currentScreen)
     assertNull(sinSesion.activeTrip)
     assertEquals("Entra a tu cuenta para pedir un viaje.", sinSesion.statusMessage)
+  }
+
+  @Test
+  fun `home starts without a destination and cannot open booking until one is selected`() {
+    val viewModel = nuevoViewModel()
+
+    assertFalse(viewModel.uiState.value.destination.tieneCoordenadas)
+    assertEquals("", viewModel.uiState.value.destination.title)
+
+    viewModel.openBooking(ServiceType.MOTO)
+
+    assertEquals(AppScreen.HOME, viewModel.uiState.value.currentScreen)
+    assertEquals("Elige un destino para continuar.", viewModel.uiState.value.statusMessage)
   }
 
   @Test
@@ -241,4 +255,3 @@ class LlegateViewModelTest {
     assertTrue(actualizado.motoEstimate!!.distanceKm > distanciaAnterior)
   }
 }
-
