@@ -100,7 +100,6 @@ import com.llegate.network.EstadoPago
 import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
-import com.llegate.ui.components.BottomNavTab
 import com.llegate.ui.components.LeafletDarkMapView
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
@@ -386,10 +385,10 @@ fun HomeScreen(
                 onDriverModeClick = { viewModel.toggleDriverMode(true) },
                 onTabSelected = { tab ->
                     when (tab) {
-                        BottomNavTab.Inicio -> viewModel.navigateToHome()
-                        BottomNavTab.Recargas -> viewModel.mostrarRecarga(true)
-                        BottomNavTab.Historial -> viewModel.openTripHistory()
-                        BottomNavTab.Perfil -> viewModel.openProfile()
+                        "inicio" -> viewModel.navigateToHome()
+                        "recargas" -> viewModel.mostrarRecarga(true)
+                        "historial" -> viewModel.openTripHistory()
+                        "perfil" -> viewModel.openProfile()
                     }
                 }
             )

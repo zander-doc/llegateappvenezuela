@@ -44,7 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.llegate.model.AutomotivePartner
-import com.llegate.ui.components.BottomNavTab
 import com.llegate.ui.components.LlegateBottomNavigationBar
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -67,7 +66,7 @@ fun HomeDashboardScreen(
     onRechargeClick: () -> Unit,
     onAccountClick: () -> Unit,
     onDriverModeClick: () -> Unit,
-    onTabSelected: (BottomNavTab) -> Unit,
+    onTabSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val firstName = userName.trim().substringBefore(' ').ifBlank { "mi pana" }
@@ -77,7 +76,7 @@ fun HomeDashboardScreen(
         containerColor = Asphalt950,
         bottomBar = {
             LlegateBottomNavigationBar(
-                currentRoute = BottomNavTab.Inicio.route,
+                currentRoute = "inicio",
                 onTabSelected = onTabSelected
             )
         }

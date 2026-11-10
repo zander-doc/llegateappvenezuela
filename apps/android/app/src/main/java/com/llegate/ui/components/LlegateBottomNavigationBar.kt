@@ -1,77 +1,79 @@
 package com.llegate.ui.components
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.llegate.ui.theme.Asphalt900
-import com.llegate.ui.theme.RacingYellow500
-import com.llegate.ui.theme.Stone400
-
-sealed class BottomNavTab(
-    val route: String,
-    val title: String,
-    val icon: ImageVector
-) {
-    data object Inicio : BottomNavTab("inicio", "Inicio", Icons.Default.Home)
-    data object Recargas : BottomNavTab("recargas", "Recargas", Icons.Default.AccountBalanceWallet)
-    data object Historial : BottomNavTab("historial", "Historial", Icons.Default.Schedule)
-    data object Perfil : BottomNavTab("perfil", "Perfil", Icons.Default.Person)
-
-    companion object {
-        val all = listOf(Inicio, Recargas, Historial, Perfil)
-    }
-}
 
 @Composable
 fun LlegateBottomNavigationBar(
     currentRoute: String,
-    onTabSelected: (BottomNavTab) -> Unit,
+    onTabSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    NavigationBar(
-        modifier = modifier.testTag("passenger_bottom_navigation"),
-        containerColor = Asphalt900
+    val tabs = listOf(
+        Triple("inicio", "Inicio", "🏠"),
+        Triple("recargas", "Recargas", "💳"),
+        Triple("historial", "Historial", "🕒"),
+        Triple("perfil", "Perfil", "👤")
+    )
+
+    Surface(
+        color = Color(0xFF0F131A),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .testTag("passenger_bottom_navigation"),
+        shadowElevation = 12.dp
     ) {
-        BottomNavTab.all.forEach { tab ->
-            val selected = currentRoute == tab.route
-            NavigationBarItem(
-                selected = selected,
-                onClick = { onTabSelected(tab) },
-                icon = {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = tab.title
-                    )
-                },
-                label = {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEach { (route, title, icon) ->
+                val isSelected = currentRoute == route
+                val contentColor = if (isSelected) Color(0xFFFFD200) else Color.Gray
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 4.dp)
+                ) {
+                    IconButton(
+                        onClick = { onTabSelected(route) },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("passenger_tab_$route")
+                    ) {
+                        Text(text = icon, fontSize = 20.sp)
+                    }
                     Text(
-                        text = tab.title,
+                        text = title,
+                        color = contentColor,
                         fontSize = 11.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                     )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = RacingYellow500,
-                    selectedTextColor = RacingYellow500,
-                    unselectedIconColor = Stone400,
-                    unselectedTextColor = Stone400,
-                    indicatorColor = RacingYellow500.copy(alpha = 0.12f)
-                ),
-                modifier = Modifier.testTag("passenger_tab_${tab.route}")
-            )
+                }
+            }
         }
     }
 }
