@@ -20,14 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -38,11 +32,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.llegate.R
 import com.llegate.model.AutomotivePartner
 import com.llegate.ui.components.LlegateBottomNavigationBar
 import com.llegate.ui.theme.Asphalt700
@@ -186,19 +183,19 @@ fun HomeDashboardScreen(
             ) {
                 ServiceGridCard(
                     title = "Viajes",
-                    icon = Icons.Default.DirectionsCar,
+                    imageRes = R.drawable.service_viajes,
                     modifier = Modifier.weight(1f),
                     testTag = "dashboard_service_car"
                 ) { onServiceClick("car") }
                 ServiceGridCard(
                     title = "Moto",
-                    icon = Icons.Default.TwoWheeler,
+                    imageRes = R.drawable.service_motos,
                     modifier = Modifier.weight(1f),
                     testTag = "dashboard_service_moto"
                 ) { onServiceClick("moto") }
                 ServiceGridCard(
                     title = "Envíos",
-                    icon = Icons.Default.Inventory2,
+                    imageRes = R.drawable.service_envios,
                     modifier = Modifier.weight(1f),
                     testTag = "dashboard_service_delivery"
                 ) { onServiceClick("delivery") }
@@ -209,19 +206,19 @@ fun HomeDashboardScreen(
             ) {
                 ServiceGridCard(
                     title = "Programar",
-                    icon = Icons.Default.CalendarMonth,
+                    imageRes = R.drawable.service_programar,
                     modifier = Modifier.weight(1f),
                     testTag = "dashboard_service_schedule"
                 ) { onServiceClick("schedule") }
                 ServiceGridCard(
                     title = "Viaja otro",
-                    icon = Icons.Default.PersonAddAlt1,
+                    imageRes = R.drawable.service_viaja_otro,
                     modifier = Modifier.weight(1f),
                     testTag = "dashboard_service_other"
                 ) { onServiceClick("other") }
                 ServiceGridCard(
                     title = "Ver todos",
-                    icon = Icons.Default.Apps,
+                    imageRes = R.drawable.service_todo,
                     modifier = Modifier.weight(1f),
                     testTag = "dashboard_service_all"
                 ) { onServiceClick("all") }
@@ -326,7 +323,7 @@ fun HomeDashboardScreen(
 @Composable
 private fun ServiceGridCard(
     title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    imageRes: Int,
     modifier: Modifier = Modifier,
     testTag: String,
     onClick: () -> Unit
@@ -340,22 +337,12 @@ private fun ServiceGridCard(
             .height(96.dp)
             .testTag(testTag)
     ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(imageVector = icon, contentDescription = null, tint = RacingYellow500, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = title,
-                color = Stone100,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        androidx.compose.foundation.Image(
+            painter = painterResource(imageRes),
+            contentDescription = title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 
