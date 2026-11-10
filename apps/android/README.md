@@ -75,6 +75,44 @@ dispositivo conectado por USB o en BlueStacks:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Firma y versiones
+
+La versión se configura en `gradle.properties`: incrementa `LLEGATE_VERSION_CODE`
+en cada build que vayas a instalar o distribuir. Android requiere un código mayor
+que el de la versión instalada para actualizarla. Actualiza también
+`LLEGATE_VERSION_NAME` para reflejar la versión legible.
+
+Para crear un keystore de release, ejecuta `keytool` (incluido con el JDK) y
+elige contraseñas seguras cuando las solicite:
+
+```powershell
+keytool -genkeypair -v -keystore C:/Users/TU_USUARIO/llegate-keys/llegate-release.jks -alias llegate-release -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Copia `keystore.properties.example` como `keystore.properties` dentro de
+`apps/android/`, y edita `storeFile` para apuntar al archivo `.jks` creado.
+Completa `storePassword`, `keyAlias` y `keyPassword` con los datos elegidos al
+crear el keystore. No compartas ni subas `keystore.properties` o el keystore al
+repositorio.
+
+Si `keystore.properties` está presente, Gradle firma los APKs debug y release
+con ese keystore. Si falta, debug usa la clave local predeterminada de Android y
+release queda sin firmar; Gradle muestra una advertencia. Builds debug firmados
+por claves distintas no se pueden instalar uno sobre otro. Cambiar de firma
+obliga a desinstalar la app una vez antes de instalar el nuevo APK; desinstalar
+borra los datos locales de la app.
+
+Compila desde `apps/android`:
+
+```powershell
+.\gradlew.bat assembleDebug
+.\gradlew.bat assembleRelease
+```
+
+Los APKs quedan en `app/build/outputs/apk/debug/app-debug.apk` y
+`app/build/outputs/apk/release/app-release-unsigned.apk` (sin configuración de
+firma) o `app/build/outputs/apk/release/app-release.apk` (firmado).
+
 ## Tipografías
 
 La app trae las cuatro familias de la marca que usa la web (Bebas Neue, Outfit,
