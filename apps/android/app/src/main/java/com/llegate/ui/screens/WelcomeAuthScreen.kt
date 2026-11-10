@@ -1,6 +1,7 @@
 package com.llegate.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,11 +30,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import com.llegate.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,12 +56,13 @@ fun WelcomeAuthScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "LLÉGATE",
-            color = Color(0xFFFFD200),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 3.sp
+        Image(
+            painter = painterResource(id = R.drawable.ic_llegate_welcome_logo),
+            contentDescription = "Llégate - Tu carrera con panas",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(76.dp)
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
