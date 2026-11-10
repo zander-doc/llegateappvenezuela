@@ -21,9 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.llegate.data.preferences.UserPreferencesRepository
 import com.llegate.ui.screens.BookingScreen
 import com.llegate.ui.screens.HomeScreen
@@ -34,17 +36,22 @@ import com.llegate.ui.screens.ProfileScreen
 import com.llegate.ui.screens.ReferralsScreen
 import com.llegate.ui.screens.TripActiveScreen
 import com.llegate.ui.screens.TripHistoryScreen
+import com.llegate.ui.screens.WelcomeAuthScreen
 import com.llegate.ui.theme.NeonOrange500
 import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
+import com.llegate.viewmodel.ServicioConductor
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 object Screen {
     const val SplashIntro = "splash_intro"
     const val Onboarding = "onboarding"
-    const val Login = "login"
+    const val WelcomeAuth = "welcome_auth"
+    const val PhoneAuth = "phone_auth/{role}"
     const val Home = "home"
+
+    fun phoneAuth(role: String): String = "phone_auth/$role"
 }
 
 @Composable
@@ -67,7 +74,7 @@ fun AppNavigation(viewModel: LlegateViewModel) {
             LaunchedEffect(introDone, isOnboardingCompleted) {
                 val onboardingCompleted = isOnboardingCompleted
                 if (introDone && onboardingCompleted != null) {
-                    val destination = if (onboardingCompleted) Screen.Home else Screen.Onboarding
+                    val destination = if (onboardingCompleted) Screen.WelcomeAuth else Screen.Onboarding
                     navController.navigate(destination) {
                         popUpTo(Screen.SplashIntro) { inclusive = true }
                     }
@@ -82,7 +89,7 @@ fun AppNavigation(viewModel: LlegateViewModel) {
                 onFinishOnboarding = {
                     scope.launch {
                         userPreferences.setOnboardingCompleted()
-                        navController.navigate(Screen.Home) {
+                        navController.navigate(Screen.WelcomeAuth) {
                             popUpTo(Screen.Onboarding) { inclusive = true }
                         }
                     }
@@ -90,20 +97,51 @@ fun AppNavigation(viewModel: LlegateViewModel) {
             )
         }
 
-        composable(Screen.Login) {
+        composable(Screen.WelcomeAuth) {
             if (uiState.revisandoSesion) {
                 CargandoSesion()
             } else if (uiState.cuenta == null) {
-                LoginScreen(uiState = uiState, viewModel = viewModel)
+                WelcomeAuthScreen(
+                    onCreateAccountClick = {
+                        navController.navigate(Screen.phoneAuth(PASSENGER_ROLE))
+                    },
+                    onLoginClick = {
+                        navController.navigate(Screen.phoneAuth(PASSENGER_ROLE))
+                    },
+                    onDriverRegisterClick = { selectedRole ->
+                        navController.navigate(Screen.phoneAuth(selectedRole))
+                    }
+                )
             } else {
-                RedirectingTo(navController, Screen.Login, Screen.Home)
+                RedirectingTo(navController, Screen.WelcomeAuth, Screen.Home)
+            }
+        }
+
+        composable(
+            route = Screen.PhoneAuth,
+            arguments = listOf(navArgument("role") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val role = backStackEntry.arguments?.getString("role").orEmpty()
+            LaunchedEffect(role) {
+                when (role) {
+                    DRIVER_MOTO_ROLE -> viewModel.seleccionarServicioConductor(ServicioConductor.MOTO)
+                    DRIVER_CAR_ROLE -> viewModel.seleccionarServicioConductor(ServicioConductor.CARRO)
+                    DELIVERY_ROLE -> viewModel.seleccionarServicioConductor(ServicioConductor.DELIVERY)
+                    else -> viewModel.continuarComoPasajero()
+                }
+            }
+
+            when {
+                uiState.revisandoSesion -> CargandoSesion()
+                uiState.cuenta != null -> RedirectingAfterAuth(navController)
+                else -> LoginScreen(uiState = uiState, viewModel = viewModel)
             }
         }
 
         composable(Screen.Home) {
             when {
                 uiState.revisandoSesion -> CargandoSesion()
-                uiState.cuenta == null -> RedirectingTo(navController, Screen.Home, Screen.Login)
+                uiState.cuenta == null -> RedirectingTo(navController, Screen.Home, Screen.WelcomeAuth)
                 else -> AnimatedContent(
                     targetState = uiState.currentScreen,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -139,8 +177,24 @@ private fun RedirectingTo(
 }
 
 @Composable
+private fun RedirectingAfterAuth(navController: NavHostController) {
+    LaunchedEffect(Unit) {
+        navController.navigate(Screen.Home) {
+            popUpTo(Screen.WelcomeAuth) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+    CargandoSesion()
+}
+
+@Composable
 private fun CargandoSesion() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(color = NeonOrange500)
     }
 }
+
+private const val PASSENGER_ROLE = "pasajero"
+private const val DRIVER_MOTO_ROLE = "driver_moto"
+private const val DRIVER_CAR_ROLE = "driver_car"
+private const val DELIVERY_ROLE = "delivery"

@@ -48,8 +48,10 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -98,6 +100,7 @@ import com.llegate.util.enmascararTelefono
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.PasoInicio
+import com.llegate.viewmodel.ServicioConductor
 
 /**
  * Ingreso por teléfono con código de WhatsApp — la identidad real de la cuenta.
@@ -105,8 +108,10 @@ import com.llegate.viewmodel.PasoInicio
  * pantalla y el canal del código se lee tal como lo contesta `/auth/otp`.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun LoginScreen(uiState: LlegateUiState, viewModel: LlegateViewModel) {
     val sacudida = remember { Animatable(0f) }
+    var mostrarRoles by remember { mutableStateOf(false) }
     LaunchedEffect(uiState.intentosInvalidos) {
         if (uiState.intentosInvalidos > 0) {
             listOf(-16f, 13f, -8f, 4f, 0f).forEach { punto ->
@@ -122,14 +127,23 @@ fun LoginScreen(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .imePadding()
-                .padding(horizontal = 22.dp, vertical = 30.dp)
+                .padding(
+                    start = 22.dp,
+                    top = 30.dp,
+                    end = 22.dp,
+                    bottom = if (uiState.pasoInicio == PasoInicio.DATOS) 76.dp else 30.dp
+                )
                 .offset { IntOffset(sacudida.value.toInt(), 0) },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             LlegateOfficialBrandHeader()
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = if (uiState.pasoInicio == PasoInicio.DATOS) "Tu cola,\ntu tarifa" else "Revisa tu\nWhatsApp",
+                text = when {
+                    uiState.pasoInicio == PasoInicio.CODIGO -> "Revisa tu\nWhatsApp"
+                    uiState.servicioConductor != null -> "Únete como\nconductor"
+                    else -> "Tu cola,\ntu tarifa"
+                },
                 color = Stone100,
                 fontSize = 30.sp,
                 lineHeight = 34.sp,
@@ -138,9 +152,13 @@ fun LoginScreen(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                 textAlign = TextAlign.Center
             )
             Text(
-                text = if (uiState.pasoInicio == PasoInicio.DATOS)
-                    "Sin contraseña: te llega un código de 6 dígitos por WhatsApp."
-                else enmascararTelefono(uiState.telefono).let { "Código para $it. Sirve una sola vez." },
+                text = when {
+                    uiState.pasoInicio == PasoInicio.CODIGO ->
+                        enmascararTelefono(uiState.telefono).let { "Código para $it. Sirve una sola vez." }
+                    uiState.servicioConductor != null ->
+                        "${uiState.servicioConductor.titulo}. Verifica tu teléfono para crear una cuenta de conductor."
+                    else -> "Sin contraseña: te llega un código de 6 dígitos por WhatsApp."
+                },
                 color = Stone400,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
@@ -161,6 +179,120 @@ fun LoginScreen(uiState: LlegateUiState, viewModel: LlegateViewModel) {
                     PasoInicio.DATOS -> PasoTelefono(uiState, viewModel)
                     PasoInicio.CODIGO -> PasoCodigo(uiState, viewModel)
                 }
+            }
+        }
+
+        if (uiState.pasoInicio == PasoInicio.DATOS) {
+            TextButton(
+                onClick = {
+                    if (uiState.servicioConductor == null) {
+                        mostrarRoles = true
+                    } else {
+                        viewModel.continuarComoPasajero()
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp)
+            ) {
+                Text(
+                    text = if (uiState.servicioConductor == null) {
+                        "Quiero ser conductor o piloto de Llégate"
+                    } else {
+                        "Continuar como pasajero"
+                    },
+                    color = RacingYellow500,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        if (mostrarRoles) {
+            ModalBottomSheet(
+                onDismissRequest = { mostrarRoles = false },
+                containerColor = Asphalt950,
+                contentColor = Stone100
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Únete a la familia Llégate",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Stone100
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Elige cómo quieres trabajar. El primer paso es verificar tu teléfono; " +
+                            "el registro del vehículo y los documentos aún no se completa en esta pantalla.",
+                        fontSize = 14.sp,
+                        color = Stone400,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    OpcionServicioConductor(
+                        titulo = ServicioConductor.MOTO.titulo,
+                        descripcion = "Genera ingresos con traslados ágiles",
+                        icono = "🛵",
+                        onClick = {
+                            mostrarRoles = false
+                            viewModel.seleccionarServicioConductor(ServicioConductor.MOTO)
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OpcionServicioConductor(
+                        titulo = ServicioConductor.CARRO.titulo,
+                        descripcion = "Ofrece viajes urbanos seguros",
+                        icono = "🚗",
+                        onClick = {
+                            mostrarRoles = false
+                            viewModel.seleccionarServicioConductor(ServicioConductor.CARRO)
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OpcionServicioConductor(
+                        titulo = ServicioConductor.DELIVERY.titulo,
+                        descripcion = "Transporta paquetes y encomiendas",
+                        icono = "📦",
+                        onClick = {
+                            mostrarRoles = false
+                            viewModel.seleccionarServicioConductor(ServicioConductor.DELIVERY)
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OpcionServicioConductor(
+    titulo: String,
+    descripcion: String,
+    icono: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = Asphalt900,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = icono, fontSize = 28.sp)
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = titulo, color = Stone100, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(text = descripcion, color = Stone400, fontSize = 13.sp)
             }
         }
     }
@@ -192,7 +324,11 @@ private fun PasoTelefono(uiState: LlegateUiState, viewModel: LlegateViewModel) {
         Spacer(modifier = Modifier.height(6.dp))
         FilaTerminos(uiState, viewModel)
         BotonNeon(
-            texto = if (uiState.enviandoCodigo) "Enviando…" else "Enviar código",
+            texto = when {
+                uiState.enviandoCodigo -> "Enviando…"
+                uiState.servicioConductor != null -> "Continuar como conductor"
+                else -> "Enviar código"
+            },
             ocupado = uiState.enviandoCodigo,
             onClick = viewModel::enviarCodigo
         )

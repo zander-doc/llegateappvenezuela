@@ -85,6 +85,12 @@ enum class PasoInicio {
     CODIGO
 }
 
+enum class ServicioConductor(val titulo: String, val tipoVehiculo: String) {
+    MOTO("Piloto de Moto", "moto"),
+    CARRO("Conductor de Carro", "carro"),
+    DELIVERY("Delivery & Encomiendas", "carro")
+}
+
 /** Los pasos de una recarga: elegir monto, pagar en el banco y reportar la referencia. */
 enum class PasoRecarga {
     MONTO,
@@ -386,6 +392,7 @@ data class LlegateUiState(
     val pagoEnCurso: Pago? = null,
     val enviandoRecarga: Boolean = false,
     val pasoInicio: PasoInicio = PasoInicio.DATOS,
+    val servicioConductor: ServicioConductor? = null,
     val telefono: String = "",
     val nombre: String = "",
     val codigo: String = "",
@@ -516,19 +523,27 @@ class LlegateViewModel(
     }
 
     fun onTelefono(valor: String) {
-        _uiState.update { it.copy(telefono = valor) }
+        _uiState.update { it.copy(telefono = valor, avisoInicio = null, statusMessage = null) }
     }
 
     fun onNombre(valor: String) {
-        _uiState.update { it.copy(nombre = valor) }
+        _uiState.update { it.copy(nombre = valor, avisoInicio = null, statusMessage = null) }
+    }
+
+    fun seleccionarServicioConductor(servicio: ServicioConductor) {
+        _uiState.update { it.copy(servicioConductor = servicio, avisoInicio = null, statusMessage = null) }
+    }
+
+    fun continuarComoPasajero() {
+        _uiState.update { it.copy(servicioConductor = null, avisoInicio = null, statusMessage = null) }
     }
 
     fun onCodigo(valor: String) {
-        _uiState.update { it.copy(codigo = valor.filter(Char::isDigit).take(6), avisoInicio = null) }
+        _uiState.update { it.copy(codigo = valor.filter(Char::isDigit).take(6), avisoInicio = null, statusMessage = null) }
     }
 
     fun setAceptaTerminos(valor: Boolean) {
-        _uiState.update { it.copy(aceptaTerminos = valor, avisoInicio = null) }
+        _uiState.update { it.copy(aceptaTerminos = valor, avisoInicio = null, statusMessage = null) }
     }
 
     fun volverAEditarTelefono() {
@@ -560,7 +575,12 @@ class LlegateViewModel(
             else -> viewModelScope.launch {
                 _uiState.update { it.copy(enviandoCodigo = true, avisoInicio = null) }
                 try {
-                    val envio = auth.pedirCodigo(e164, nombre = state.nombre.trim().ifBlank { null })
+                    val rol = if (state.servicioConductor != null) "conductor" else "cliente"
+                    val envio = auth.pedirCodigo(
+                        e164,
+                        rol = rol,
+                        nombre = state.nombre.trim().ifBlank { null }
+                    )
                     _uiState.update {
                         it.copy(
                             pasoInicio = PasoInicio.CODIGO,
@@ -601,6 +621,7 @@ class LlegateViewModel(
                             cuenta = perfil,
                             revisandoSesion = false,
                             pasoInicio = PasoInicio.DATOS,
+                            servicioConductor = null,
                             codigo = "",
                             avisoInicio = null,
                             mensajeCanal = null, canalOtp = null,

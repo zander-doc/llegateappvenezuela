@@ -818,61 +818,64 @@ fun HomeScreen(
                 }
             }
 
-            // THREE ACTIVE SERVICES (MOTOTAXI, TAXI PANA, DELIVERY EXPRESS)
+            // SERVICE OPTIONS
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    // 1. Mototaxi ($1.81 / Bs. 1.606)
-                    val motoPriceUsd = uiState.motoEstimate?.priceUsd ?: 1.81
-                    val motoPriceBs = uiState.motoEstimate?.priceBs ?: (1.81 * uiState.bcvExchangeRate)
-                    CompactServiceRowCard(
-                        title = "Mototaxi",
-                        subtitle = "3–7 min · 1 pasajero",
-                        priceUsd = motoPriceUsd,
-                        priceBs = motoPriceBs,
-                        icon = Icons.Default.TwoWheeler,
-                        iconBgColor = RacingYellow500,
-                        iconColor = Asphalt950,
-                        isSelected = uiState.selectedService == ServiceType.MOTO,
-                        onClick = { viewModel.selectService(ServiceType.MOTO) },
-                        testTag = "service_card_moto"
+                    Text(
+                        text = "Elige tu servicio",
+                        color = Stone100,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    // 2. Taxi Pana ($4.62 / Bs. 4.099)
-                    val carPriceUsd = uiState.carEstimate?.priceUsd ?: 4.62
-                    val carPriceBs = uiState.carEstimate?.priceBs ?: (4.62 * uiState.bcvExchangeRate)
-                    CompactServiceRowCard(
-                        title = "Taxi Pana",
-                        subtitle = "5–10 min · Hasta 4",
-                        priceUsd = carPriceUsd,
-                        priceBs = carPriceBs,
-                        icon = Icons.Default.DirectionsCar,
-                        iconBgColor = Asphalt800,
-                        iconColor = Stone100,
-                        isSelected = uiState.selectedService == ServiceType.CAR,
-                        onClick = { viewModel.selectService(ServiceType.CAR) },
-                        testTag = "service_card_car"
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val motoPriceUsd = uiState.motoEstimate?.priceUsd ?: 1.81
+                        val motoPriceBs = uiState.motoEstimate?.priceBs ?: (1.81 * uiState.bcvExchangeRate)
+                        ServiceCard(
+                            title = "Moto",
+                            priceUsd = motoPriceUsd,
+                            priceBs = motoPriceBs,
+                            icon = Icons.Default.TwoWheeler,
+                            isSelected = uiState.selectedService == ServiceType.MOTO,
+                            onClick = { viewModel.selectService(ServiceType.MOTO) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "service_card_moto"
+                        )
 
-                    // 3. Delivery Express ($1.94 / Bs. 1.721)
-                    val deliveryPriceUsd = uiState.deliveryEstimate?.priceUsd ?: 1.94
-                    val deliveryPriceBs = uiState.deliveryEstimate?.priceBs ?: (1.94 * uiState.bcvExchangeRate)
-                    CompactServiceRowCard(
-                        title = "Delivery Express",
-                        subtitle = "20–45 min · Hasta 5 kg",
-                        priceUsd = deliveryPriceUsd,
-                        priceBs = deliveryPriceBs,
-                        icon = Icons.Default.Inventory2,
-                        iconBgColor = Asphalt800,
-                        iconColor = Stone100,
-                        isSelected = uiState.selectedService == ServiceType.DELIVERY,
-                        onClick = { viewModel.selectService(ServiceType.DELIVERY) },
-                        testTag = "service_card_delivery"
-                    )
+                        val carPriceUsd = uiState.carEstimate?.priceUsd ?: 4.62
+                        val carPriceBs = uiState.carEstimate?.priceBs ?: (4.62 * uiState.bcvExchangeRate)
+                        ServiceCard(
+                            title = "Carro",
+                            priceUsd = carPriceUsd,
+                            priceBs = carPriceBs,
+                            icon = Icons.Default.DirectionsCar,
+                            isSelected = uiState.selectedService == ServiceType.CAR,
+                            onClick = { viewModel.selectService(ServiceType.CAR) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "service_card_car"
+                        )
+
+                        val deliveryPriceUsd = uiState.deliveryEstimate?.priceUsd ?: 1.94
+                        val deliveryPriceBs = uiState.deliveryEstimate?.priceBs ?: (1.94 * uiState.bcvExchangeRate)
+                        ServiceCard(
+                            title = "Envíos",
+                            priceUsd = deliveryPriceUsd,
+                            priceBs = deliveryPriceBs,
+                            icon = Icons.Default.Inventory2,
+                            isSelected = uiState.selectedService == ServiceType.DELIVERY,
+                            onClick = { viewModel.selectService(ServiceType.DELIVERY) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "service_card_delivery"
+                        )
+                    }
                 }
             }
 
@@ -1672,6 +1675,68 @@ fun HomeScreen(
         )
     }
 
+}
+
+@Composable
+fun ServiceCard(
+    title: String,
+    priceUsd: Double,
+    priceBs: Double,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String
+) {
+    Surface(
+        onClick = onClick,
+        color = if (isSelected) Asphalt800 else Asphalt950,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) RacingYellow500 else Asphalt700
+        ),
+        modifier = modifier
+            .height(112.dp)
+            .testTag(testTag)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = if (isSelected) RacingYellow500 else Stone300,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(
+                text = title,
+                color = Stone100,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                text = "$${String.format(java.util.Locale.US, "%.2f", priceUsd)}",
+                color = if (isSelected) RacingYellow500 else Stone100,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1
+            )
+            Text(
+                text = "Bs. ${String.format(java.util.Locale.US, "%,.0f", priceBs).replace(',', '.')}",
+                color = Stone400,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 /**

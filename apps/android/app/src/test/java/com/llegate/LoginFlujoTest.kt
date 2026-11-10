@@ -6,6 +6,7 @@ import com.llegate.data.SessionStore
 import com.llegate.network.AuthRepository
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.PasoInicio
+import com.llegate.viewmodel.ServicioConductor
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -32,6 +33,19 @@ class LoginFlujoTest {
     assertNull(estado.cuenta)
     assertEquals(PasoInicio.DATOS, estado.pasoInicio)
     assertEquals(false, estado.revisandoSesion)
+  }
+
+  @Test
+  fun `seleccionar registro de conductor conserva el servicio y permite volver a pasajero`() {
+    val viewModel = nuevoViewModel()
+
+    viewModel.seleccionarServicioConductor(ServicioConductor.DELIVERY)
+
+    assertEquals("carro", viewModel.uiState.value.servicioConductor?.tipoVehiculo)
+
+    viewModel.continuarComoPasajero()
+
+    assertNull(viewModel.uiState.value.servicioConductor)
   }
 
   @Test
@@ -111,5 +125,21 @@ class LoginFlujoTest {
     viewModel.onCodigo("123456")
     assertNull(viewModel.uiState.value.avisoInicio)
     assertEquals(1, viewModel.uiState.value.intentosInvalidos)
+  }
+
+  @Test
+  fun `corregir el telefono o el nombre borra el aviso de validacion`() {
+    val viewModel = nuevoViewModel()
+    viewModel.onTelefono("0414 1234567")
+
+    viewModel.enviarCodigo()
+    assertEquals("Debes aceptar los términos para usar Llégate.", viewModel.uiState.value.avisoInicio)
+
+    viewModel.onTelefono("0424 7654321")
+    assertNull(viewModel.uiState.value.avisoInicio)
+
+    viewModel.onNombre("María José")
+    viewModel.setAceptaTerminos(true)
+    assertNull(viewModel.uiState.value.avisoInicio)
   }
 }
