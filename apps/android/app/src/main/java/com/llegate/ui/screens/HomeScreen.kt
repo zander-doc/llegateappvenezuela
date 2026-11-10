@@ -104,6 +104,7 @@ import com.llegate.ui.components.LeafletDarkMapView
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
 import com.llegate.ui.components.UpdateDialog
+import com.llegate.ui.components.VehicleCategorySelector
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -211,11 +212,7 @@ fun HomeScreen(
 
     // FULLSCREEN MAP MODE
     if (uiState.showFullMapExpanded) {
-        val selectedEstimate = when (uiState.selectedService) {
-            ServiceType.MOTO -> uiState.motoEstimate
-            ServiceType.CAR -> uiState.carEstimate
-            ServiceType.DELIVERY -> uiState.deliveryEstimate
-        }
+        val selectedEstimate = uiState.selectedEstimate
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -876,6 +873,19 @@ fun HomeScreen(
                             testTag = "service_card_delivery"
                         )
                     }
+                }
+            }
+
+            if (uiState.selectedService == ServiceType.MOTO || uiState.selectedService == ServiceType.CAR) {
+                item {
+                    VehicleCategorySelector(
+                        selectedCategoryId = uiState.selectedVehicleCategoryId,
+                        bcvExchangeRate = uiState.bcvExchangeRate,
+                        onCategorySelected = viewModel::selectVehicleCategory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
                 }
             }
 
