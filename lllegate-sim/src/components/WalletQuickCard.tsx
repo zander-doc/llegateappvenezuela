@@ -18,7 +18,7 @@ export function WalletQuickCard() {
           </div>
         </div>
         <Link to="/billetera">
-          <Button variant="yellow" size="sm">
+          <Button variant="primary" size="sm">
             <Plus className="h-4 w-4" /> Recargar
           </Button>
         </Link>

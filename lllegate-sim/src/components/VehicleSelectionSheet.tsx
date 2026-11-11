@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ArrowRight, Bike, Car, Truck, Users, Clock } from "lucide-react";
-import { Button, ServiceIcon } from "./ui";
+import { ArrowRight, Bike, Car, Truck } from "lucide-react";
+import { ServiceIcon } from "./ui";
 import { formatBs } from "../lib/format";
 import type { Service } from "../data/services";
 import { LAUNCH_SERVICES } from "../data/services";
@@ -129,7 +129,7 @@ function VehicleCard({ service, accent, isSelected, onSelect }: VehicleCardProps
           ? `border-2 border-${accent}-500 bg-${accent}-50/50 shadow-lg shadow-${accent}-500/15`
           : "border border-white/10 bg-asphalt-900/80 hover:border-white/20 hover:bg-asphalt-850/80"
       }`}
-      onClick={onSelect}
+      onClick={() => onSelect(service)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onSelect(service)}

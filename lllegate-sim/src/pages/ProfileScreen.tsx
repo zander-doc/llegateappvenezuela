@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { User, Shield, MapPin, Clock, Settings, LogOut } from "lucide-react"
+import { Shield, MapPin, Clock, Settings, LogOut } from "lucide-react"
 import { Button } from "../components/ui"
 import { useNavSection } from "../lib/navigation"
 

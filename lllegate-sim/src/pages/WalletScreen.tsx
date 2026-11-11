@@ -1,6 +1,4 @@
 import { useState } from "react"
-import { Wallet } from "lucide-react"
-import { Button } from "../components/ui"
 import { usePilotWallet } from "../lib/pilotWallet"
 import { DEMO_BCV_RATE, formatBs, formatUSD } from "../lib/format"
 import { useNavSection } from "../lib/navigation"
@@ -9,9 +7,6 @@ export function WalletScreen() {
   useNavSection()
   const wallet = usePilotWallet()
   const [activeTab, setActiveTab] = useState<"pm" | "zelle" | "c2p">("pm")
-  const [amount, setAmount] = useState("")
-  const [reference, setReference] = useState("")
-  const [copied, setCopied] = useState(false)
 
   const balanceUSD = wallet.balance
   const balanceBs = balanceUSD * DEMO_BCV_RATE
@@ -73,24 +68,6 @@ export function WalletScreen() {
       <p className="text-sm text-white/50">Transferencia bancaria inmediata</p>
     </section>
   )
-
-  /* --- Manejadores --- */
-  const handleCopy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {}
-  }
-
-  const handleRecharge = () => {
-    const amt = parseFloat(amount)
-    if (!isNaN(amt) && amt > 0) {
-      wallet.requestRecharge(amt)
-      setAmount("")
-      setReference("")
-    }
-  }
 
   return (
     <div className="min-h-screen bg-asphalt-950 p-4 md:p-6">

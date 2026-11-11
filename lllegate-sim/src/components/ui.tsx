@@ -18,7 +18,7 @@ import {
 import { DEMO_BCV_RATE, formatBs, formatUSD } from "../lib/format";
 import { Reveal } from "./Motion";
 
-type Variant = "primary" | "secondary" | "ghost" | "dark" | "yellow";
+type Variant = "primary" | "secondary" | "ghost" | "dark" | "yellow" | "outline" | "destructive";
 type Size = "sm" | "md" | "lg";
 
 const base =
@@ -32,6 +32,8 @@ const variants: Record<Variant, string> = {
   ghost: "text-ink-200 hover:text-white hover:bg-white/[0.06]",
   dark: "bg-asphalt-950 text-white border border-asphalt-700 hover:border-brand-500/60",
   yellow: "bg-racing-500 text-asphalt-950 hover:bg-racing-400 hover:scale-[1.02] active:scale-[0.98]",
+  outline: "border border-white/12 bg-transparent text-ink-200 hover:border-brand-500/60 hover:bg-white/[0.04]",
+  destructive: "bg-red-500 text-white hover:bg-red-400 active:bg-red-600",
 };
 
 const sizes: Record<Size, string> = {
