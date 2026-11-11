@@ -2,6 +2,7 @@ package com.llegate.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -334,13 +335,13 @@ private fun ServiceGridCard(
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Asphalt800),
         modifier = modifier
-            .height(96.dp)
+            .aspectRatio(1f)
             .testTag(testTag)
     ) {
         androidx.compose.foundation.Image(
             painter = painterResource(imageRes),
             contentDescription = title,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize()
         )
     }
