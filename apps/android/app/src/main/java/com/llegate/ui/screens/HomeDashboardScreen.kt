@@ -48,6 +48,7 @@ import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Emerald500
+import com.llegate.ui.theme.NeonOrange500
 import com.llegate.ui.theme.RacingYellow500
 import com.llegate.ui.theme.Stone100
 import com.llegate.ui.theme.Stone400
@@ -263,7 +264,7 @@ fun HomeDashboardScreen(
                 Button(
                     onClick = onRechargeClick,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Emerald500,
+                        containerColor = NeonOrange500,
                         contentColor = Asphalt950
                     ),
                     shape = RoundedCornerShape(12.dp),
