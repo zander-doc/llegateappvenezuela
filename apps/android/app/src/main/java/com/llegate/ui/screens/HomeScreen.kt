@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,11 +32,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AirportShuttle
@@ -101,6 +102,7 @@ import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
 import com.llegate.ui.components.LeafletDarkMapView
+import com.llegate.ui.components.MapDestinationCard
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
 import com.llegate.ui.components.UpdateDialog
@@ -147,6 +149,7 @@ fun HomeScreen(
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var showLocationPickerModal by remember { mutableStateOf(false) }
+    var showMapVehicleSelector by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
 
     LaunchedEffect(Unit) {
@@ -265,83 +268,79 @@ fun HomeScreen(
                     )
                 }
             }
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Asphalt950.copy(alpha = 0.96f),
-                border = BorderStroke(1.dp, Asphalt700),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 38.dp)
-                    .testTag("map_destination_confirmation")
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (showMapVehicleSelector) {
+                Surface(
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    color = Asphalt950.copy(alpha = 0.98f),
+                    border = BorderStroke(1.dp, Asphalt700),
+                    shadowElevation = 16.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .heightIn(max = 620.dp)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 38.dp)
+                        .testTag("map_vehicle_category_selector")
                 ) {
-                    Text(
-                        text = "DESTINO SELECCIONADO",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Emerald500
-                    )
-                    Text(
-                        text = uiState.destination.title.ifBlank { "¿A dónde vas?" },
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Stone100,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = uiState.destination.subtitle,
-                        fontSize = 12.sp,
-                        color = Stone300,
-                        maxLines = 2
-                    )
-                    Text(
-                        text = uiState.routeDistanceKm?.let {
-                            "Ruta por calles: ${String.format(java.util.Locale.US, "%.1f", it)} km"
-                        } ?: "Estimación preliminar; esperando la ruta por calles.",
-                        fontSize = 11.sp,
-                        color = Stone400
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = selectedEstimate?.let { usdConSigno(it.priceUsd) }
-                                ?: "Calculando tarifa…",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            color = RacingYellow500
-                        )
-                        Text(
-                            text = uiState.selectedService.colloquialTitle,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Stone300
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.openBooking(uiState.selectedService) },
-                        enabled = selectedEstimate != null,
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("map_continue_to_booking"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = RacingYellow500,
-                            contentColor = Asphalt950,
-                            disabledContainerColor = Asphalt700,
-                            disabledContentColor = Stone400
-                        )
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("Continuar con este destino", fontWeight = FontWeight.Black)
+                        TextButton(onClick = { showMapVehicleSelector = false }) {
+                            Text("← Cambiar destino", color = RacingYellow500)
+                        }
+                        VehicleCategorySelector(
+                            selectedCategoryId = uiState.selectedVehicleCategoryId,
+                            bcvExchangeRate = uiState.bcvExchangeRate,
+                            onCategorySelected = viewModel::selectVehicleCategory,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = { viewModel.openBooking(ServiceType.CAR) },
+                            enabled = uiState.selectedVehicleCategoryId != null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp)
+                                .testTag("map_continue_to_booking"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = RacingYellow500,
+                                contentColor = Asphalt950,
+                                disabledContainerColor = Asphalt700,
+                                disabledContentColor = Stone400
+                            )
+                        ) {
+                            Text("Continuar con esta categoría", fontWeight = FontWeight.Black)
+                        }
                     }
                 }
+            } else {
+                MapDestinationCard(
+                    streetName = uiState.destination.title
+                            .takeUnless {
+                                it.isBlank() ||
+                                    it == "Destino en el mapa" ||
+                                    it == "Buscando dirección…"
+                            }
+                        ?: "Destino seleccionado",
+                    sectorName = uiState.destination.subtitle
+                        .takeUnless { it.isBlank() || it.contains(Regex("-?\\d+\\.\\d+")) }
+                        ?: "${uiState.destination.cityName}, ${uiState.destination.stateName}",
+                    distanceText = uiState.routeDistanceKm?.let {
+                        "Ruta por calles: ${String.format(java.util.Locale.US, "%.1f", it)} km"
+                    } ?: "Calculando distancia por calles…",
+                    estimatedPriceUsd = selectedEstimate?.priceUsd ?: 0.0,
+                    confirmEnabled = selectedEstimate != null,
+                    onConfirmClick = {
+                        viewModel.selectService(ServiceType.CAR)
+                        showMapVehicleSelector = true
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 38.dp)
+                        .testTag("map_destination_confirmation")
+                )
             }
         }
         return

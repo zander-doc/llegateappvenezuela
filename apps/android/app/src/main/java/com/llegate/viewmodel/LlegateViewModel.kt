@@ -1308,8 +1308,8 @@ class LlegateViewModel(
         val state = _uiState.value
         updateDestination(
             LocationPoint(
-                title = "Destino en el mapa",
-                subtitle = String.format(Locale.US, "%.5f, %.5f", lat, lng),
+                title = "Buscando dirección…",
+                subtitle = "${state.selectedCityName}, ${state.currentState.name}",
                 lat = lat,
                 lng = lng,
                 stateName = state.currentState.name,
@@ -1327,14 +1327,14 @@ class LlegateViewModel(
                 null
             } ?: return@launch
             val title = address.thoroughfare
-                ?: address.featureName
+                ?: address.premises
                 ?: address.subLocality
                 ?: address.locality
-                ?: return@launch
+                ?: "Punto seleccionado"
             val subtitle = listOfNotNull(address.subLocality ?: address.locality, address.adminArea)
                 .distinct()
                 .joinToString(", ")
-                .ifBlank { String.format(Locale.US, "%.5f, %.5f", lat, lng) }
+                .ifBlank { "${state.selectedCityName}, ${state.currentState.name}" }
             _uiState.update { current ->
                 if (kotlin.math.abs(current.destination.lat - lat) > 0.000001 ||
                     kotlin.math.abs(current.destination.lng - lng) > 0.000001

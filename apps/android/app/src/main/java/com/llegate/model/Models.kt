@@ -130,7 +130,7 @@ data class VehicleCategory(
 val VEHICLE_CATEGORIES = listOf(
     VehicleCategory(
         id = "car_vip",
-        title = "Full Cacheroso (VIP)",
+        title = "Full Cacheroso / VIP",
         description = "Vehículos premium, aire acondicionado y comodidad para viajar a tu gusto.",
         priceUsd = 5.00,
         tag = "Recomendado",
@@ -138,7 +138,7 @@ val VEHICLE_CATEGORIES = listOf(
     ),
     VehicleCategory(
         id = "car_ac",
-        title = "Cómodo A/A",
+        title = "Aire Fuerte",
         description = "Viaja fresco y tranquilo con aire acondicionado.",
         priceUsd = 3.50,
         icon = "❄️🚗"
