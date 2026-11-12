@@ -54,9 +54,10 @@ dibuja la ruta declarada en el viaje. Siguen pendientes la verificación de docu
 piloto y decidir qué hacer con la vitrina de concesionarios (`automotivePartners`), que
 lista beneficios aún no firmados.
 
-`MapboxDarkMapScreen` está disponible como componente reutilizable en
-`ui/components/MapboxViewComponent.kt`, pero todavía no reemplaza el mapa Leaflet activo:
-este último conserva la selección de destino y las rutas de la app.
+`MapboxDarkMapScreen` se usa como mapa oscuro en `HomeScreen`. Esta integración
+básica no incluye todavía selección de destino al tocar el mapa, centrado GPS,
+cambio de capas ni rutas; esas funciones siguen disponibles en las pantallas
+que todavía usan `LeafletDarkMapView`.
 
 ## Requisitos
 

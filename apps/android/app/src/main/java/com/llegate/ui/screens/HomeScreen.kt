@@ -101,7 +101,7 @@ import com.llegate.network.EstadoPago
 import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
-import com.llegate.ui.components.LeafletDarkMapView
+import com.llegate.ui.components.MapboxDarkMapScreen
 import com.llegate.ui.components.MapDestinationCard
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
@@ -242,13 +242,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(Asphalt950)
         ) {
-            LeafletDarkMapView(
-                uiState = uiState,
-                viewModel = viewModel,
-                modifier = Modifier.fillMaxSize(),
-                isExpanded = true,
-                onExpandToggle = { viewModel.toggleFullMapExpanded(false) }
-            )
+            MapboxDarkMapScreen(modifier = Modifier.fillMaxSize())
             Surface(
                 onClick = { viewModel.toggleFullMapExpanded(false) },
                 shape = CircleShape,
@@ -392,15 +386,11 @@ fun HomeScreen(
                 }
             )
         } else {
-        // 1. Live Leaflet map with destination selection and road routing.
-        LeafletDarkMapView(
-            uiState = uiState,
-            viewModel = viewModel,
+        // 1. Dark Mapbox map behind the floating HomeScreen controls.
+        MapboxDarkMapScreen(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(410.dp),
-            isExpanded = false,
-            onExpandToggle = { viewModel.toggleFullMapExpanded(true) }
+                .height(410.dp)
         )
 
         // 2. FLOATING TOP HEADER OVER THE MAP (MATCHING ATTACHED SCREENSHOT)
