@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,6 +31,7 @@ import com.llegate.ui.theme.RacingYellow500
 import com.llegate.ui.theme.Stone100
 import com.llegate.ui.theme.Stone300
 import com.llegate.ui.theme.Stone400
+import com.llegate.model.LocationPoint
 import java.util.Locale
 
 @Composable
@@ -39,6 +42,8 @@ fun MapDestinationCard(
     estimatedPriceUsd: Double,
     onConfirmClick: () -> Unit,
     confirmEnabled: Boolean = true,
+    suggestedDestinations: List<LocationPoint> = emptyList(),
+    onSuggestedDestinationClick: (LocationPoint) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -90,6 +95,36 @@ fun MapDestinationCard(
                 color = Stone400.copy(alpha = 0.8f),
                 fontSize = 12.sp
             )
+            if (suggestedDestinations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "PUNTOS POPULARES",
+                    color = RacingYellow500,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(suggestedDestinations) { destination ->
+                        Surface(
+                            onClick = { onSuggestedDestinationClick(destination) },
+                            shape = RoundedCornerShape(18.dp),
+                            color = Asphalt950,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Asphalt700)
+                        ) {
+                            Text(
+                                text = destination.title,
+                                color = Stone100,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(

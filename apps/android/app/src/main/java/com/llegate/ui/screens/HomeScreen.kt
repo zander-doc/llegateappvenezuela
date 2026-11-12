@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -242,24 +243,80 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(Asphalt950)
         ) {
-            MapboxDarkMapScreen(modifier = Modifier.fillMaxSize())
+            MapboxDarkMapScreen(
+                modifier = Modifier.fillMaxSize(),
+                selectedDestination = uiState.destination.takeIf { it.tieneCoordenadas },
+                onMapCenterChanged = { point ->
+                    viewModel.updateDestinationFromMap(context, point.latitude(), point.longitude())
+                }
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.offset(y = (-34).dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Asphalt900.copy(alpha = 0.96f),
+                        border = BorderStroke(1.dp, Asphalt700),
+                        shadowElevation = 8.dp
+                    ) {
+                        Text(
+                            text = "DESTINO",
+                            color = Stone100,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Filled.LocationOn,
+                        contentDescription = "Centro del destino",
+                        tint = RacingRed500,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+            }
             Surface(
-                onClick = { viewModel.toggleFullMapExpanded(false) },
-                shape = CircleShape,
-                color = Asphalt900.copy(alpha = 0.92f),
+                shape = RoundedCornerShape(12.dp),
+                color = Asphalt900.copy(alpha = 0.94f),
                 border = BorderStroke(1.dp, Asphalt700),
                 modifier = Modifier
-                    .padding(16.dp)
-                    .align(Alignment.TopStart)
-                    .size(44.dp)
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 48.dp)
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    androidx.compose.material3.IconButton(
+                        onClick = { viewModel.toggleFullMapExpanded(false) }
+                    ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Volver al panel",
+                        contentDescription = "Volver",
                         tint = Stone100,
                         modifier = Modifier.size(22.dp)
                     )
+                    }
+                    Column(modifier = Modifier.padding(start = 8.dp, end = 12.dp)) {
+                        Text(
+                            text = "Ubica tu destino en el mapa",
+                            color = Stone100,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Mueve el mapa para colocar el pin.",
+                            color = Stone400,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
             if (showMapVehicleSelector) {
@@ -323,9 +380,13 @@ fun HomeScreen(
                         ?: "${uiState.destination.cityName}, ${uiState.destination.stateName}",
                     distanceText = uiState.routeDistanceKm?.let {
                         "Ruta por calles: ${String.format(java.util.Locale.US, "%.1f", it)} km"
-                    } ?: "Calculando distancia por calles…",
+                    } ?: selectedEstimate?.distanceKm?.let {
+                        "Distancia estimada: ${String.format(java.util.Locale.US, "%.1f", it)} km"
+                    } ?: "Calculando distancia…",
                     estimatedPriceUsd = selectedEstimate?.priceUsd ?: 0.0,
                     confirmEnabled = selectedEstimate != null,
+                    suggestedDestinations = uiState.currentPopularLocations,
+                    onSuggestedDestinationClick = viewModel::updateDestination,
                     onConfirmClick = {
                         viewModel.selectService(ServiceType.CAR)
                         showMapVehicleSelector = true

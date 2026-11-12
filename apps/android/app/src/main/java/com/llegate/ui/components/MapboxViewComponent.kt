@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,19 +28,27 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.llegate.R
+import com.llegate.model.LocationPoint
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Stone100
+import com.mapbox.android.gestures.MoveGestureDetector
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
 import com.mapbox.maps.extension.style.style
 import com.mapbox.maps.plugin.animation.flyTo
+import com.mapbox.maps.plugin.gestures.OnMoveListener
+import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
 
 @Composable
-fun MapboxDarkMapScreen(modifier: Modifier = Modifier) {
+fun MapboxDarkMapScreen(
+    modifier: Modifier = Modifier,
+    selectedDestination: LocationPoint? = null,
+    onMapCenterChanged: (Point) -> Unit = {}
+) {
     val accessToken = stringResource(R.string.mapbox_access_token)
     if (accessToken.isBlank()) {
         Box(
@@ -73,6 +82,7 @@ fun MapboxDarkMapScreen(modifier: Modifier = Modifier) {
     }
     var hasCenteredOnUser by remember { mutableStateOf(false) }
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
+    val currentOnMapCenterChanged by rememberUpdatedState(onMapCenterChanged)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -110,6 +120,47 @@ fun MapboxDarkMapScreen(modifier: Modifier = Modifier) {
     )
 
     val mapView = mapViewState.value
+    LaunchedEffect(mapView, selectedDestination?.lat, selectedDestination?.lng) {
+        val destination = selectedDestination
+        if (mapView != null && destination?.tieneCoordenadas == true) {
+            mapView.mapboxMap.flyTo(
+                CameraOptions.Builder()
+                    .center(Point.fromLngLat(destination.lng, destination.lat))
+                    .zoom(15.0)
+                    .build()
+            )
+        }
+    }
+
+    DisposableEffect(mapView) {
+        if (mapView == null) {
+            onDispose {}
+        } else {
+            var userMovedMap = false
+            val moveListener = object : OnMoveListener {
+                override fun onMoveBegin(detector: MoveGestureDetector) {
+                    userMovedMap = true
+                }
+
+                override fun onMove(detector: MoveGestureDetector): Boolean = false
+
+                override fun onMoveEnd(detector: MoveGestureDetector) = Unit
+            }
+            mapView.gestures.addOnMoveListener(moveListener)
+            val mapIdleSubscription = mapView.mapboxMap.subscribeMapIdle {
+                if (userMovedMap) {
+                    userMovedMap = false
+                    currentOnMapCenterChanged(mapView.mapboxMap.cameraState.center)
+                }
+            }
+
+            onDispose {
+                mapView.gestures.removeOnMoveListener(moveListener)
+                mapIdleSubscription.cancel()
+            }
+        }
+    }
+
     DisposableEffect(mapView, hasLocationPermission) {
         if (mapView == null || !hasLocationPermission) {
             onDispose {}
