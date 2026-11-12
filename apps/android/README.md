@@ -55,7 +55,9 @@ piloto y decidir qué hacer con la vitrina de concesionarios (`automotivePartner
 lista beneficios aún no firmados.
 
 `MapboxDarkMapScreen` se usa como mapa oscuro en `HomeScreen`. Esta integración
-básica no incluye todavía selección de destino al tocar el mapa, centrado GPS,
+básica muestra Villa de Cura como posición inicial y, si el usuario concede el
+permiso de ubicación, activa el indicador pulsante y centra la cámara en la
+primera posición GPS. Todavía no incluye selección de destino al tocar el mapa,
 cambio de capas ni rutas; esas funciones siguen disponibles en las pantallas
 que todavía usan `LeafletDarkMapView`.
 
