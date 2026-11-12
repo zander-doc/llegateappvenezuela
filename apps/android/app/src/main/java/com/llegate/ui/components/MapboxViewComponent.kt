@@ -50,7 +50,6 @@ import com.mapbox.maps.extension.style.sources.addSource
 import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
 import com.mapbox.maps.extension.style.sources.getSourceAs
-import com.mapbox.maps.extension.style.style
 import com.mapbox.maps.plugin.animation.flyTo
 import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.maps.plugin.gestures.gestures
@@ -79,7 +78,9 @@ private val routeHttpClient = OkHttpClient.Builder()
 
 private data class RoadRoute(
     val points: List<Point>,
-    val distanceKm: Double
+    val distanceKm: Double,
+    val origin: Point,
+    val destination: Point
 )
 
 fun updateMapboxRoute(
@@ -103,6 +104,23 @@ private fun setMapboxRoutePoints(mapboxMap: MapboxMap, points: List<Point>) {
         FeatureCollection.fromFeatures(emptyArray())
     }
     source.featureCollection(collection)
+}
+
+private fun installRouteLayer(style: Style) {
+    style.addSource(
+        geoJsonSource(ROUTE_SOURCE_ID) {
+            featureCollection(FeatureCollection.fromFeatures(emptyArray()))
+        }
+    )
+    style.addLayer(
+        lineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID) {
+            lineColor("#00E676")
+            lineWidth(5.5)
+            lineCap(LineCap.ROUND)
+            lineJoin(LineJoin.ROUND)
+            lineOpacity(0.92)
+        }
+    )
 }
 
 private suspend fun requestRoadRoute(origin: Point, destination: Point): RoadRoute =
@@ -144,7 +162,7 @@ private suspend fun requestRoadRoute(origin: Point, destination: Point): RoadRou
                         if (points.size < 2 || !distanceKm.isFinite() || distanceKm <= 0.0) {
                             throw IllegalStateException("OSRM devolvió una ruta vacía o inválida.")
                         }
-                        RoadRoute(points, distanceKm)
+                        RoadRoute(points, distanceKm, origin, destination)
                     }
                     if (continuation.isActive) continuation.resume(routeResult)
                 } catch (failure: IOException) {
@@ -161,6 +179,7 @@ private suspend fun requestRoadRoute(origin: Point, destination: Point): RoadRou
 @Composable
 fun MapboxDarkMapScreen(
     modifier: Modifier = Modifier,
+    currentMapStyle: LlegateMapStyle = LlegateMapStyle.DARK,
     origin: LocationPoint? = null,
     selectedDestination: LocationPoint? = null,
     onMapCenterChanged: (Point) -> Unit = {},
@@ -202,12 +221,17 @@ fun MapboxDarkMapScreen(
     val hasLocationPermission = locationPermissionGranted ?: localLocationPermission
     var hasCenteredOnUser by remember { mutableStateOf(false) }
     var isStyleLoaded by remember { mutableStateOf(false) }
+    var isStyleLoading by remember { mutableStateOf(false) }
     var roadRoute by remember { mutableStateOf<RoadRoute?>(null) }
     var isRouteLoading by remember { mutableStateOf(false) }
     var lastFitRequest by remember { mutableStateOf(0) }
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     val currentOnMapCenterChanged by rememberUpdatedState(onMapCenterChanged)
     val currentOnRouteDistanceChanged by rememberUpdatedState(onRouteDistanceChanged)
+    val latestMapStyle by rememberUpdatedState(currentMapStyle)
+    val latestOrigin by rememberUpdatedState(origin)
+    val latestDestination by rememberUpdatedState(selectedDestination)
+    val latestRoadRoute by rememberUpdatedState(roadRoute)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -238,22 +262,6 @@ fun MapboxDarkMapScreen(
                         .zoom(14.5)
                         .build()
                 )
-                mapboxMap.loadStyle(
-                    style(Style.DARK) {
-                        +geoJsonSource(ROUTE_SOURCE_ID) {
-                            featureCollection(FeatureCollection.fromFeatures(emptyArray()))
-                        }
-                        +lineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID) {
-                            lineColor("#00E676")
-                            lineWidth(5.5)
-                            lineCap(LineCap.ROUND)
-                            lineJoin(LineJoin.ROUND)
-                            lineOpacity(0.92)
-                        }
-                    }
-                ) {
-                    isStyleLoaded = true
-                }
             }
         },
         update = {}
@@ -265,8 +273,41 @@ fun MapboxDarkMapScreen(
     val destinationLat = selectedDestination?.lat
     val destinationLng = selectedDestination?.lng
 
-    LaunchedEffect(mapView, isStyleLoaded, originLat, originLng, destinationLat, destinationLng) {
-        if (mapView == null || !isStyleLoaded) return@LaunchedEffect
+    LaunchedEffect(mapView, currentMapStyle) {
+        if (mapView == null) return@LaunchedEffect
+        isStyleLoaded = false
+        isStyleLoading = true
+        val requestedStyle = currentMapStyle
+        mapView.mapboxMap.loadStyle(requestedStyle.styleUri) { style ->
+            installRouteLayer(style)
+            if (mapViewState.value !== mapView || latestMapStyle != requestedStyle) {
+                return@loadStyle
+            }
+            val route = latestRoadRoute
+            val activeOrigin = latestOrigin
+            val activeDestination = latestDestination
+            if (route != null &&
+                activeOrigin?.tieneCoordenadas == true &&
+                activeDestination?.tieneCoordenadas == true &&
+                route.origin.longitude() == activeOrigin.lng &&
+                route.origin.latitude() == activeOrigin.lat &&
+                route.destination.longitude() == activeDestination.lng &&
+                route.destination.latitude() == activeDestination.lat
+            ) {
+                updateMapboxRoute(
+                    mapView.mapboxMap,
+                    Point.fromLngLat(activeOrigin.lng, activeOrigin.lat),
+                    Point.fromLngLat(activeDestination.lng, activeDestination.lat),
+                    route.points
+                )
+            }
+            isStyleLoading = false
+            isStyleLoaded = true
+        }
+    }
+
+    LaunchedEffect(mapView, originLat, originLng, destinationLat, destinationLng) {
+        if (mapView == null) return@LaunchedEffect
         if (originLat == null || originLng == null ||
             destinationLat == null || destinationLng == null ||
             originLat !in -90.0..90.0 || originLng !in -180.0..180.0 ||
@@ -285,7 +326,7 @@ fun MapboxDarkMapScreen(
         val routeDestination = Point.fromLngLat(destinationLng, destinationLat)
         roadRoute = null
         isRouteLoading = true
-        setMapboxRoutePoints(mapView.mapboxMap, emptyList())
+        if (isStyleLoaded) setMapboxRoutePoints(mapView.mapboxMap, emptyList())
         currentOnRouteDistanceChanged(null)
 
         try {
@@ -293,7 +334,6 @@ fun MapboxDarkMapScreen(
             val route = requestRoadRoute(routeOrigin, routeDestination)
             roadRoute = route
             isRouteLoading = false
-            updateMapboxRoute(mapView.mapboxMap, routeOrigin, routeDestination, route.points)
             currentOnRouteDistanceChanged(route.distanceKm)
         } catch (failure: IOException) {
             isRouteLoading = false
@@ -304,6 +344,28 @@ fun MapboxDarkMapScreen(
         } catch (failure: IllegalStateException) {
             isRouteLoading = false
             Log.w("MapboxView", "OSRM devolvió datos de ruta inválidos.", failure)
+        }
+    }
+
+    LaunchedEffect(mapView, isStyleLoaded, roadRoute, originLat, originLng, destinationLat, destinationLng) {
+        if (mapView == null || !isStyleLoaded || isStyleLoading) return@LaunchedEffect
+        val route = roadRoute
+        if (route != null &&
+            originLat != null && originLng != null &&
+            destinationLat != null && destinationLng != null &&
+            route.origin.longitude() == originLng &&
+            route.origin.latitude() == originLat &&
+            route.destination.longitude() == destinationLng &&
+            route.destination.latitude() == destinationLat
+        ) {
+            updateMapboxRoute(
+                mapView.mapboxMap,
+                Point.fromLngLat(originLng, originLat),
+                Point.fromLngLat(destinationLng, destinationLat),
+                route.points
+            )
+        } else {
+            setMapboxRoutePoints(mapView.mapboxMap, emptyList())
         }
     }
 

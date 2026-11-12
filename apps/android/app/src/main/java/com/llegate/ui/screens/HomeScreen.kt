@@ -103,6 +103,8 @@ import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
 import com.llegate.ui.components.MapboxDarkMapScreen
+import com.llegate.ui.components.LlegateMapStyle
+import com.llegate.ui.components.MapLayerSelectorButton
 import com.llegate.ui.components.MapDestinationCard
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
@@ -152,6 +154,7 @@ fun HomeScreen(
     var showLocationPickerModal by remember { mutableStateOf(false) }
     var showMapVehicleSelector by remember { mutableStateOf(false) }
     var fitRouteRequest by remember { mutableStateOf(0) }
+    var currentMapStyle by remember { mutableStateOf(LlegateMapStyle.DARK) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -252,6 +255,7 @@ fun HomeScreen(
         ) {
             MapboxDarkMapScreen(
                 modifier = Modifier.fillMaxSize(),
+                currentMapStyle = currentMapStyle,
                 origin = uiState.origin,
                 selectedDestination = uiState.destination.takeIf { it.tieneCoordenadas },
                 onMapCenterChanged = { point ->
@@ -330,6 +334,13 @@ fun HomeScreen(
                     }
                 }
             }
+            MapLayerSelectorButton(
+                currentMapStyle = currentMapStyle,
+                onMapStyleSelected = { currentMapStyle = it },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 124.dp, end = 16.dp)
+            )
             if (showMapVehicleSelector) {
                 Surface(
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -464,6 +475,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(410.dp),
+            currentMapStyle = currentMapStyle,
             locationPermissionGranted = hasLocationPermission
         )
 

@@ -64,7 +64,9 @@ La geometría vial y distancia se consultan a OSRM y se dibujan como una línea
 GeoJSON en Mapbox; el precio continúa usando la tarifa configurada por la API
 mediante `tarifaUsd`, sin llamar a Mapbox Directions. Si OSRM no está disponible,
 se conserva la estimación de distancia existente. Al confirmar, la cámara encuadra
-la ruta. El selector todavía no ofrece cambio de capas.
+la ruta. El selector flotante permite cambiar entre los estilos oscuro,
+calles y satélite; al cambiar de estilo se vuelve a crear la capa GeoJSON y
+se dibuja de nuevo la ruta activa.
 
 ## Requisitos
 
