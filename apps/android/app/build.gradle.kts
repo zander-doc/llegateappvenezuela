@@ -11,6 +11,9 @@ val llegateVersionCode = (project.findProperty("LLEGATE_VERSION_CODE")
   .toInt()
 val llegateVersionName = project.findProperty("LLEGATE_VERSION_NAME")?.toString()
   ?: throw GradleException("Missing LLEGATE_VERSION_NAME in gradle.properties")
+val mapboxAccessToken = providers.gradleProperty("MAPBOX_ACCESS_TOKEN")
+  .orElse(providers.environmentVariable("MAPBOX_ACCESS_TOKEN"))
+  .orElse("")
 
 val keystorePropertiesText = providers.fileContents(
   rootProject.layout.projectDirectory.file("keystore.properties")
@@ -31,6 +34,7 @@ android {
     targetSdk = 36
     versionCode = llegateVersionCode
     versionName = llegateVersionName
+    resValue("string", "mapbox_access_token", mapboxAccessToken.get())
   }
 
   if (keystoreProperties != null) {
@@ -76,6 +80,7 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
+    resValues = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
@@ -112,6 +117,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.mapbox.maps)
   implementation(libs.androidx.navigation.compose)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)

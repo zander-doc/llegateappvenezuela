@@ -54,6 +54,10 @@ dibuja la ruta declarada en el viaje. Siguen pendientes la verificación de docu
 piloto y decidir qué hacer con la vitrina de concesionarios (`automotivePartners`), que
 lista beneficios aún no firmados.
 
+`MapboxDarkMapScreen` está disponible como componente reutilizable en
+`ui/components/MapboxViewComponent.kt`, pero todavía no reemplaza el mapa Leaflet activo:
+este último conserva la selección de destino y las rutas de la app.
+
 ## Requisitos
 
 - JDK 17 o superior (lo trae Android Studio).
@@ -123,6 +127,12 @@ Cómo se generan y bajo qué licencia están explicados en `fonts/README.md`.
 ## La API
 
 La app habla con `https://llegate-app-api.onrender.com`. La dirección se fija en
-`ApiConfig`; no hay claves ni tokens empaquetados en el APK: el acceso es por
-código enviado al teléfono y la sesión de este dispositivo se guarda sola, junto
-con el `refresh_token` que la API rota en cada renovación.
+`ApiConfig`; no hay credenciales de acceso a la API empaquetadas en el APK: el
+acceso es por código enviado al teléfono y la sesión de este dispositivo se
+guarda sola, junto con el `refresh_token` que la API rota en cada renovación.
+
+El SDK de Mapbox usa el recurso `mapbox_access_token`. Para proporcionarlo sin
+guardarlo en Git, define la variable de entorno `MAPBOX_ACCESS_TOKEN` antes de
+compilar (o pásala como propiedad Gradle con `-PMAPBOX_ACCESS_TOKEN=...`). Si no
+se define, el recurso queda vacío; los mapas Mapbox requieren un token público
+válido para cargar estilos y datos.
