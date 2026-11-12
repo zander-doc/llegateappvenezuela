@@ -11,9 +11,15 @@ val llegateVersionCode = (project.findProperty("LLEGATE_VERSION_CODE")
   .toInt()
 val llegateVersionName = project.findProperty("LLEGATE_VERSION_NAME")?.toString()
   ?: throw GradleException("Missing LLEGATE_VERSION_NAME in gradle.properties")
+val localPropertiesText = providers.fileContents(
+  rootProject.layout.projectDirectory.file("local.properties")
+).asText.orNull
+val localProperties = localPropertiesText?.let { text ->
+  Properties().apply { text.reader().use { load(it) } }
+}
 val mapboxAccessToken = providers.gradleProperty("MAPBOX_ACCESS_TOKEN")
   .orElse(providers.environmentVariable("MAPBOX_ACCESS_TOKEN"))
-  .orElse("")
+  .orElse(localProperties?.getProperty("MAPBOX_ACCESS_TOKEN").orEmpty())
 
 val keystorePropertiesText = providers.fileContents(
   rootProject.layout.projectDirectory.file("keystore.properties")

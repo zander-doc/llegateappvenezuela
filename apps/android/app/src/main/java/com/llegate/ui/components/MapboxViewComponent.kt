@@ -23,6 +23,7 @@ import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Stone100
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
+import com.mapbox.maps.extension.style.style
 
 @Composable
 fun MapboxDarkMapScreen(modifier: Modifier = Modifier) {
@@ -52,7 +53,7 @@ fun MapboxDarkMapScreen(modifier: Modifier = Modifier) {
         factory = {
             MapView(context).apply {
                 mapViewState.value = this
-                getMapboxMap().loadStyleUri(Style.DARK)
+                mapboxMap.loadStyle(style(Style.DARK) {})
             }
         },
         update = {}

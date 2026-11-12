@@ -132,8 +132,9 @@ La app habla con `https://llegate-app-api.onrender.com`. La dirección se fija e
 acceso es por código enviado al teléfono y la sesión de este dispositivo se
 guarda sola, junto con el `refresh_token` que la API rota en cada renovación.
 
-El SDK de Mapbox usa el recurso `mapbox_access_token`. Para proporcionarlo sin
-guardarlo en Git, define la variable de entorno `MAPBOX_ACCESS_TOKEN` antes de
-compilar (o pásala como propiedad Gradle con `-PMAPBOX_ACCESS_TOKEN=...`). Si no
-se define, el recurso queda vacío; los mapas Mapbox requieren un token público
-válido para cargar estilos y datos.
+El SDK de Mapbox usa el recurso generado `mapbox_access_token`. Para
+proporcionarlo sin guardarlo en Git, añade `MAPBOX_ACCESS_TOKEN=<tu token>`
+en `local.properties`, define esa variable de entorno antes de compilar o
+pásala como propiedad Gradle con `-PMAPBOX_ACCESS_TOKEN=...`. `local.properties`
+está excluido de Git. Si no se define el token, el recurso queda vacío y Mapbox
+no puede cargar estilos ni datos.
