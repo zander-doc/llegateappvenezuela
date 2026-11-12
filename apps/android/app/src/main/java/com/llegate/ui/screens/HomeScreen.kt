@@ -110,6 +110,7 @@ import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
 import com.llegate.ui.components.UpdateDialog
 import com.llegate.ui.components.VehicleCategorySelector
+import com.llegate.ui.navigation.BookingFlowState
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -147,12 +148,13 @@ import kotlin.math.roundToInt
 fun HomeScreen(
     uiState: LlegateUiState,
     viewModel: LlegateViewModel,
+    bookingFlowState: BookingFlowState,
+    onBookingFlowStateChange: (BookingFlowState) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var showLocationPickerModal by remember { mutableStateOf(false) }
-    var showMapVehicleSelector by remember { mutableStateOf(false) }
     var fitRouteRequest by remember { mutableStateOf(0) }
     var currentMapStyle by remember { mutableStateOf(LlegateMapStyle.DARK) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
@@ -246,7 +248,11 @@ fun HomeScreen(
     }
 
     // FULLSCREEN MAP MODE
-    if (uiState.showFullMapExpanded) {
+    if (
+        uiState.showFullMapExpanded ||
+        bookingFlowState is BookingFlowState.MapPinPicker ||
+        bookingFlowState is BookingFlowState.VehicleSelection
+    ) {
         val selectedEstimate = uiState.selectedEstimate
         Box(
             modifier = modifier
@@ -310,7 +316,10 @@ fun HomeScreen(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     androidx.compose.material3.IconButton(
-                        onClick = { viewModel.toggleFullMapExpanded(false) }
+                        onClick = {
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                            viewModel.toggleFullMapExpanded(false)
+                        }
                     ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -341,7 +350,7 @@ fun HomeScreen(
                     .align(Alignment.TopEnd)
                     .padding(top = 124.dp, end = 16.dp)
             )
-            if (showMapVehicleSelector) {
+            if (bookingFlowState is BookingFlowState.VehicleSelection) {
                 Surface(
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     color = Asphalt950.copy(alpha = 0.98f),
@@ -360,7 +369,11 @@ fun HomeScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        TextButton(onClick = { showMapVehicleSelector = false }) {
+                        TextButton(
+                            onClick = {
+                                onBookingFlowStateChange(BookingFlowState.MapPinPicker)
+                            }
+                        ) {
                             Text("← Cambiar destino", color = RacingYellow500)
                         }
                         VehicleCategorySelector(
@@ -412,7 +425,7 @@ fun HomeScreen(
                     onConfirmClick = {
                         viewModel.selectService(ServiceType.CAR)
                         fitRouteRequest += 1
-                        showMapVehicleSelector = true
+                        onBookingFlowStateChange(BookingFlowState.VehicleSelection)
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -1030,6 +1043,7 @@ fun HomeScreen(
                 Button(
                     onClick = {
                         if (uiState.destination.tieneCoordenadas) {
+                            onBookingFlowStateChange(BookingFlowState.VehicleSelection)
                             viewModel.openBooking(uiState.selectedService)
                         } else {
                             showLocationPickerModal = true

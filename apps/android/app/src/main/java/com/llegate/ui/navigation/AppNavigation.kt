@@ -39,6 +39,7 @@ import com.llegate.ui.screens.TripActiveScreen
 import com.llegate.ui.screens.TripHistoryScreen
 import com.llegate.ui.screens.WelcomeAuthScreen
 import com.llegate.ui.theme.NeonOrange500
+import com.llegate.model.TripStep
 import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.ServicioConductor
@@ -68,6 +69,30 @@ fun AppNavigation(viewModel: LlegateViewModel) {
         .collectAsState(initial = null)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var introDone by rememberSaveable { mutableStateOf(false) }
+    var bookingFlowState by remember {
+        mutableStateOf<BookingFlowState>(BookingFlowState.SearchAddresses)
+    }
+
+    LaunchedEffect(
+        uiState.currentScreen,
+        uiState.showFullMapExpanded,
+        uiState.activeTrip?.currentStep
+    ) {
+        when {
+            uiState.currentScreen == AppScreen.TRIP_ACTIVE &&
+                uiState.activeTrip?.currentStep == TripStep.SEARCHING_DRIVER -> {
+                bookingFlowState = BookingFlowState.SearchingDriver
+            }
+            uiState.currentScreen == AppScreen.HOME && uiState.showFullMapExpanded -> {
+                if (bookingFlowState !is BookingFlowState.VehicleSelection) {
+                    bookingFlowState = BookingFlowState.MapPinPicker
+                }
+            }
+            uiState.currentScreen == AppScreen.HOME -> {
+                bookingFlowState = BookingFlowState.SearchAddresses
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -174,7 +199,12 @@ fun AppNavigation(viewModel: LlegateViewModel) {
                     label = "screen_transition"
                 ) { screen ->
                     when (screen) {
-                        AppScreen.HOME -> HomeScreen(uiState = uiState, viewModel = viewModel)
+                        AppScreen.HOME -> HomeScreen(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            bookingFlowState = bookingFlowState,
+                            onBookingFlowStateChange = { bookingFlowState = it }
+                        )
                         AppScreen.BOOKING_DETAILS -> BookingScreen(uiState = uiState, viewModel = viewModel)
                         AppScreen.TRIP_ACTIVE -> TripActiveScreen(uiState = uiState, viewModel = viewModel)
                         AppScreen.TRIP_HISTORY -> TripHistoryScreen(uiState = uiState, viewModel = viewModel)
