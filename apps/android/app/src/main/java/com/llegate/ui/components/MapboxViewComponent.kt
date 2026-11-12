@@ -2,6 +2,7 @@ package com.llegate.ui.components
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -32,22 +33,140 @@ import com.llegate.model.LocationPoint
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Stone100
 import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.geojson.Feature
+import com.mapbox.geojson.FeatureCollection
+import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
+import com.mapbox.maps.EdgeInsets
+import com.mapbox.maps.MapboxMap
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
+import com.mapbox.maps.extension.style.layers.addLayer
+import com.mapbox.maps.extension.style.layers.generated.lineLayer
+import com.mapbox.maps.extension.style.layers.properties.generated.LineCap
+import com.mapbox.maps.extension.style.layers.properties.generated.LineJoin
+import com.mapbox.maps.extension.style.sources.addSource
+import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
+import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
+import com.mapbox.maps.extension.style.sources.getSourceAs
 import com.mapbox.maps.extension.style.style
 import com.mapbox.maps.plugin.animation.flyTo
 import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import org.json.JSONException
+import org.json.JSONObject
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+private const val ROUTE_SOURCE_ID = "llegate-route-source"
+private const val ROUTE_LAYER_ID = "llegate-route-layer"
+private val routeHttpClient = OkHttpClient.Builder()
+    .connectTimeout(8, TimeUnit.SECONDS)
+    .readTimeout(12, TimeUnit.SECONDS)
+    .build()
+
+private data class RoadRoute(
+    val points: List<Point>,
+    val distanceKm: Double
+)
+
+fun updateMapboxRoute(
+    mapboxMap: MapboxMap,
+    origin: Point,
+    destination: Point,
+    routePoints: List<Point> = listOf(origin, destination)
+) {
+    setMapboxRoutePoints(
+        mapboxMap,
+        routePoints.takeIf { it.size >= 2 } ?: listOf(origin, destination)
+    )
+}
+
+private fun setMapboxRoutePoints(mapboxMap: MapboxMap, points: List<Point>) {
+    val style = mapboxMap.style ?: return
+    val source = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return
+    val collection = if (points.size >= 2) {
+        FeatureCollection.fromFeature(Feature.fromGeometry(LineString.fromLngLats(points)))
+    } else {
+        FeatureCollection.fromFeatures(emptyArray())
+    }
+    source.featureCollection(collection)
+}
+
+private suspend fun requestRoadRoute(origin: Point, destination: Point): RoadRoute =
+    suspendCancellableCoroutine { continuation ->
+        val url = "https://router.project-osrm.org/route/v1/driving/" +
+            "${origin.longitude()},${origin.latitude()};" +
+            "${destination.longitude()},${destination.latitude()}?overview=full&geometries=geojson&steps=false"
+        val request = Request.Builder().url(url).get().build()
+        val call = routeHttpClient.newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (continuation.isActive) continuation.resumeWithException(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                try {
+                    val routeResult = response.use {
+                        if (!it.isSuccessful) throw IOException("OSRM respondió HTTP ${it.code}.")
+                        val body = it.body?.string()
+                            ?: throw IOException("OSRM devolvió una respuesta vacía.")
+                        val route = JSONObject(body)
+                            .getJSONArray("routes")
+                            .optJSONObject(0)
+                            ?: throw IllegalStateException("OSRM no encontró una ruta vial.")
+                        val distanceKm = route.getDouble("distance") / 1000.0
+                        val coordinates = route.getJSONObject("geometry").getJSONArray("coordinates")
+                        val points = List(coordinates.length()) { index ->
+                            val coordinate = coordinates.getJSONArray(index)
+                            val longitude = coordinate.getDouble(0)
+                            val latitude = coordinate.getDouble(1)
+                            if (!longitude.isFinite() || !latitude.isFinite() ||
+                                longitude !in -180.0..180.0 || latitude !in -90.0..90.0
+                            ) {
+                                throw IllegalStateException("OSRM devolvió coordenadas inválidas.")
+                            }
+                            Point.fromLngLat(longitude, latitude)
+                        }
+                        if (points.size < 2 || !distanceKm.isFinite() || distanceKm <= 0.0) {
+                            throw IllegalStateException("OSRM devolvió una ruta vacía o inválida.")
+                        }
+                        RoadRoute(points, distanceKm)
+                    }
+                    if (continuation.isActive) continuation.resume(routeResult)
+                } catch (failure: IOException) {
+                    if (continuation.isActive) continuation.resumeWithException(failure)
+                } catch (failure: JSONException) {
+                    if (continuation.isActive) continuation.resumeWithException(failure)
+                } catch (failure: IllegalStateException) {
+                    if (continuation.isActive) continuation.resumeWithException(failure)
+                }
+            }
+        })
+    }
 
 @Composable
 fun MapboxDarkMapScreen(
     modifier: Modifier = Modifier,
+    origin: LocationPoint? = null,
     selectedDestination: LocationPoint? = null,
-    onMapCenterChanged: (Point) -> Unit = {}
+    onMapCenterChanged: (Point) -> Unit = {},
+    onRouteDistanceChanged: (Double?) -> Unit = {},
+    fitRouteRequest: Int = 0,
+    locationPermissionGranted: Boolean? = null
 ) {
     val accessToken = stringResource(R.string.mapbox_access_token)
     if (accessToken.isBlank()) {
@@ -68,7 +187,7 @@ fun MapboxDarkMapScreen(
 
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var hasLocationPermission by remember {
+    var localLocationPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
                 context,
@@ -80,19 +199,25 @@ fun MapboxDarkMapScreen(
                 ) == PackageManager.PERMISSION_GRANTED
         )
     }
+    val hasLocationPermission = locationPermissionGranted ?: localLocationPermission
     var hasCenteredOnUser by remember { mutableStateOf(false) }
+    var isStyleLoaded by remember { mutableStateOf(false) }
+    var roadRoute by remember { mutableStateOf<RoadRoute?>(null) }
+    var isRouteLoading by remember { mutableStateOf(false) }
+    var lastFitRequest by remember { mutableStateOf(0) }
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     val currentOnMapCenterChanged by rememberUpdatedState(onMapCenterChanged)
+    val currentOnRouteDistanceChanged by rememberUpdatedState(onRouteDistanceChanged)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        hasLocationPermission =
+        localLocationPermission =
             permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
 
-    LaunchedEffect(Unit) {
-        if (!hasLocationPermission) {
+    LaunchedEffect(locationPermissionGranted) {
+        if (locationPermissionGranted == null && !localLocationPermission) {
             permissionLauncher.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -113,13 +238,75 @@ fun MapboxDarkMapScreen(
                         .zoom(14.5)
                         .build()
                 )
-                mapboxMap.loadStyle(style(Style.DARK) {})
+                mapboxMap.loadStyle(
+                    style(Style.DARK) {
+                        +geoJsonSource(ROUTE_SOURCE_ID) {
+                            featureCollection(FeatureCollection.fromFeatures(emptyArray()))
+                        }
+                        +lineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID) {
+                            lineColor("#00E676")
+                            lineWidth(5.5)
+                            lineCap(LineCap.ROUND)
+                            lineJoin(LineJoin.ROUND)
+                            lineOpacity(0.92)
+                        }
+                    }
+                ) {
+                    isStyleLoaded = true
+                }
             }
         },
         update = {}
     )
 
     val mapView = mapViewState.value
+    val originLat = origin?.lat
+    val originLng = origin?.lng
+    val destinationLat = selectedDestination?.lat
+    val destinationLng = selectedDestination?.lng
+
+    LaunchedEffect(mapView, isStyleLoaded, originLat, originLng, destinationLat, destinationLng) {
+        if (mapView == null || !isStyleLoaded) return@LaunchedEffect
+        if (originLat == null || originLng == null ||
+            destinationLat == null || destinationLng == null ||
+            originLat !in -90.0..90.0 || originLng !in -180.0..180.0 ||
+            destinationLat !in -90.0..90.0 || destinationLng !in -180.0..180.0 ||
+            (originLat == 0.0 && originLng == 0.0) ||
+            (destinationLat == 0.0 && destinationLng == 0.0)
+        ) {
+            roadRoute = null
+            isRouteLoading = false
+            setMapboxRoutePoints(mapView.mapboxMap, emptyList())
+            currentOnRouteDistanceChanged(null)
+            return@LaunchedEffect
+        }
+
+        val routeOrigin = Point.fromLngLat(originLng, originLat)
+        val routeDestination = Point.fromLngLat(destinationLng, destinationLat)
+        roadRoute = null
+        isRouteLoading = true
+        setMapboxRoutePoints(mapView.mapboxMap, emptyList())
+        currentOnRouteDistanceChanged(null)
+
+        try {
+            delay(300)
+            val route = requestRoadRoute(routeOrigin, routeDestination)
+            roadRoute = route
+            isRouteLoading = false
+            updateMapboxRoute(mapView.mapboxMap, routeOrigin, routeDestination, route.points)
+            currentOnRouteDistanceChanged(route.distanceKm)
+        } catch (failure: IOException) {
+            isRouteLoading = false
+            Log.w("MapboxView", "No se pudo obtener la geometría vial de OSRM.", failure)
+        } catch (failure: JSONException) {
+            isRouteLoading = false
+            Log.w("MapboxView", "OSRM devolvió una ruta inválida.", failure)
+        } catch (failure: IllegalStateException) {
+            isRouteLoading = false
+            Log.w("MapboxView", "OSRM devolvió datos de ruta inválidos.", failure)
+        }
+    }
+
     LaunchedEffect(mapView, selectedDestination?.lat, selectedDestination?.lng) {
         val destination = selectedDestination
         if (mapView != null && destination?.tieneCoordenadas == true) {
@@ -130,6 +317,39 @@ fun MapboxDarkMapScreen(
                     .build()
             )
         }
+    }
+
+    LaunchedEffect(
+        mapView,
+        fitRouteRequest,
+        roadRoute,
+        isRouteLoading,
+        originLat,
+        originLng,
+        destinationLat,
+        destinationLng
+    ) {
+        if (mapView == null || fitRouteRequest == 0 || fitRouteRequest == lastFitRequest) {
+            return@LaunchedEffect
+        }
+        if (isRouteLoading) return@LaunchedEffect
+        val routeCoordinates = roadRoute?.points?.takeIf { it.size >= 2 } ?: listOfNotNull(
+            originLat?.let { lat -> originLng?.let { lng -> Point.fromLngLat(lng, lat) } },
+            destinationLat?.let { lat -> destinationLng?.let { lng -> Point.fromLngLat(lng, lat) } }
+        )
+        if (routeCoordinates.size >= 2) {
+            val density = mapView.resources.displayMetrics.density
+            mapView.mapboxMap.cameraForCoordinates(
+                routeCoordinates,
+                CameraOptions.Builder().build(),
+                EdgeInsets(180.0 * density, 48.0 * density, 300.0 * density, 48.0 * density),
+                14.5,
+                null
+            ) { cameraOptions ->
+                mapView.mapboxMap.flyTo(cameraOptions)
+            }
+        }
+        lastFitRequest = fitRouteRequest
     }
 
     DisposableEffect(mapView) {

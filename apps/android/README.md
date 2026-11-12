@@ -50,9 +50,9 @@ cercanos, la telemetría GPS (satélites, precisión y rumbo de mentira) y el fe
 de la comunidad con sus reportes guardados solo en el teléfono; `BookingScreen` dejó de
 contar cuántos panas están cerca y de prometer respuesta en menos de un minuto, y la
 sección de alertas queda rotulada «Próximamente». El mapa (`LeafletDarkMapView`) solo
-dibuja la ruta declarada en el viaje. Siguen pendientes la verificación de documentos del
-piloto y decidir qué hacer con la vitrina de concesionarios (`automotivePartners`), que
-lista beneficios aún no firmados.
+dibuja la ruta declarada en las pantallas de reserva y viaje. Siguen pendientes la
+verificación de documentos del piloto y decidir qué hacer con la vitrina de
+concesionarios (`automotivePartners`), que lista beneficios aún no firmados.
 
 `MapboxDarkMapScreen` se usa como mapa oscuro en `HomeScreen`. Esta integración
 básica muestra Villa de Cura como posición inicial y, si el usuario concede el
@@ -60,8 +60,11 @@ permiso de ubicación, activa el indicador pulsante y centra la cámara en la
 primera posición GPS. En el selector de destino, el pin central permanece fijo
 mientras se mueve el mapa; al quedar inactivo, se actualiza la dirección del
 destino. También se muestran los puntos populares de la ciudad seleccionada.
-La integración todavía no dibuja rutas ni ofrece cambio de capas; esas funciones
-siguen disponibles en las pantallas que todavía usan `LeafletDarkMapView`.
+La geometría vial y distancia se consultan a OSRM y se dibujan como una línea
+GeoJSON en Mapbox; el precio continúa usando la tarifa configurada por la API
+mediante `tarifaUsd`, sin llamar a Mapbox Directions. Si OSRM no está disponible,
+se conserva la estimación de distancia existente. Al confirmar, la cámara encuadra
+la ruta. El selector todavía no ofrece cambio de capas.
 
 ## Requisitos
 

@@ -151,7 +151,20 @@ fun HomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showLocationPickerModal by remember { mutableStateOf(false) }
     var showMapVehicleSelector by remember { mutableStateOf(false) }
+    var fitRouteRequest by remember { mutableStateOf(0) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
 
     LaunchedEffect(Unit) {
         try {
@@ -208,22 +221,16 @@ fun HomeScreen(
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) {
+    ) { permissions ->
+        hasLocationPermission =
+            permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         viewModel.requestCurrentGpsLocation(context)
     }
 
     LaunchedEffect(Unit) {
         viewModel.clearDestination()
-        val hasFineLocation = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasCoarseLocation = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (hasFineLocation || hasCoarseLocation) {
+        if (hasLocationPermission) {
             viewModel.requestCurrentGpsLocation(context)
         } else {
             permissionLauncher.launch(
@@ -245,10 +252,14 @@ fun HomeScreen(
         ) {
             MapboxDarkMapScreen(
                 modifier = Modifier.fillMaxSize(),
+                origin = uiState.origin,
                 selectedDestination = uiState.destination.takeIf { it.tieneCoordenadas },
                 onMapCenterChanged = { point ->
                     viewModel.updateDestinationFromMap(context, point.latitude(), point.longitude())
-                }
+                },
+                onRouteDistanceChanged = viewModel::updateRoadRouteDistance,
+                fitRouteRequest = fitRouteRequest,
+                locationPermissionGranted = hasLocationPermission
             )
             Box(
                 modifier = Modifier
@@ -389,6 +400,7 @@ fun HomeScreen(
                     onSuggestedDestinationClick = viewModel::updateDestination,
                     onConfirmClick = {
                         viewModel.selectService(ServiceType.CAR)
+                        fitRouteRequest += 1
                         showMapVehicleSelector = true
                     },
                     modifier = Modifier
@@ -451,7 +463,8 @@ fun HomeScreen(
         MapboxDarkMapScreen(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(410.dp)
+                .height(410.dp),
+            locationPermissionGranted = hasLocationPermission
         )
 
         // 2. FLOATING TOP HEADER OVER THE MAP (MATCHING ATTACHED SCREENSHOT)
