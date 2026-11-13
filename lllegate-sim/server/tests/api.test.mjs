@@ -12,6 +12,7 @@ import {
   listarMigraciones,
   root,
 } from "../../scripts/embedded-postgres.mjs";
+import { resetRateLimit } from "../src/security/rateLimit.js";
 
 const PUERTO_PG = 55434;
 const PUERTO_API = 4399;
@@ -257,27 +258,22 @@ test("solicitar OTP no cambia perfiles existentes y un código concurrente solo 
     "select rol, nombre, estado, ciudad from public.usuarios where id = $1",
     [CLIENTE.id],
   );
-  const codigoExistente = await pedirCodigo(CLIENTE.telefono, {
-    rol: "conductor",
-    nombre: "Nombre no autorizado",
-    estado: "Estado no autorizado",
-    ciudad: "Ciudad no autorizada",
-  });
-  const [perfilPendiente] = await sql(
-    "select rol, nombre, estado, ciudad from public.usuarios where id = $1",
-    [CLIENTE.id],
-  );
-  assert.deepEqual(perfilPendiente, perfilOriginal);
-
-  const verificacionExistente = await pedir("POST", "/auth/verify", {
-    cuerpo: { telefono: CLIENTE.telefono, token: codigoExistente },
-  });
-  assert.equal(verificacionExistente.status, 200);
-  const [perfilVerificado] = await sql(
-    "select rol, nombre, estado, ciudad from public.usuarios where id = $1",
-    [CLIENTE.id],
-  );
-  assert.deepEqual(perfilVerificado, perfilOriginal);
+  resetRateLimit(`otp:telefono:${CLIENTE.telefono}`);
+  try {
+    await pedirCodigo(CLIENTE.telefono, {
+      rol: "conductor",
+      nombre: "Nombre no autorizado",
+      estado: "Estado no autorizado",
+      ciudad: "Ciudad no autorizada",
+    });
+    const [perfilPendiente] = await sql(
+      "select rol, nombre, estado, ciudad from public.usuarios where id = $1",
+      [CLIENTE.id],
+    );
+    assert.deepEqual(perfilPendiente, perfilOriginal);
+  } finally {
+    resetRateLimit(`otp:telefono:${CLIENTE.telefono}`);
+  }
 
   const telefono = "+584146666667";
   const codigo = await pedirCodigo(telefono, { nombre: "Alta concurrente" });

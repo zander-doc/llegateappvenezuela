@@ -59,7 +59,6 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.CancellationException
 import com.mapbox.geojson.Point
-import com.mapbox.geojson.Point
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -279,17 +278,8 @@ data class LlegateUiState(
         "Zulia", "Amazonas"
     ),
     val selectedStateId: String = "aragua", // Default Launch Hub
-    val selectedCityName: String = "Villa de Cura, Aragua", // Default City in Aragua
-    // Origin configured for Maracay, Aragua (Sede de Lanzamiento)
-    val origin: LocationPoint = LocationPoint(
-        title = "Av. BolÃ­var Este, Maracay",
-        subtitle = "Maracay, Estado Aragua (Sede Principal LlÃ©gate)",
-        lat = 10.0386,
-        lng = -67.4894,
-        isCurrentGps = false,
-        stateName = "Aragua",
-        cityName = "Villa de Cura"
-    ),
+    val selectedCityName: String = "Villa de Cura",
+    val origin: LocationPoint = VenezuelaLocationDefaults.defaultOriginLocationPoint(),
     val destination: LocationPoint = LocationPoint(
         title = "",
         subtitle = "",
@@ -455,7 +445,21 @@ data class LlegateUiState(
             ?: CityInfo(selectedCityName, currentState.name, currentState.popularPoints)
 
     val currentPopularLocations: List<LocationPoint>
-        get() = currentCity.points.ifEmpty { currentState.popularPoints }
+        get() {
+            val cityLocations = currentCity.points.ifEmpty { currentState.popularPoints }
+            if (selectedStateId != "aragua") return cityLocations
+            val localPlaces = VenezuelaLocationDefaults.ARAGUA_PLACES.map { it.toLocationPoint() }
+            val localPlacesByTitle = localPlaces.associateBy { it.title.trim().lowercase() }
+            val cityTitleKeys = cityLocations.map { it.title.trim().lowercase() }.toSet()
+            val cityLocationsWithLocalCoordinates = cityLocations.map { location ->
+                localPlacesByTitle[location.title.trim().lowercase()] ?: location
+            }
+            val additionalLocalPlaces = localPlaces.filterNot {
+                it.title.trim().lowercase() in cityTitleKeys
+            }
+            return (cityLocationsWithLocalCoordinates + additionalLocalPlaces)
+                .distinctBy { it.title.trim().lowercase() }
+        }
 
     val currentSuggestions: List<LocationSuggestion>
         get() = locationSuggestions.filter { it.stateId.equals(selectedStateId, ignoreCase = true) }
@@ -496,21 +500,68 @@ object VenezuelaLocationDefaults {
     val DEFAULT_ORIGIN = Point.fromLngLat(-67.4894, 10.0386)
     const val DEFAULT_ORIGIN_LABEL = "Villa de Cura, Aragua"
 
-    data class LocalPlace(val name: String, val address: String, val lat: Double, val lng: Double)
+    fun defaultOriginLocationPoint() = LocationPoint(
+        title = DEFAULT_ORIGIN_LABEL,
+        subtitle = DEFAULT_ORIGIN_LABEL,
+        lat = DEFAULT_ORIGIN.latitude(),
+        lng = DEFAULT_ORIGIN.longitude(),
+        stateName = "Aragua",
+        cityName = "Villa de Cura"
+    )
+
+    data class LocalPlace(
+        val name: String,
+        val address: String,
+        val point: Point,
+        val cityName: String
+    ) {
+        fun toLocationPoint() = LocationPoint(
+            title = name,
+            subtitle = address,
+            lat = point.latitude(),
+            lng = point.longitude(),
+            stateName = "Aragua",
+            cityName = cityName
+        )
+    }
 
     val ARAGUA_PLACES = listOf(
-        LocalPlace("Plaza Bolívar Villa de Cura", "Centro, Villa de Cura, Aragua", 10.0392, -67.4889),
-        LocalPlace("Frigorífico El Avión", "Av. Bolívar, Villa de Cura, Aragua", 10.0415, -67.4852),
-        LocalPlace("Panadería El Búcaro", "Calle Comercio, Villa de Cura, Aragua", 10.0378, -67.4910),
-        LocalPlace("Hospital Dr. José Rangel", "Av. Sucre, Villa de Cura, Aragua", 10.0401, -67.4925),
-        LocalPlace("CC Parque Aragua", "Av. Bolívar Este, Maracay, Aragua", 10.2469, -67.5908),
-        LocalPlace("CC Las Américas", "Av. Las Delicias, Maracay, Aragua", 10.2736, -67.5786),
-        LocalPlace("Terminal de Maracay", "Av. Constitución, Maracay, Aragua", 10.2412, -67.5961)
+        LocalPlace(
+            "Plaza Bolívar Villa de Cura", "Centro, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4889, 10.0392), "Villa de Cura"
+        ),
+        LocalPlace(
+            "Frigorífico El Avión", "Av. Bolívar, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4852, 10.0415), "Villa de Cura"
+        ),
+        LocalPlace(
+            "Panadería El Búcaro", "Calle Comercio, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4910, 10.0378), "Villa de Cura"
+        ),
+        LocalPlace(
+            "Hospital Dr. José Rangel", "Av. Sucre, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4925, 10.0401), "Villa de Cura"
+        ),
+        LocalPlace(
+            "CC Parque Aragua", "Av. Bolívar Este, Maracay, Aragua",
+            Point.fromLngLat(-67.5908, 10.2469), "Maracay"
+        ),
+        LocalPlace(
+            "CC Las Américas", "Av. Las Delicias, Maracay, Aragua",
+            Point.fromLngLat(-67.5786, 10.2736), "Maracay"
+        ),
+        LocalPlace(
+            "Terminal de Maracay", "Av. Constitución, Maracay, Aragua",
+            Point.fromLngLat(-67.5961, 10.2412), "Maracay"
+        )
     )
 
     fun sanitizeGpsPoint(lat: Double, lng: Double): Point {
         val isEmulatorDefault = (lat in 37.3..37.5) && (lng in -122.2..-121.9)
-        return if (isEmulatorDefault || (lat == 0.0 && lng == 0.0)) {
+        val isInvalid = !lat.isFinite() || !lng.isFinite() ||
+            lat !in -90.0..90.0 || lng !in -180.0..180.0 ||
+            (lat == 0.0 && lng == 0.0)
+        return if (isEmulatorDefault || isInvalid) {
             DEFAULT_ORIGIN
         } else {
             Point.fromLngLat(lng, lat)
@@ -1048,8 +1099,16 @@ class LlegateViewModel(
 
     fun selectState(stateId: String) {
         val state = _uiState.value.availableStates.firstOrNull { it.id == stateId } ?: return
-        val defaultCity = state.cities.firstOrNull()?.name ?: state.citiesAndTowns.firstOrNull() ?: "Centro"
-        val newDefaultOrigin = state.popularPoints.firstOrNull() ?: _uiState.value.origin
+        val defaultCity = if (state.id == "aragua") {
+            "Villa de Cura"
+        } else {
+            state.cities.firstOrNull()?.name ?: state.citiesAndTowns.firstOrNull() ?: "Centro"
+        }
+        val newDefaultOrigin = if (state.id == "aragua") {
+            VenezuelaLocationDefaults.defaultOriginLocationPoint()
+        } else {
+            state.popularPoints.firstOrNull() ?: _uiState.value.origin
+        }
         val newDefaultDest = state.popularPoints.getOrNull(1) ?: state.popularPoints.firstOrNull() ?: _uiState.value.destination
 
         _uiState.update {
@@ -1482,10 +1541,17 @@ class LlegateViewModel(
                     }
 
                     viewModelScope.launch {
+                        val sanitizedPoint = VenezuelaLocationDefaults.sanitizeGpsPoint(
+                            location.latitude,
+                            location.longitude
+                        )
+                        val latitude = sanitizedPoint.latitude()
+                        val longitude = sanitizedPoint.longitude()
+                        val gpsWasSanitized = latitude != location.latitude || longitude != location.longitude
                         val address = try {
                             withContext(Dispatchers.IO) {
                                 Geocoder(context, Locale.getDefault())
-                                    .getFromLocation(location.latitude, location.longitude, 1)
+                                    .getFromLocation(latitude, longitude, 1)
                                     ?.firstOrNull()
                             }
                         } catch (_: Exception) {
@@ -1495,18 +1561,22 @@ class LlegateViewModel(
                         val point = LocationPoint(
                             title = address?.thoroughfare
                                 ?: address?.featureName
-                                ?: "Mi ubicaciÃ³n actual",
+                                ?: if (gpsWasSanitized) VenezuelaLocationDefaults.DEFAULT_ORIGIN_LABEL else "Mi ubicaciÃ³n actual",
                             subtitle = listOfNotNull(
                                 address?.subLocality ?: address?.locality,
                                 address?.adminArea
                             ).joinToString(", ").ifBlank {
-                                String.format(Locale.US, "%.5f, %.5f", location.latitude, location.longitude)
+                                if (gpsWasSanitized) {
+                                    VenezuelaLocationDefaults.DEFAULT_ORIGIN_LABEL
+                                } else {
+                                    String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
+                                }
                             },
-                            lat = location.latitude,
-                            lng = location.longitude,
+                            lat = latitude,
+                            lng = longitude,
                             isCurrentGps = true,
-                            stateName = address?.adminArea ?: state.currentState.name,
-                            cityName = address?.locality ?: state.selectedCityName
+                            stateName = if (gpsWasSanitized) "Aragua" else address?.adminArea ?: state.currentState.name,
+                            cityName = if (gpsWasSanitized) "Villa de Cura" else address?.locality ?: state.selectedCityName
                         )
                         _uiState.update {
                             it.copy(

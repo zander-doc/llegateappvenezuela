@@ -8,6 +8,7 @@ import com.llegate.model.ServiceType
 import com.llegate.network.AuthRepository
 import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
+import com.llegate.viewmodel.VenezuelaLocationDefaults
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -68,6 +69,33 @@ class LlegateViewModelTest {
   }
 
   @Test
+  fun `la ubicacion inicial y la busqueda local usan Villa de Cura y Aragua`() {
+    val state = nuevoViewModel().uiState.value
+
+    assertEquals("Villa de Cura, Aragua", state.origin.title)
+    assertEquals(-67.4894, state.origin.lng, 0.0)
+    assertEquals(10.0386, state.origin.lat, 0.0)
+    assertTrue(state.currentPopularLocations.any { it.title == "Panadería El Búcaro" })
+    assertTrue(state.currentPopularLocations.any { it.title == "Terminal de Maracay" })
+  }
+
+  @Test
+  fun `el GPS de Mountain View y coordenadas invalidas vuelven al origen de Aragua`() {
+    val emulatorPoint = VenezuelaLocationDefaults.sanitizeGpsPoint(37.42, -122.08)
+    val zeroPoint = VenezuelaLocationDefaults.sanitizeGpsPoint(0.0, 0.0)
+    val invalidPoint = VenezuelaLocationDefaults.sanitizeGpsPoint(Double.NaN, -67.0)
+
+    listOf(emulatorPoint, zeroPoint, invalidPoint).forEach { point ->
+      assertEquals(-67.4894, point.longitude(), 0.0)
+      assertEquals(10.0386, point.latitude(), 0.0)
+    }
+
+    val validPoint = VenezuelaLocationDefaults.sanitizeGpsPoint(10.25, -67.59)
+    assertEquals(-67.59, validPoint.longitude(), 0.0)
+    assertEquals(10.25, validPoint.latitude(), 0.0)
+  }
+
+  @Test
   fun `home starts without a destination and cannot open booking until one is selected`() {
     val viewModel = nuevoViewModel()
 
@@ -87,7 +115,7 @@ class LlegateViewModelTest {
 
     // Aragua is default launch hub
     assertEquals("aragua", state.selectedStateId)
-    assertEquals("Maracay", state.selectedCityName)
+    assertEquals("Villa de Cura", state.selectedCityName)
     assertTrue(state.currentState.isLaunchHub)
     assertEquals(4, state.availableStates.size)
     assertEquals(20, state.otherStatesRoadmap.size)
@@ -99,6 +127,10 @@ class LlegateViewModelTest {
     val updatedState = viewModel.uiState.value
     assertEquals("Cagua", updatedState.selectedCityName)
     assertTrue(updatedState.origin.cityName.contains("Cagua") || updatedState.origin.title.contains("Cagua"))
+
+    viewModel.selectState("aragua")
+    assertEquals("Villa de Cura", viewModel.uiState.value.selectedCityName)
+    assertEquals("Villa de Cura, Aragua", viewModel.uiState.value.origin.title)
   }
 
   @Test
@@ -142,7 +174,9 @@ class LlegateViewModelTest {
   @Test
   fun `la estimacion usa la distancia vial disponible y vuelve al estimado provisional si falla`() {
     val viewModel = nuevoViewModel()
-    viewModel.updateDestination(viewModel.uiState.value.currentPopularLocations.first())
+    viewModel.updateDestination(
+      viewModel.uiState.value.currentPopularLocations.first { it.title == "CC Parque Aragua" }
+    )
 
     viewModel.updateRoadRouteDistance(8.7)
     assertEquals(8.7, viewModel.uiState.value.routeDistanceKm!!, 0.0)
@@ -240,7 +274,9 @@ class LlegateViewModelTest {
     viewModel.updateOrigin(
       LocationPoint("Origen", "Maracay", 10.2480, -67.6000, stateName = "Aragua", cityName = "Maracay")
     )
-    viewModel.updateDestination(viewModel.uiState.value.currentPopularLocations.first())
+    viewModel.updateDestination(
+      viewModel.uiState.value.currentPopularLocations.first { it.title == "CC Parque Aragua" }
+    )
     val distanciaAnterior = viewModel.uiState.value.motoEstimate!!.distanceKm
 
     val puntoSeleccionado = LocationPoint(
