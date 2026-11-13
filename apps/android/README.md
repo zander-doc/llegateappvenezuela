@@ -60,6 +60,11 @@ permiso de ubicación, activa el indicador pulsante y centra la cámara en la
 primera posición GPS. En el selector de destino, el pin central permanece fijo
 mientras se mueve el mapa; al quedar inactivo, se actualiza la dirección del
 destino. También se muestran los puntos populares de la ciudad seleccionada.
+El flujo de reserva abre una pantalla de direcciones desde la búsqueda o al
+elegir un servicio; permite buscar puntos de la ciudad, usar favoritos de la API
+y destinos recientes de la sesión, y pasar al mapa para ajustar el pin. La
+selección de vehículo conserva las tarifas actuales y el estado de búsqueda de
+conductor sigue mostrando el viaje creado por la API.
 La geometría vial y distancia se consultan a OSRM y se dibujan como una línea
 GeoJSON en Mapbox; el precio continúa usando la tarifa configurada por la API
 mediante `tarifaUsd`, sin llamar a Mapbox Directions. Si OSRM no está disponible,

@@ -27,6 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.llegate.data.preferences.UserPreferencesRepository
+import com.llegate.model.LocationPoint
 import com.llegate.ui.screens.BookingScreen
 import com.llegate.ui.screens.HomeScreen
 import com.llegate.ui.screens.IntroVideoScreen
@@ -72,11 +73,14 @@ fun AppNavigation(viewModel: LlegateViewModel) {
     var bookingFlowState by remember {
         mutableStateOf<BookingFlowState>(BookingFlowState.SearchAddresses)
     }
+    var isBookingFlowActive by remember { mutableStateOf(false) }
+    var recentDestinations by remember { mutableStateOf(emptyList<LocationPoint>()) }
 
     LaunchedEffect(
         uiState.currentScreen,
         uiState.showFullMapExpanded,
-        uiState.activeTrip?.currentStep
+        uiState.activeTrip?.currentStep,
+        isBookingFlowActive
     ) {
         when {
             uiState.currentScreen == AppScreen.TRIP_ACTIVE &&
@@ -88,8 +92,13 @@ fun AppNavigation(viewModel: LlegateViewModel) {
                     bookingFlowState = BookingFlowState.MapPinPicker
                 }
             }
-            uiState.currentScreen == AppScreen.HOME -> {
+            uiState.currentScreen == AppScreen.HOME && !isBookingFlowActive -> {
                 bookingFlowState = BookingFlowState.SearchAddresses
+            }
+            uiState.currentScreen == AppScreen.HOME &&
+                bookingFlowState is BookingFlowState.SearchingDriver -> {
+                bookingFlowState = BookingFlowState.SearchAddresses
+                isBookingFlowActive = false
             }
         }
     }
@@ -203,7 +212,15 @@ fun AppNavigation(viewModel: LlegateViewModel) {
                             uiState = uiState,
                             viewModel = viewModel,
                             bookingFlowState = bookingFlowState,
-                            onBookingFlowStateChange = { bookingFlowState = it }
+                            onBookingFlowStateChange = { bookingFlowState = it },
+                            isBookingFlowActive = isBookingFlowActive,
+                            onBookingFlowActiveChange = { isBookingFlowActive = it },
+                            recentDestinations = recentDestinations,
+                            onRecentDestination = { point ->
+                                recentDestinations = (listOf(point) + recentDestinations.filterNot {
+                                    it.lat == point.lat && it.lng == point.lng
+                                }).take(5)
+                            }
                         )
                         AppScreen.BOOKING_DETAILS -> BookingScreen(uiState = uiState, viewModel = viewModel)
                         AppScreen.TRIP_ACTIVE -> TripActiveScreen(uiState = uiState, viewModel = viewModel)

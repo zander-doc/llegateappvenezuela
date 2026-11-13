@@ -62,6 +62,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -102,6 +103,7 @@ import com.llegate.network.EstadoPago
 import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
+import com.llegate.ui.navigation.BookingFlowState
 import com.llegate.ui.components.MapboxDarkMapScreen
 import com.llegate.ui.components.LlegateMapStyle
 import com.llegate.ui.components.MapLayerSelectorButton
@@ -110,7 +112,6 @@ import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
 import com.llegate.ui.components.UpdateDialog
 import com.llegate.ui.components.VehicleCategorySelector
-import com.llegate.ui.navigation.BookingFlowState
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -150,6 +151,10 @@ fun HomeScreen(
     viewModel: LlegateViewModel,
     bookingFlowState: BookingFlowState,
     onBookingFlowStateChange: (BookingFlowState) -> Unit,
+    isBookingFlowActive: Boolean,
+    onBookingFlowActiveChange: (Boolean) -> Unit,
+    recentDestinations: List<LocationPoint>,
+    onRecentDestination: (LocationPoint) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -157,6 +162,7 @@ fun HomeScreen(
     var showLocationPickerModal by remember { mutableStateOf(false) }
     var fitRouteRequest by remember { mutableStateOf(0) }
     var currentMapStyle by remember { mutableStateOf(LlegateMapStyle.DARK) }
+    var showFavoriteDestinations by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -233,8 +239,12 @@ fun HomeScreen(
         viewModel.requestCurrentGpsLocation(context)
     }
 
+    LaunchedEffect(isBookingFlowActive) {
+        if (!isBookingFlowActive) viewModel.clearDestination()
+    }
+
     LaunchedEffect(Unit) {
-        viewModel.clearDestination()
+        viewModel.refrescarFavoritos()
         if (hasLocationPermission) {
             viewModel.requestCurrentGpsLocation(context)
         } else {
@@ -245,6 +255,41 @@ fun HomeScreen(
                 )
             )
         }
+    }
+
+    if (
+        isBookingFlowActive &&
+        bookingFlowState is BookingFlowState.SearchAddresses
+    ) {
+        AddressSearchScreen(
+            originText = uiState.origin.title.takeIf { it.isNotBlank() } ?: "Tu ubicación actual",
+            destinationText = uiState.destination.title
+                .takeIf { uiState.destination.tieneCoordenadas && it.isNotBlank() }
+                ?: "¿A dónde vas?",
+            popularDestinations = uiState.currentPopularLocations,
+            recentDestinations = recentDestinations,
+            favoriteDestinations = uiState.favoriteAddresses.map { it.asLocationPoint() },
+            showFavorites = showFavoriteDestinations,
+            onShowFavoritesChange = { showFavoriteDestinations = it },
+            onBackClick = {
+                onBookingFlowActiveChange(false)
+                onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                viewModel.toggleFullMapExpanded(false)
+            },
+            onOriginClick = { viewModel.requestCurrentGpsLocation(context) },
+            onSelectFromMapClick = {
+                onBookingFlowStateChange(BookingFlowState.MapPinPicker)
+                viewModel.toggleFullMapExpanded(true)
+            },
+            onDestinationSelected = { point ->
+                viewModel.updateDestination(point)
+                onRecentDestination(point)
+                onBookingFlowStateChange(BookingFlowState.MapPinPicker)
+                viewModel.toggleFullMapExpanded(true)
+            },
+            modifier = modifier
+        )
+        return
     }
 
     // FULLSCREEN MAP MODE
@@ -376,15 +421,43 @@ fun HomeScreen(
                         ) {
                             Text("← Cambiar destino", color = RacingYellow500)
                         }
-                        VehicleCategorySelector(
-                            selectedCategoryId = uiState.selectedVehicleCategoryId,
-                            bcvExchangeRate = uiState.bcvExchangeRate,
-                            onCategorySelected = viewModel::selectVehicleCategory,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                ServiceType.MOTO to "Moto",
+                                ServiceType.CAR to "Carro",
+                                ServiceType.DELIVERY to "Envíos"
+                            ).forEach { (service, label) ->
+                                FilterChip(
+                                    selected = uiState.selectedService == service,
+                                    onClick = { viewModel.selectService(service) },
+                                    label = { Text(label) },
+                                    modifier = Modifier.testTag(
+                                        "vehicle_service_${service.name.lowercase()}"
+                                    )
+                                )
+                            }
+                        }
+                        if (uiState.selectedService == ServiceType.DELIVERY) {
+                            Text(
+                                text = "Tarifa estimada: $${String.format(java.util.Locale.US, "%.2f", selectedEstimate?.priceUsd ?: 0.0)} USD",
+                                color = RacingYellow500,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("delivery_estimated_fare")
+                            )
+                        } else {
+                            VehicleCategorySelector(
+                                selectedCategoryId = uiState.selectedVehicleCategoryId,
+                                bcvExchangeRate = uiState.bcvExchangeRate,
+                                onCategorySelected = viewModel::selectVehicleCategory,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         Button(
-                            onClick = { viewModel.openBooking(ServiceType.CAR) },
-                            enabled = uiState.selectedVehicleCategoryId != null,
+                            onClick = { viewModel.openBooking(uiState.selectedService) },
+                            enabled = uiState.selectedService == ServiceType.DELIVERY ||
+                                uiState.selectedVehicleCategoryId != null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(54.dp)
@@ -423,7 +496,7 @@ fun HomeScreen(
                     suggestedDestinations = uiState.currentPopularLocations,
                     onSuggestedDestinationClick = viewModel::updateDestination,
                     onConfirmClick = {
-                        viewModel.selectService(ServiceType.CAR)
+                        onRecentDestination(uiState.destination)
                         fitRouteRequest += 1
                         onBookingFlowStateChange(BookingFlowState.VehicleSelection)
                     },
@@ -455,27 +528,39 @@ fun HomeScreen(
                     when (service) {
                         "car" -> {
                             viewModel.selectService(ServiceType.CAR)
-                            viewModel.toggleFullMapExpanded(true)
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
                         }
                         "moto" -> {
                             viewModel.selectService(ServiceType.MOTO)
-                            viewModel.toggleFullMapExpanded(true)
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
                         }
                         "delivery" -> {
                             viewModel.selectService(ServiceType.DELIVERY)
-                            viewModel.toggleFullMapExpanded(true)
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
                         }
-                        "schedule", "other" -> viewModel.toggleFullMapExpanded(true)
+                        "schedule", "other" -> {
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                        }
                         "all" -> viewModel.showCitySelector(true)
                     }
                 },
-                onSearchClick = { viewModel.toggleFullMapExpanded(true) },
+                onSearchClick = {
+                    onBookingFlowActiveChange(true)
+                    onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                },
                 onRechargeClick = { viewModel.mostrarRecarga(true) },
                 onAccountClick = { viewModel.mostrarCuenta(true) },
                 onDriverModeClick = { viewModel.toggleDriverMode(true) },
                 onTabSelected = { tab ->
                     when (tab) {
-                        "inicio" -> viewModel.navigateToHome()
+                        "inicio" -> {
+                            onBookingFlowActiveChange(false)
+                            viewModel.navigateToHome()
+                        }
                         "recargas" -> viewModel.mostrarRecarga(true)
                         "historial" -> viewModel.openTripHistory()
                         "perfil" -> viewModel.openProfile()
