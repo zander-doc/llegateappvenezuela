@@ -203,6 +203,10 @@ test("GET /health/otp informa el canal y la plantilla de WhatsApp", async () => 
 test("el registro por SMS crea la cuenta y entrega tokens propios", async () => {
   const codigo = await pedirCodigo(ASPIRANTE.telefono, { rol: "conductor", nombre: "Nuevo Piloto" });
   assert.match(codigo, /^\d{6}$/);
+  const [antesDeVerificar] = await sql("select 1 from auth.users where phone = $1", [
+    ASPIRANTE.telefono,
+  ]);
+  assert.equal(antesDeVerificar, undefined);
 
   const [guardado] = await sql("select intentos from auth.otp_codigos where telefono = $1", [
     ASPIRANTE.telefono,
@@ -246,6 +250,54 @@ test("el registro por SMS crea la cuenta y entrega tokens propios", async () => 
   assert.ok(!perfil.cuerpo.capacidades.puede_conducir);
 
   sesiones.aspirante = verificado.cuerpo;
+});
+
+test("solicitar OTP no cambia perfiles existentes y un código concurrente solo inicia una sesión", async () => {
+  const [perfilOriginal] = await sql(
+    "select rol, nombre, estado, ciudad from public.usuarios where id = $1",
+    [CLIENTE.id],
+  );
+  const codigoExistente = await pedirCodigo(CLIENTE.telefono, {
+    rol: "conductor",
+    nombre: "Nombre no autorizado",
+    estado: "Estado no autorizado",
+    ciudad: "Ciudad no autorizada",
+  });
+  const [perfilPendiente] = await sql(
+    "select rol, nombre, estado, ciudad from public.usuarios where id = $1",
+    [CLIENTE.id],
+  );
+  assert.deepEqual(perfilPendiente, perfilOriginal);
+
+  const verificacionExistente = await pedir("POST", "/auth/verify", {
+    cuerpo: { telefono: CLIENTE.telefono, token: codigoExistente },
+  });
+  assert.equal(verificacionExistente.status, 200);
+  const [perfilVerificado] = await sql(
+    "select rol, nombre, estado, ciudad from public.usuarios where id = $1",
+    [CLIENTE.id],
+  );
+  assert.deepEqual(perfilVerificado, perfilOriginal);
+
+  const telefono = "+584146666667";
+  const codigo = await pedirCodigo(telefono, { nombre: "Alta concurrente" });
+  const resultados = await Promise.all([
+    pedir("POST", "/auth/verify", { cuerpo: { telefono, token: codigo } }),
+    pedir("POST", "/auth/verify", { cuerpo: { telefono, token: codigo } }),
+  ]);
+  assert.deepEqual(
+    resultados.map((resultado) => resultado.status).sort(),
+    [200, 401],
+  );
+
+  const [cantidadSesiones] = await sql(
+    `select count(*)::int as cantidad
+       from auth.sesiones s
+       join auth.users u on u.id = s.usuario_id
+      where u.phone = $1`,
+    [telefono],
+  );
+  assert.equal(cantidadSesiones.cantidad, 1);
 });
 
 test("el registro guarda el estado y la ciudad del pasajero", async () => {

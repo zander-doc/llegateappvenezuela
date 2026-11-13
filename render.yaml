@@ -38,7 +38,15 @@ services:
       - key: OTP_LOG_EN_DESARROLLO
         value: "0"
       - key: STORAGE_DRIVER
-        value: local
+        value: r2
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
 
   - type: web
     name: llegate-app-web

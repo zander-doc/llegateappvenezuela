@@ -8,21 +8,27 @@ import {
   venceRefresh,
 } from "./tokens.js";
 
-export async function crearOActualizarCuenta({ telefono, rol, nombre, estado, ciudad }) {
+async function crearCuentaSiNoExiste({ telefono, rol, nombre, estado, ciudad }) {
   const metadata = { rol: rol ?? "cliente", ...(nombre ? { nombre } : {}) };
 
-  const cuenta = await fila(
+  const nuevaCuenta = await fila(
     `insert into auth.users (phone, raw_user_meta_data)
      values ($1, $2::jsonb)
-     on conflict (phone) do update
-        set raw_user_meta_data = auth.users.raw_user_meta_data || excluded.raw_user_meta_data
+     on conflict (phone) do nothing
      returning id, phone, phone_confirmed_at`,
     [telefono, JSON.stringify(metadata)],
   );
 
-  // El trigger solo crea el perfil al insertar; en un registro repetido la
-  // ciudad se actualiza aquí.
-  if (cuenta && (estado || ciudad)) {
+  const cuenta =
+    nuevaCuenta ??
+    (await fila(
+      `select id, phone, phone_confirmed_at
+         from auth.users
+        where phone = $1`,
+      [telefono],
+    ));
+
+  if (nuevaCuenta && (estado || ciudad)) {
     await filas(
       `update public.usuarios
           set estado = coalesce($2, estado),
@@ -35,23 +41,24 @@ export async function crearOActualizarCuenta({ telefono, rol, nombre, estado, ci
   return cuenta;
 }
 
-export async function guardarCodigo(telefono, hash) {
+export async function guardarCodigo(telefono, hash, datosRegistro) {
   // Un código nuevo anula el anterior y reinicia el contador de intentos.
   await filas(
-    `insert into auth.otp_codigos (telefono, codigo_hash, expira_en, intentos, creado_en)
-     values ($1, $2, now() + make_interval(mins => $3), 0, now())
+    `insert into auth.otp_codigos (telefono, codigo_hash, datos_registro, expira_en, intentos, creado_en)
+     values ($1, $2, $3::jsonb, now() + make_interval(mins => $4), 0, now())
      on conflict (telefono) do update
         set codigo_hash = excluded.codigo_hash,
+            datos_registro = excluded.datos_registro,
             expira_en = excluded.expira_en,
             intentos = 0,
             creado_en = now()`,
-    [telefono, hash, config.otp.ttlMinutos],
+    [telefono, hash, JSON.stringify(datosRegistro), config.otp.ttlMinutos],
   );
 }
 
 export async function validarCodigo(telefono, codigo) {
   const registro = await fila(
-    `select codigo_hash, expira_en, intentos, expira_en <= now() as vencido
+    `select codigo_hash, datos_registro, expira_en, intentos, expira_en <= now() as vencido
        from auth.otp_codigos
       where telefono = $1`,
     [telefono],
@@ -60,27 +67,49 @@ export async function validarCodigo(telefono, codigo) {
   if (!registro) return { ok: false, motivo: "codigo_invalido" };
 
   if (registro.vencido || registro.intentos >= config.otp.maxIntentos) {
-    await filas("delete from auth.otp_codigos where telefono = $1", [telefono]);
+    await filas(
+      "delete from auth.otp_codigos where telefono = $1 and codigo_hash = $2",
+      [telefono, registro.codigo_hash],
+    );
     return { ok: false, motivo: registro.vencido ? "codigo_expirado" : "codigo_invalido" };
   }
 
   if (!codigoCoincide(telefono, codigo, registro.codigo_hash)) {
     await filas(
-      "update auth.otp_codigos set intentos = intentos + 1 where telefono = $1",
-      [telefono],
+      `update auth.otp_codigos
+          set intentos = intentos + 1
+        where telefono = $1 and codigo_hash = $2 and expira_en > now()`,
+      [telefono, registro.codigo_hash],
     );
     return { ok: false, motivo: "codigo_invalido" };
   }
 
-  await filas("delete from auth.otp_codigos where telefono = $1", [telefono]);
+  // DELETE is the one-time consume operation. Concurrent verifications can
+  // read the challenge, but only one can delete and receive its pending data.
+  const [consumido] = await filas(
+    `delete from auth.otp_codigos
+      where telefono = $1
+        and codigo_hash = $2
+        and expira_en > now()
+        and intentos < $3
+      returning datos_registro`,
+    [telefono, registro.codigo_hash, config.otp.maxIntentos],
+  );
+  if (!consumido) return { ok: false, motivo: "codigo_invalido" };
+
+  const cuenta = await crearCuentaSiNoExiste({
+    telefono,
+    ...(consumido.datos_registro ?? {}),
+  });
+  if (!cuenta) return { ok: false, motivo: "cuenta_no_encontrada" };
 
   const usuario = await fila(
     `update auth.users
         set phone_confirmed_at = coalesce(phone_confirmed_at, now()),
             last_sign_in_at = now()
-      where phone = $1
+      where id = $1
       returning id, phone`,
-    [telefono],
+    [cuenta.id],
   );
 
   if (!usuario) return { ok: false, motivo: "cuenta_no_encontrada" };

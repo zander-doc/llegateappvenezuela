@@ -101,20 +101,22 @@ export function ProfileScreen() {
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className="block text-sm text-white/70 mb-2">
+                  <label htmlFor="kyc-identity" className="block text-sm text-white/70 mb-2">
                     Cédula de Identidad
                   </label>
                   <input
+                    id="kyc-identity"
                     type="text"
                     placeholder="V-12345678"
                     className="w-full rounded bg-asphalt-900 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-racing-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-white/70 mb-2">
+                  <label htmlFor="kyc-phone" className="block text-sm text-white/70 mb-2">
                     Teléfono
                   </label>
                   <input
+                    id="kyc-phone"
                     type="tel"
                     placeholder="0414-1234567"
                     className="w-full rounded bg-asphalt-900 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-racing-500"
@@ -124,10 +126,11 @@ export function ProfileScreen() {
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className="block text-sm text-white/70 mb-2">
+                  <label htmlFor="kyc-document-type" className="block text-sm text-white/70 mb-2">
                     Tipo de documento
                   </label>
                   <select
+                    id="kyc-document-type"
                     className="w-full rounded bg-asphalt-900 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-racing-500"
                   >
                     <option>Cédula de Identidad (V/E)</option>
@@ -135,10 +138,11 @@ export function ProfileScreen() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-white/70 mb-2">
+                  <label htmlFor="kyc-country" className="block text-sm text-white/70 mb-2">
                     País de emisión
                   </label>
                   <select
+                    id="kyc-country"
                     className="w-full rounded bg-asphalt-900 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-racing-500"
                   >
                     <option>Venezuela</option>

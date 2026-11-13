@@ -1,4 +1,4 @@
-﻿package com.llegate.viewmodel
+package com.llegate.viewmodel
 
 import android.annotation.SuppressLint
 import android.Manifest
@@ -58,6 +58,8 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.CancellationException
+import com.mapbox.geojson.Point
+import com.mapbox.geojson.Point
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -485,6 +487,36 @@ data class LlegateUiState(
         }
 }
 
+
+/**
+ * Valores predeterminados de ubicación para Venezuela (Villa de Cura, Aragua)
+ * y catálogo local de sitios para búsqueda instantánea.
+ */
+object VenezuelaLocationDefaults {
+    val DEFAULT_ORIGIN = Point.fromLngLat(-67.4894, 10.0386)
+    const val DEFAULT_ORIGIN_LABEL = "Villa de Cura, Aragua"
+
+    data class LocalPlace(val name: String, val address: String, val lat: Double, val lng: Double)
+
+    val ARAGUA_PLACES = listOf(
+        LocalPlace("Plaza Bolívar Villa de Cura", "Centro, Villa de Cura, Aragua", 10.0392, -67.4889),
+        LocalPlace("Frigorífico El Avión", "Av. Bolívar, Villa de Cura, Aragua", 10.0415, -67.4852),
+        LocalPlace("Panadería El Búcaro", "Calle Comercio, Villa de Cura, Aragua", 10.0378, -67.4910),
+        LocalPlace("Hospital Dr. José Rangel", "Av. Sucre, Villa de Cura, Aragua", 10.0401, -67.4925),
+        LocalPlace("CC Parque Aragua", "Av. Bolívar Este, Maracay, Aragua", 10.2469, -67.5908),
+        LocalPlace("CC Las Américas", "Av. Las Delicias, Maracay, Aragua", 10.2736, -67.5786),
+        LocalPlace("Terminal de Maracay", "Av. Constitución, Maracay, Aragua", 10.2412, -67.5961)
+    )
+
+    fun sanitizeGpsPoint(lat: Double, lng: Double): Point {
+        val isEmulatorDefault = (lat in 37.3..37.5) && (lng in -122.2..-121.9)
+        return if (isEmulatorDefault || (lat == 0.0 && lng == 0.0)) {
+            DEFAULT_ORIGIN
+        } else {
+            Point.fromLngLat(lng, lat)
+        }
+    }
+}
 class LlegateViewModel(
     private val auth: AuthRepository,
     private val configRepo: ConfigRepository = ConfigRepository(),
@@ -1799,4 +1831,7 @@ class LlegateViewModel(
         _uiState.update { it.copy(statusMessage = "Mapa centrado en ${it.origin.title}") }
     }
 }
+
+
+
 

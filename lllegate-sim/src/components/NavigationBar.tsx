@@ -17,6 +17,7 @@ const icons: Record<(typeof tabs)[number]["path"], typeof Home> = {
 };
 
 export function NavigationBar() {
+  const location = useLocation();
   const { section } = useNavSection();
 
   return (
@@ -25,7 +26,7 @@ export function NavigationBar() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {tabs.map(({ path, label }) => {
-        const active = useLocation().pathname === path;
+        const active = location.pathname === path;
         const Icon = icons[path];
         return (
           <Link

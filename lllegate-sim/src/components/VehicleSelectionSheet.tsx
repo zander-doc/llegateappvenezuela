@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowRight, Bike, Car, Truck } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { ServiceIcon } from "./ui";
 import { formatBs } from "../lib/format";
 import type { Service } from "../data/services";
@@ -13,7 +14,7 @@ const tabLabels: Record<Tab, string> = {
   envios: "Envíos",
 };
 
-const tabIcons: Record<Tab, any> = {
+const tabIcons: Record<Tab, LucideIcon> = {
   carro: Car,
   moto: Bike,
   envios: Truck,
@@ -25,11 +26,36 @@ const tabServices: Record<Tab, Service[]> = {
   envios: LAUNCH_SERVICES.filter((s) => s.icon === "package" || s.icon === "truck"),
 };
 
-const tabAccent: Record<Tab, string> = {
-  carro: "racing",
-  moto: "emerald",
-  envios: "brand",
+const tabAccent: Record<
+  Tab,
+  {
+    tab: string;
+    selectedCard: string;
+    selectedIcon: string;
+    idleIcon: string;
+  }
+> = {
+  carro: {
+    tab: "border-racing-500",
+    selectedCard: "border-2 border-racing-500 bg-racing-50/50 shadow-lg shadow-racing-500/15",
+    selectedIcon: "bg-racing-500 text-asphalt-950",
+    idleIcon: "bg-racing-500/10 text-racing-600 border border-racing-500/20",
+  },
+  moto: {
+    tab: "border-emerald-500",
+    selectedCard: "border-2 border-emerald-500 bg-emerald-50/50 shadow-lg shadow-emerald-500/15",
+    selectedIcon: "bg-emerald-500 text-asphalt-950",
+    idleIcon: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20",
+  },
+  envios: {
+    tab: "border-brand-500",
+    selectedCard: "border-2 border-brand-500 bg-brand-50/50 shadow-lg shadow-brand-500/15",
+    selectedIcon: "bg-brand-500 text-asphalt-950",
+    idleIcon: "bg-brand-500/10 text-brand-600 border border-brand-500/20",
+  },
 };
+
+const tabs: Tab[] = ["carro", "moto", "envios"];
 
 export function VehicleSelectionSheet({ onSelect }: { onSelect: (service: Service | null) => void }) {
   const [activeTab, setActiveTab] = useState<Tab>("moto");
@@ -58,21 +84,21 @@ export function VehicleSelectionSheet({ onSelect }: { onSelect: (service: Servic
       {/* Tabs */}
       <div className="border-b border-white/10 bg-asphalt-900/50">
         <div className="flex px-6">
-        {Object.keys(tabLabels).map((tab) => {
+        {tabs.map((tab) => {
           const active = activeTab === tab;
-          const TabIcon = tabIcons[tab as Tab];
+          const TabIcon = tabIcons[tab];
           return (
             <button
               key={tab}
               type="button"
               onClick={() => {
-                setActiveTab(tab as Tab);
+                setActiveTab(tab);
                 setSelectedService(null);
               }}
-              className={`flex h-12 shrink-0 items-center justify-center border-b-2 px-4 text-sm font-bold transition ${active ? `border-${tabAccent[tab as Tab]}-500 text-white` : "border-transparent text-ink-500 hover:text-white hover:bg-white/5"}`}
+              className={`flex h-12 shrink-0 items-center justify-center border-b-2 px-4 text-sm font-bold transition ${active ? `${tabAccent[tab].tab} text-white` : "border-transparent text-ink-500 hover:text-white hover:bg-white/5"}`}
             >
               <TabIcon className="h-4 w-4 mr-2" />
-              {tabLabels[tab as Tab]}
+              {tabLabels[tab]}
             </button>
           );
         })}
@@ -112,9 +138,11 @@ export function VehicleSelectionSheet({ onSelect }: { onSelect: (service: Servic
   );
 }
 
+type VehicleAccent = (typeof tabAccent)[Tab];
+
 interface VehicleCardProps {
   service: Service;
-  accent: string;
+  accent: VehicleAccent;
   isSelected: boolean;
   onSelect: (service: Service) => void;
 }
@@ -123,26 +151,24 @@ function VehicleCard({ service, accent, isSelected, onSelect }: VehicleCardProps
   const rateUSD = service.minFareUSD;
 
   return (
-    <div
-      className={`cursor-pointer transition-all duration-200 rounded-2xl p-4 flex items-center justify-between group ${
+    <button
+      type="button"
+      aria-pressed={isSelected}
+      className={`w-full text-left cursor-pointer transition-all duration-200 rounded-2xl p-4 flex items-center justify-between group ${
         isSelected
-          ? `border-2 border-${accent}-500 bg-${accent}-50/50 shadow-lg shadow-${accent}-500/15`
+          ? accent.selectedCard
           : "border border-white/10 bg-asphalt-900/80 hover:border-white/20 hover:bg-asphalt-850/80"
       }`}
       onClick={() => onSelect(service)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && onSelect(service)}
     >
       {/* Lado izquierdo: icono e información */}
       <div className="flex items-center gap-3">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-          isSelected
-            ? `bg-${accent}-500 text-asphalt-950`
-            : `bg-${accent}-500/10 text-${accent}-600 border border-${accent}-500/20`
-        }`}
+        <div
+          className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+            isSelected ? accent.selectedIcon : accent.idleIcon
+          }`}
         >
-          <ServiceIcon icon={service.icon as any} className="h-6 w-6" />
+          <ServiceIcon icon={service.icon} className="h-6 w-6" />
         </div>
         <div className="min-w-0">
           <h4 className={`font-bold ${isSelected ? "text-white" : "text-ink-100"}`}>{service.name}</h4>
@@ -157,6 +183,6 @@ function VehicleCard({ service, accent, isSelected, onSelect }: VehicleCardProps
         </span>
         <p className={`text-xs ${isSelected ? "text-ink-400" : "text-ink-500"}`}>USD {rateUSD.toFixed(2)}</p>
       </div>
-    </div>
+    </button>
   );
 }
