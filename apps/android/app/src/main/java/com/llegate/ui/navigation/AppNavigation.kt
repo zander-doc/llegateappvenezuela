@@ -44,7 +44,6 @@ import com.llegate.model.TripStep
 import com.llegate.viewmodel.AppScreen
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.ServicioConductor
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 object Screen {
@@ -65,9 +64,9 @@ fun AppNavigation(viewModel: LlegateViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val userPreferences = remember { UserPreferencesRepository(context) }
-    val isOnboardingCompleted by userPreferences.isOnboardingCompleted
-        .map<Boolean, Boolean?> { it }
-        .collectAsState(initial = null)
+    val isOnboardingCompleted by remember(userPreferences) {
+        userPreferences.isOnboardingCompleted
+    }.collectAsState(initial = null)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var introDone by rememberSaveable { mutableStateOf(false) }
     var bookingFlowState by remember {
