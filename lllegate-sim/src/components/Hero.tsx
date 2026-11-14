@@ -13,7 +13,7 @@ import { Logo } from "./Logo";
 import { Reveal, Stagger, StaggerItem } from "./Motion";
 import { useUI } from "../lib/ui";
 import { STATS } from "../data/site";
-import telefono from \import telefono from "../assets/telefono.webp";
+import telefono from "../assets/telefono.webp";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
