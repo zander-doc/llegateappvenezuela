@@ -136,7 +136,7 @@ fun RequestRideScreen(
         }
     }
 
-    val currentEstimate = when (uiState.selectedService) {
+    val currentEstimate = uiState.selectedEstimate ?: when (uiState.selectedService) {
         ServiceType.MOTO -> uiState.motoEstimate ?: PriceEstimate(ServiceType.MOTO, 3.2, 7, 1.81, 1606.0)
         ServiceType.CAR -> uiState.carEstimate ?: PriceEstimate(ServiceType.CAR, 3.2, 14, 4.62, 4099.0)
         ServiceType.DELIVERY -> uiState.deliveryEstimate ?: PriceEstimate(ServiceType.DELIVERY, 3.2, 8, 1.94, 1721.0)

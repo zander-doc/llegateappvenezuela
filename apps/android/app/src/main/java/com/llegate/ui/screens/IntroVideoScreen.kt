@@ -40,7 +40,7 @@ fun IntroVideoScreen(onIntroFinished: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        delay(3_200)
+        delay(5_000)
         finishIntro()
     }
 
@@ -53,8 +53,11 @@ fun IntroVideoScreen(onIntroFinished: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
                 VideoView(context).apply {
-                    setBackgroundColor(android.graphics.Color.rgb(7, 9, 12))
                     setOnCompletionListener { finishIntro() }
+                    setOnErrorListener { _, _, _ ->
+                        finishIntro()
+                        true
+                    }
                     setOnPreparedListener { it.start() }
                     setVideoURI(
                         Uri.parse("android.resource://${context.packageName}/${com.llegate.R.raw.video_1}")
@@ -62,6 +65,9 @@ fun IntroVideoScreen(onIntroFinished: () -> Unit) {
                 }
             },
             onRelease = { videoView ->
+                videoView.setOnCompletionListener(null)
+                videoView.setOnErrorListener(null)
+                videoView.setOnPreparedListener(null)
                 videoView.stopPlayback()
             }
         )

@@ -50,9 +50,28 @@ cercanos, la telemetría GPS (satélites, precisión y rumbo de mentira) y el fe
 de la comunidad con sus reportes guardados solo en el teléfono; `BookingScreen` dejó de
 contar cuántos panas están cerca y de prometer respuesta en menos de un minuto, y la
 sección de alertas queda rotulada «Próximamente». El mapa (`LeafletDarkMapView`) solo
-dibuja la ruta declarada en el viaje. Siguen pendientes la verificación de documentos del
-piloto y decidir qué hacer con la vitrina de concesionarios (`automotivePartners`), que
-lista beneficios aún no firmados.
+dibuja la ruta declarada en las pantallas de reserva y viaje. Siguen pendientes la
+verificación de documentos del piloto y decidir qué hacer con la vitrina de
+concesionarios (`automotivePartners`), que lista beneficios aún no firmados.
+
+`MapboxDarkMapScreen` se usa como mapa oscuro en `HomeScreen`. Esta integración
+básica muestra Villa de Cura como posición inicial y, si el usuario concede el
+permiso de ubicación, activa el indicador pulsante y centra la cámara en la
+primera posición GPS. En el selector de destino, el pin central permanece fijo
+mientras se mueve el mapa; al quedar inactivo, se actualiza la dirección del
+destino. También se muestran los puntos populares de la ciudad seleccionada.
+El flujo de reserva abre una pantalla de direcciones desde la búsqueda o al
+elegir un servicio; permite buscar puntos de la ciudad, usar favoritos de la API
+y destinos recientes de la sesión, y pasar al mapa para ajustar el pin. La
+selección de vehículo conserva las tarifas actuales y el estado de búsqueda de
+conductor sigue mostrando el viaje creado por la API.
+La geometría vial y distancia se consultan a OSRM y se dibujan como una línea
+GeoJSON en Mapbox; el precio continúa usando la tarifa configurada por la API
+mediante `tarifaUsd`, sin llamar a Mapbox Directions. Si OSRM no está disponible,
+se conserva la estimación de distancia existente. Al confirmar, la cámara encuadra
+la ruta. El selector flotante permite cambiar entre los estilos oscuro,
+calles y satélite; al cambiar de estilo se vuelve a crear la capa GeoJSON y
+se dibuja de nuevo la ruta activa.
 
 ## Requisitos
 
@@ -75,6 +94,44 @@ dispositivo conectado por USB o en BlueStacks:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Firma y versiones
+
+La versión se configura en `gradle.properties`: incrementa `LLEGATE_VERSION_CODE`
+en cada build que vayas a instalar o distribuir. Android requiere un código mayor
+que el de la versión instalada para actualizarla. Actualiza también
+`LLEGATE_VERSION_NAME` para reflejar la versión legible.
+
+Para crear un keystore de release, ejecuta `keytool` (incluido con el JDK) y
+elige contraseñas seguras cuando las solicite:
+
+```powershell
+keytool -genkeypair -v -keystore C:/Users/TU_USUARIO/llegate-keys/llegate-release.jks -alias llegate-release -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Copia `keystore.properties.example` como `keystore.properties` dentro de
+`apps/android/`, y edita `storeFile` para apuntar al archivo `.jks` creado.
+Completa `storePassword`, `keyAlias` y `keyPassword` con los datos elegidos al
+crear el keystore. No compartas ni subas `keystore.properties` o el keystore al
+repositorio.
+
+Si `keystore.properties` está presente, Gradle firma los APKs debug y release
+con ese keystore. Si falta, debug usa la clave local predeterminada de Android y
+release queda sin firmar; Gradle muestra una advertencia. Builds debug firmados
+por claves distintas no se pueden instalar uno sobre otro. Cambiar de firma
+obliga a desinstalar la app una vez antes de instalar el nuevo APK; desinstalar
+borra los datos locales de la app.
+
+Compila desde `apps/android`:
+
+```powershell
+.\gradlew.bat assembleDebug
+.\gradlew.bat assembleRelease
+```
+
+Los APKs quedan en `app/build/outputs/apk/debug/app-debug.apk` y
+`app/build/outputs/apk/release/app-release-unsigned.apk` (sin configuración de
+firma) o `app/build/outputs/apk/release/app-release.apk` (firmado).
+
 ## Tipografías
 
 La app trae las cuatro familias de la marca que usa la web (Bebas Neue, Outfit,
@@ -85,6 +142,13 @@ Cómo se generan y bajo qué licencia están explicados en `fonts/README.md`.
 ## La API
 
 La app habla con `https://llegate-app-api.onrender.com`. La dirección se fija en
-`ApiConfig`; no hay claves ni tokens empaquetados en el APK: el acceso es por
-código enviado al teléfono y la sesión de este dispositivo se guarda sola, junto
-con el `refresh_token` que la API rota en cada renovación.
+`ApiConfig`; no hay credenciales de acceso a la API empaquetadas en el APK: el
+acceso es por código enviado al teléfono y la sesión de este dispositivo se
+guarda sola, junto con el `refresh_token` que la API rota en cada renovación.
+
+El SDK de Mapbox usa el recurso generado `mapbox_access_token`. Para
+proporcionarlo sin guardarlo en Git, añade `MAPBOX_ACCESS_TOKEN=<tu token>`
+en `local.properties`, define esa variable de entorno antes de compilar o
+pásala como propiedad Gradle con `-PMAPBOX_ACCESS_TOKEN=...`. `local.properties`
+está excluido de Git. Si no se define el token, el recurso queda vacío y Mapbox
+no puede cargar estilos ni datos.

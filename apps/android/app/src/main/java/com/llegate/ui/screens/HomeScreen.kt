@@ -2,6 +2,8 @@ package com.llegate.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -22,6 +24,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,11 +33,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AirportShuttle
@@ -58,6 +62,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -66,6 +71,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +92,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.llegate.R
+import com.llegate.BuildConfig
 import com.llegate.model.CityInfo
 import com.llegate.model.LocationPoint
 import com.llegate.model.SafeMeetingPoint
@@ -96,9 +103,15 @@ import com.llegate.network.EstadoPago
 import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
 import com.llegate.ui.components.CommunityAlertsSection
-import com.llegate.ui.components.LeafletDarkMapView
+import com.llegate.ui.navigation.BookingFlowState
+import com.llegate.ui.components.MapboxDarkMapScreen
+import com.llegate.ui.components.LlegateMapStyle
+import com.llegate.ui.components.MapLayerSelectorButton
+import com.llegate.ui.components.MapDestinationCard
 import com.llegate.ui.components.SmartLocationSuggestionsSection
 import com.llegate.ui.components.SpeedStripes
+import com.llegate.ui.components.UpdateDialog
+import com.llegate.ui.components.VehicleCategorySelector
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
 import com.llegate.ui.theme.Asphalt800
@@ -122,9 +135,13 @@ import com.llegate.util.bs
 import com.llegate.util.enmascararTelefono
 import com.llegate.util.usd
 import com.llegate.util.usdConSigno
+import com.llegate.utils.UpdateInfo
+import com.llegate.utils.UpdateManager
 import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
 import com.llegate.viewmodel.PasoRecarga
+import org.json.JSONException
+import java.io.IOException
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,135 +149,362 @@ import kotlin.math.roundToInt
 fun HomeScreen(
     uiState: LlegateUiState,
     viewModel: LlegateViewModel,
+    bookingFlowState: BookingFlowState,
+    onBookingFlowStateChange: (BookingFlowState) -> Unit,
+    isBookingFlowActive: Boolean,
+    onBookingFlowActiveChange: (Boolean) -> Unit,
+    recentDestinations: List<LocationPoint>,
+    onRecentDestination: (LocationPoint) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var showLocationPickerModal by remember { mutableStateOf(false) }
+    var fitRouteRequest by remember { mutableStateOf(0) }
+    var currentMapStyle by remember { mutableStateOf(LlegateMapStyle.DARK) }
+    var showFavoriteDestinations by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            viewModel.requestCurrentGpsLocation(context)
+    LaunchedEffect(Unit) {
+        try {
+            updateInfo = UpdateManager.checkForUpdates(BuildConfig.VERSION_CODE)
+        } catch (exception: IOException) {
+            Log.e("HomeScreen", "No se pudo consultar si hay actualizaciones.", exception)
+        } catch (exception: JSONException) {
+            Log.e("HomeScreen", "La respuesta de actualización no contiene JSON válido.", exception)
+        } catch (exception: IllegalArgumentException) {
+            Log.e("HomeScreen", "La respuesta de actualización contiene datos inválidos.", exception)
         }
     }
 
-    // FULLSCREEN MAP MODE
-    if (uiState.showFullMapExpanded) {
-        val selectedEstimate = when (uiState.selectedService) {
-            ServiceType.MOTO -> uiState.motoEstimate
-            ServiceType.CAR -> uiState.carEstimate
-            ServiceType.DELIVERY -> uiState.deliveryEstimate
+    updateInfo?.let { update ->
+        UpdateDialog(
+            versionName = update.versionName,
+            isMandatory = update.isMandatory,
+            onUpdateClick = {
+                try {
+                    val downloadId = UpdateManager.downloadAndInstallApk(context, update.apkUrl)
+                    Log.i("HomeScreen", "Descarga de actualización iniciada: $downloadId")
+                    Toast.makeText(
+                        context,
+                        "Descarga de actualización iniciada.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    updateInfo = null
+                } catch (exception: IllegalArgumentException) {
+                    Log.e("HomeScreen", "La URL del APK de actualización no es válida.", exception)
+                    Toast.makeText(
+                        context,
+                        "No se pudo iniciar la actualización.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } catch (exception: SecurityException) {
+                    Log.e("HomeScreen", "No se permitió iniciar la descarga de actualización.", exception)
+                    Toast.makeText(
+                        context,
+                        "No se pudo iniciar la actualización.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } catch (exception: IllegalStateException) {
+                    Log.e("HomeScreen", "El servicio de descargas no está disponible.", exception)
+                    Toast.makeText(
+                        context,
+                        "No se pudo iniciar la actualización.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            },
+            onDismiss = { updateInfo = null }
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasLocationPermission =
+            permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        viewModel.requestCurrentGpsLocation(context)
+    }
+
+    LaunchedEffect(isBookingFlowActive) {
+        if (!isBookingFlowActive) viewModel.clearDestination()
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.refrescarFavoritos()
+        if (hasLocationPermission) {
+            viewModel.requestCurrentGpsLocation(context)
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
+    }
+
+    if (
+        isBookingFlowActive &&
+        bookingFlowState is BookingFlowState.SearchAddresses
+    ) {
+        AddressSearchScreen(
+            originText = uiState.origin.title.takeIf { it.isNotBlank() } ?: "Tu ubicación actual",
+            destinationText = uiState.destination.title
+                .takeIf { uiState.destination.tieneCoordenadas && it.isNotBlank() }
+                ?: "¿A dónde vas?",
+            popularDestinations = uiState.currentPopularLocations,
+            recentDestinations = recentDestinations,
+            favoriteDestinations = uiState.favoriteAddresses.map { it.asLocationPoint() },
+            showFavorites = showFavoriteDestinations,
+            onShowFavoritesChange = { showFavoriteDestinations = it },
+            onBackClick = {
+                onBookingFlowActiveChange(false)
+                onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                viewModel.toggleFullMapExpanded(false)
+            },
+            onOriginClick = { viewModel.requestCurrentGpsLocation(context) },
+            onSelectFromMapClick = {
+                onBookingFlowStateChange(BookingFlowState.MapPinPicker)
+                viewModel.toggleFullMapExpanded(true)
+            },
+            onDestinationSelected = { point ->
+                viewModel.updateDestination(point)
+                onRecentDestination(point)
+                onBookingFlowStateChange(BookingFlowState.MapPinPicker)
+                viewModel.toggleFullMapExpanded(true)
+            },
+            modifier = modifier
+        )
+        return
+    }
+
+    // FULLSCREEN MAP MODE
+    if (
+        uiState.showFullMapExpanded ||
+        bookingFlowState is BookingFlowState.MapPinPicker ||
+        bookingFlowState is BookingFlowState.VehicleSelection
+    ) {
+        val selectedEstimate = uiState.selectedEstimate
         Box(
             modifier = modifier
                 .fillMaxSize()
                 .background(Asphalt950)
         ) {
-            LeafletDarkMapView(
-                uiState = uiState,
-                viewModel = viewModel,
+            MapboxDarkMapScreen(
                 modifier = Modifier.fillMaxSize(),
-                isExpanded = true,
-                onExpandToggle = { viewModel.toggleFullMapExpanded(false) }
+                currentMapStyle = currentMapStyle,
+                origin = uiState.origin,
+                selectedDestination = uiState.destination.takeIf { it.tieneCoordenadas },
+                onMapCenterChanged = { point ->
+                    viewModel.updateDestinationFromMap(context, point.latitude(), point.longitude())
+                },
+                onRouteDistanceChanged = viewModel::updateRoadRouteDistance,
+                fitRouteRequest = fitRouteRequest,
+                locationPermissionGranted = hasLocationPermission
             )
-            Surface(
-                onClick = { viewModel.toggleFullMapExpanded(false) },
-                shape = CircleShape,
-                color = Asphalt900.copy(alpha = 0.92f),
-                border = BorderStroke(1.dp, Asphalt700),
+            Box(
                 modifier = Modifier
-                    .padding(16.dp)
-                    .align(Alignment.TopStart)
-                    .size(44.dp)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.offset(y = (-34).dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Asphalt900.copy(alpha = 0.96f),
+                        border = BorderStroke(1.dp, Asphalt700),
+                        shadowElevation = 8.dp
+                    ) {
+                        Text(
+                            text = "DESTINO",
+                            color = Stone100,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Volver al panel",
-                        tint = Stone100,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = Icons.Filled.LocationOn,
+                        contentDescription = "Centro del destino",
+                        tint = RacingRed500,
+                        modifier = Modifier.size(38.dp)
                     )
                 }
             }
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Asphalt950.copy(alpha = 0.96f),
+                shape = RoundedCornerShape(12.dp),
+                color = Asphalt900.copy(alpha = 0.94f),
                 border = BorderStroke(1.dp, Asphalt700),
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 38.dp)
-                    .testTag("map_destination_confirmation")
+                    .padding(start = 16.dp, end = 16.dp, top = 48.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
-                    Text(
-                        text = "DESTINO SELECCIONADO",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Emerald500
-                    )
-                    Text(
-                        text = uiState.destination.title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Stone100,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = uiState.destination.subtitle,
-                        fontSize = 12.sp,
-                        color = Stone300,
-                        maxLines = 2
-                    )
-                    Text(
-                        text = uiState.routeDistanceKm?.let {
-                            "Ruta por calles: ${String.format(java.util.Locale.US, "%.1f", it)} km"
-                        } ?: "Estimación preliminar; esperando la ruta por calles.",
-                        fontSize = 11.sp,
-                        color = Stone400
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                            viewModel.toggleFullMapExpanded(false)
+                        }
                     ) {
-                        Text(
-                            text = selectedEstimate?.let { usdConSigno(it.priceUsd) }
-                                ?: "Calculando tarifa…",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            color = RacingYellow500
-                        )
-                        Text(
-                            text = uiState.selectedService.colloquialTitle,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Stone300
-                        )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Stone100,
+                        modifier = Modifier.size(22.dp)
+                    )
                     }
-                    Button(
-                        onClick = { viewModel.openBooking(uiState.selectedService) },
-                        enabled = selectedEstimate != null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("map_continue_to_booking"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = RacingYellow500,
-                            contentColor = Asphalt950,
-                            disabledContainerColor = Asphalt700,
-                            disabledContentColor = Stone400
+                    Column(modifier = Modifier.padding(start = 8.dp, end = 12.dp)) {
+                        Text(
+                            text = "Ubica tu destino en el mapa",
+                            color = Stone100,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    ) {
-                        Text("Continuar con este destino", fontWeight = FontWeight.Black)
+                        Text(
+                            text = "Mueve el mapa para colocar el pin.",
+                            color = Stone400,
+                            fontSize = 12.sp
+                        )
                     }
                 }
+            }
+            MapLayerSelectorButton(
+                currentMapStyle = currentMapStyle,
+                onMapStyleSelected = { currentMapStyle = it },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 124.dp, end = 16.dp)
+            )
+            if (bookingFlowState is BookingFlowState.VehicleSelection) {
+                Surface(
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    color = Asphalt950.copy(alpha = 0.98f),
+                    border = BorderStroke(1.dp, Asphalt700),
+                    shadowElevation = 16.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .heightIn(max = 620.dp)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 38.dp)
+                        .testTag("map_vehicle_category_selector")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TextButton(
+                            onClick = {
+                                onBookingFlowStateChange(BookingFlowState.MapPinPicker)
+                            }
+                        ) {
+                            Text("← Cambiar destino", color = RacingYellow500)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                ServiceType.MOTO to "Moto",
+                                ServiceType.CAR to "Carro",
+                                ServiceType.DELIVERY to "Envíos"
+                            ).forEach { (service, label) ->
+                                FilterChip(
+                                    selected = uiState.selectedService == service,
+                                    onClick = { viewModel.selectService(service) },
+                                    label = { Text(label) },
+                                    modifier = Modifier.testTag(
+                                        "vehicle_service_${service.name.lowercase()}"
+                                    )
+                                )
+                            }
+                        }
+                        if (uiState.selectedService == ServiceType.DELIVERY) {
+                            Text(
+                                text = "Tarifa estimada: $${String.format(java.util.Locale.US, "%.2f", selectedEstimate?.priceUsd ?: 0.0)} USD",
+                                color = RacingYellow500,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("delivery_estimated_fare")
+                            )
+                        } else {
+                            VehicleCategorySelector(
+                                selectedCategoryId = uiState.selectedVehicleCategoryId,
+                                bcvExchangeRate = uiState.bcvExchangeRate,
+                                onCategorySelected = viewModel::selectVehicleCategory,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Button(
+                            onClick = { viewModel.openBooking(uiState.selectedService) },
+                            enabled = uiState.selectedService == ServiceType.DELIVERY ||
+                                uiState.selectedVehicleCategoryId != null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp)
+                                .testTag("map_continue_to_booking"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = RacingYellow500,
+                                contentColor = Asphalt950,
+                                disabledContainerColor = Asphalt700,
+                                disabledContentColor = Stone400
+                            )
+                        ) {
+                            Text("Continuar con esta categoría", fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+            } else {
+                MapDestinationCard(
+                    streetName = uiState.destination.title
+                            .takeUnless {
+                                it.isBlank() ||
+                                    it == "Destino en el mapa" ||
+                                    it == "Buscando dirección…"
+                            }
+                        ?: "Destino seleccionado",
+                    sectorName = uiState.destination.subtitle
+                        .takeUnless { it.isBlank() || it.contains(Regex("-?\\d+\\.\\d+")) }
+                        ?: "${uiState.destination.cityName}, ${uiState.destination.stateName}",
+                    distanceText = uiState.routeDistanceKm?.let {
+                        "Ruta por calles: ${String.format(java.util.Locale.US, "%.1f", it)} km"
+                    } ?: selectedEstimate?.distanceKm?.let {
+                        "Distancia estimada: ${String.format(java.util.Locale.US, "%.1f", it)} km"
+                    } ?: "Calculando distancia…",
+                    estimatedPriceUsd = selectedEstimate?.priceUsd ?: 0.0,
+                    confirmEnabled = selectedEstimate != null,
+                    suggestedDestinations = uiState.currentPopularLocations,
+                    onSuggestedDestinationClick = viewModel::updateDestination,
+                    onConfirmClick = {
+                        onRecentDestination(uiState.destination)
+                        fitRouteRequest += 1
+                        onBookingFlowStateChange(BookingFlowState.VehicleSelection)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 38.dp)
+                        .testTag("map_destination_confirmation")
+                )
             }
         }
         return
@@ -272,15 +516,65 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Asphalt950)
     ) {
-        // 1. Live Leaflet map with destination selection and road routing.
-        LeafletDarkMapView(
-            uiState = uiState,
-            viewModel = viewModel,
+        if (!uiState.isDriverMode) {
+            HomeDashboardScreen(
+                userName = uiState.cuenta?.nombre.orEmpty(),
+                userBalance = uiState.billetera?.disponibleUsd
+                    ?: uiState.cuenta?.saldoBilletera
+                    ?: 0.0,
+                partners = uiState.automotivePartners,
+                showDriverMode = uiState.cuenta?.rol == "conductor",
+                onServiceClick = { service ->
+                    when (service) {
+                        "car" -> {
+                            viewModel.selectService(ServiceType.CAR)
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                        }
+                        "moto" -> {
+                            viewModel.selectService(ServiceType.MOTO)
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                        }
+                        "delivery" -> {
+                            viewModel.selectService(ServiceType.DELIVERY)
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                        }
+                        "schedule", "other" -> {
+                            onBookingFlowActiveChange(true)
+                            onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                        }
+                        "all" -> viewModel.showCitySelector(true)
+                    }
+                },
+                onSearchClick = {
+                    onBookingFlowActiveChange(true)
+                    onBookingFlowStateChange(BookingFlowState.SearchAddresses)
+                },
+                onRechargeClick = { viewModel.mostrarRecarga(true) },
+                onAccountClick = { viewModel.mostrarCuenta(true) },
+                onDriverModeClick = { viewModel.toggleDriverMode(true) },
+                onTabSelected = { tab ->
+                    when (tab) {
+                        "inicio" -> {
+                            onBookingFlowActiveChange(false)
+                            viewModel.navigateToHome()
+                        }
+                        "recargas" -> viewModel.mostrarRecarga(true)
+                        "historial" -> viewModel.openTripHistory()
+                        "perfil" -> viewModel.openProfile()
+                    }
+                }
+            )
+        } else {
+        // 1. Dark Mapbox map behind the floating HomeScreen controls.
+        MapboxDarkMapScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(410.dp),
-            isExpanded = false,
-            onExpandToggle = { viewModel.toggleFullMapExpanded(true) }
+            currentMapStyle = currentMapStyle,
+            locationPermissionGranted = hasLocationPermission
         )
 
         // 2. FLOATING TOP HEADER OVER THE MAP (MATCHING ATTACHED SCREENSHOT)
@@ -600,7 +894,7 @@ fun HomeScreen(
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    text = uiState.destination.title,
+                                    text = uiState.destination.title.ifBlank { "¿A dónde vas?" },
                                     fontSize = 13.sp,
                                     color = Stone100,
                                     fontWeight = FontWeight.Bold,
@@ -755,60 +1049,76 @@ fun HomeScreen(
                 }
             }
 
-            // THREE ACTIVE SERVICES (MOTOTAXI, TAXI PANA, DELIVERY EXPRESS)
+            // SERVICE OPTIONS
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    // 1. Mototaxi ($1.81 / Bs. 1.606)
-                    val motoPriceUsd = uiState.motoEstimate?.priceUsd ?: 1.81
-                    val motoPriceBs = uiState.motoEstimate?.priceBs ?: (1.81 * uiState.bcvExchangeRate)
-                    CompactServiceRowCard(
-                        title = "Mototaxi",
-                        subtitle = "3–7 min · 1 pasajero",
-                        priceUsd = motoPriceUsd,
-                        priceBs = motoPriceBs,
-                        icon = Icons.Default.TwoWheeler,
-                        iconBgColor = RacingYellow500,
-                        iconColor = Asphalt950,
-                        isSelected = uiState.selectedService == ServiceType.MOTO,
-                        onClick = { viewModel.selectService(ServiceType.MOTO) },
-                        testTag = "service_card_moto"
+                    Text(
+                        text = "Elige tu servicio",
+                        color = Stone100,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    // 2. Taxi Pana ($4.62 / Bs. 4.099)
-                    val carPriceUsd = uiState.carEstimate?.priceUsd ?: 4.62
-                    val carPriceBs = uiState.carEstimate?.priceBs ?: (4.62 * uiState.bcvExchangeRate)
-                    CompactServiceRowCard(
-                        title = "Taxi Pana",
-                        subtitle = "5–10 min · Hasta 4",
-                        priceUsd = carPriceUsd,
-                        priceBs = carPriceBs,
-                        icon = Icons.Default.DirectionsCar,
-                        iconBgColor = Asphalt800,
-                        iconColor = Stone100,
-                        isSelected = uiState.selectedService == ServiceType.CAR,
-                        onClick = { viewModel.selectService(ServiceType.CAR) },
-                        testTag = "service_card_car"
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val motoPriceUsd = uiState.motoEstimate?.priceUsd ?: 1.81
+                        val motoPriceBs = uiState.motoEstimate?.priceBs ?: (1.81 * uiState.bcvExchangeRate)
+                        ServiceCard(
+                            title = "Moto",
+                            priceUsd = motoPriceUsd,
+                            priceBs = motoPriceBs,
+                            icon = Icons.Default.TwoWheeler,
+                            isSelected = uiState.selectedService == ServiceType.MOTO,
+                            onClick = { viewModel.selectService(ServiceType.MOTO) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "service_card_moto"
+                        )
 
-                    // 3. Delivery Express ($1.94 / Bs. 1.721)
-                    val deliveryPriceUsd = uiState.deliveryEstimate?.priceUsd ?: 1.94
-                    val deliveryPriceBs = uiState.deliveryEstimate?.priceBs ?: (1.94 * uiState.bcvExchangeRate)
-                    CompactServiceRowCard(
-                        title = "Delivery Express",
-                        subtitle = "20–45 min · Hasta 5 kg",
-                        priceUsd = deliveryPriceUsd,
-                        priceBs = deliveryPriceBs,
-                        icon = Icons.Default.Inventory2,
-                        iconBgColor = Asphalt800,
-                        iconColor = Stone100,
-                        isSelected = uiState.selectedService == ServiceType.DELIVERY,
-                        onClick = { viewModel.selectService(ServiceType.DELIVERY) },
-                        testTag = "service_card_delivery"
+                        val carPriceUsd = uiState.carEstimate?.priceUsd ?: 4.62
+                        val carPriceBs = uiState.carEstimate?.priceBs ?: (4.62 * uiState.bcvExchangeRate)
+                        ServiceCard(
+                            title = "Carro",
+                            priceUsd = carPriceUsd,
+                            priceBs = carPriceBs,
+                            icon = Icons.Default.DirectionsCar,
+                            isSelected = uiState.selectedService == ServiceType.CAR,
+                            onClick = { viewModel.selectService(ServiceType.CAR) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "service_card_car"
+                        )
+
+                        val deliveryPriceUsd = uiState.deliveryEstimate?.priceUsd ?: 1.94
+                        val deliveryPriceBs = uiState.deliveryEstimate?.priceBs ?: (1.94 * uiState.bcvExchangeRate)
+                        ServiceCard(
+                            title = "Envíos",
+                            priceUsd = deliveryPriceUsd,
+                            priceBs = deliveryPriceBs,
+                            icon = Icons.Default.Inventory2,
+                            isSelected = uiState.selectedService == ServiceType.DELIVERY,
+                            onClick = { viewModel.selectService(ServiceType.DELIVERY) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "service_card_delivery"
+                        )
+                    }
+                }
+            }
+
+            if (uiState.selectedService == ServiceType.MOTO || uiState.selectedService == ServiceType.CAR) {
+                item {
+                    VehicleCategorySelector(
+                        selectedCategoryId = uiState.selectedVehicleCategoryId,
+                        bcvExchangeRate = uiState.bcvExchangeRate,
+                        onCategorySelected = viewModel::selectVehicleCategory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
             }
@@ -816,7 +1126,14 @@ fun HomeScreen(
             // PRIMARY ACTION BUTTON (CONFIRMAR VIAJE / ¡LLÉGATE YA!)
             item {
                 Button(
-                    onClick = { viewModel.openBooking(uiState.selectedService) },
+                    onClick = {
+                        if (uiState.destination.tieneCoordenadas) {
+                            onBookingFlowStateChange(BookingFlowState.VehicleSelection)
+                            viewModel.openBooking(uiState.selectedService)
+                        } else {
+                            showLocationPickerModal = true
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -830,7 +1147,11 @@ fun HomeScreen(
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
                 ) {
                     Text(
-                        text = "¡Llégate ya! • ${uiState.selectedService.colloquialTitle}",
+                        text = if (uiState.destination.tieneCoordenadas) {
+                            "¡Llégate ya! • ${uiState.selectedService.colloquialTitle}"
+                        } else {
+                            "Elige tu destino"
+                        },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Black
                     )
@@ -1082,6 +1403,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
         }
     }
 
@@ -1609,6 +1931,68 @@ fun HomeScreen(
         )
     }
 
+}
+
+@Composable
+fun ServiceCard(
+    title: String,
+    priceUsd: Double,
+    priceBs: Double,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String
+) {
+    Surface(
+        onClick = onClick,
+        color = if (isSelected) Asphalt800 else Asphalt950,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) RacingYellow500 else Asphalt700
+        ),
+        modifier = modifier
+            .height(112.dp)
+            .testTag(testTag)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = if (isSelected) RacingYellow500 else Stone300,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(
+                text = title,
+                color = Stone100,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                text = "$${String.format(java.util.Locale.US, "%.2f", priceUsd)}",
+                color = if (isSelected) RacingYellow500 else Stone100,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1
+            )
+            Text(
+                text = "Bs. ${String.format(java.util.Locale.US, "%,.0f", priceBs).replace(',', '.')}",
+                color = Stone400,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 /**

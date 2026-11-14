@@ -1,6 +1,5 @@
 import { Router } from "express";
 import {
-  crearOActualizarCuenta,
   crearSesion,
   guardarCodigo,
   revocarSesion,
@@ -144,13 +143,9 @@ authRouter.post(
       );
     }
 
-    const cuenta = await crearOActualizarCuenta(body);
-    if (!cuenta) {
-      throw new HttpError(500, "cuenta_error", "No pudimos preparar tu cuenta. Intenta de nuevo.");
-    }
-
     const codigo = generarCodigo();
-    await guardarCodigo(body.telefono, hashCodigo(body.telefono, codigo));
+    const { telefono, ...datosRegistro } = body;
+    await guardarCodigo(telefono, hashCodigo(telefono, codigo), datosRegistro);
 
     let canal;
     try {

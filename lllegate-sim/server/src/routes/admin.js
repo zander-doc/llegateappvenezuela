@@ -18,7 +18,7 @@ import { urlFirmada } from "../storage.js";
 export const adminRouter = Router();
 
 const DRIVER_ADMIN_COLUMNS =
-  "usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, anio, cedula_url, licencia_url, certificado_medico_url, verificacion, estado, motivo_rechazo, riesgo_puntaje, riesgo_motivos, enviado_en, intentos_verificacion, verificado_por, verificado_en, created_at";
+  "usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, color, anio, cedula_url, licencia_url, certificado_medico_url, verificacion, estado, motivo_rechazo, riesgo_puntaje, riesgo_motivos, enviado_en, intentos_verificacion, verificado_por, verificado_en, created_at";
 
 adminRouter.use(requireUser, requireAdmin);
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -67,13 +67,16 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [destino, setDestino] = useState<DestinoSolicitud>("real");
+  const solicitudEnviada = useRef(false);
 
   const selectedService = LAUNCH_SERVICES.find((service) => service.slug === serviceSlug);
 
   useEffect(() => {
-    if (done) return;
+    if (done || solicitudEnviada.current) return;
     const timer = window.setTimeout(() => {
-      saveDraft(DRAFT_KEY, { serviceSlug, city, name: name.trim(), experience });
+      if (!solicitudEnviada.current) {
+        saveDraft(DRAFT_KEY, { serviceSlug, city, name: name.trim(), experience });
+      }
     }, 300);
     return () => window.clearTimeout(timer);
   }, [serviceSlug, city, name, experience, done]);
@@ -136,6 +139,7 @@ export function DriverWizard({ onClose }: { onClose: () => void }) {
         },
         { serviceSlug, city, name: name.trim(), experience, plan: "prepago" },
       );
+      solicitudEnviada.current = true;
       clearDraft(DRAFT_KEY);
       setDestino(donde);
       setDone(true);

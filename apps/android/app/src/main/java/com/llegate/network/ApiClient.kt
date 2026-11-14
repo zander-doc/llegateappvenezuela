@@ -12,7 +12,13 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 object ApiConfig {
+  // Servidor activo en la nube (Render) - Funciona de inmediato sin servidor local
   const val BASE_URL: String = "https://llegate-app-api.onrender.com"
+
+  // Para desarrollo local con backend en la PC:
+  // - Emulador Android: "http://10.0.2.2:3000"
+  // - Dispositivo físico Wi-Fi: "http://192.168.40.4:3000"
+
   const val USER_AGENT: String = "LlegateApp-Android/1.0"
   internal val JSON: okhttp3.MediaType = "application/json; charset=utf-8".toMediaType()
 }

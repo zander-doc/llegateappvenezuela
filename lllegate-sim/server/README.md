@@ -13,7 +13,10 @@ transacción y traduce errores.
 - Un canal para entregar el OTP: WhatsApp Cloud API, SMS por Twilio o, solo
   fuera de producción, el log del servidor (ver [OTP por WhatsApp o SMS](#otp-por-whatsapp-o-sms)).
 - Almacenamiento para los documentos: disco local en desarrollo o Cloudflare R2
-  en producción.
+  en producción. La API rechaza el disco local en producción porque el disco de
+  un servicio web de Render es efímero; configura `STORAGE_DRIVER=r2`,
+  `STORAGE_BUCKET`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` y
+  `R2_SECRET_ACCESS_KEY` antes de desplegar.
 
 ## Puesta en marcha
 
@@ -43,7 +46,11 @@ responde `503`; nunca se simula un pago. La configuración completa está en
 4. Cuando el token expira, `POST /auth/refresh` entrega un par nuevo sin pedir otro SMS.
 5. `POST /auth/logout` cierra solo la sesión de ese dispositivo.
 
-Al primer registro, el API crea la cuenta en `auth.users`; el trigger
+La solicitud de OTP no crea ni modifica cuentas: los datos de alta se guardan
+temporalmente junto al desafío y solo se aplican tras consumir un código válido.
+Un inicio de sesión de un teléfono existente no cambia su perfil; para editarlo,
+se requiere `PATCH /auth/perfil`. Al primer registro verificado, la API crea la
+cuenta en `auth.users`; el trigger
 `handle_new_user` crea el perfil en `public.usuarios`. Al confirmar el código, el
 trigger `sync_usuario_auth` marca el teléfono como verificado y lo copia al
 perfil. El rol del metadata solo puede ser `cliente` o `conductor`; cualquier
@@ -995,7 +1002,10 @@ reescritura a `index.html` para las rutas de React).
 2. Conecta el repositorio `zander-doc/llegateappvenezuela`.
 3. Render pide el valor de `DATABASE_URL`: pega la cadena **directa** de Neon
    (sin `-pooler`, con `sslmode=require`), la misma que está en `server/.env`.
-4. Aplica el blueprint y espera el primer despliegue. La web queda en
+4. Completa en Render `STORAGE_BUCKET`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`
+   y `R2_SECRET_ACCESS_KEY` con los datos del bucket privado de Cloudflare R2.
+   La API no arranca en producción si R2 no está configurado. Aplica el blueprint
+   y espera el primer despliegue. La web queda en
    `https://llegate-app-web.onrender.com` y la API en
    `https://llegate-app-api.onrender.com`.
 
@@ -1017,12 +1027,15 @@ Ajustes pendientes antes de abrirlo al público:
   registrar el código. Se comprueba con `GET /health/otp`, que responde
   `canal: "whatsapp"` y `log: { activo: false }`.
 - **Documentos:** `STORAGE_DRIVER=local` no sobrevive a un reinicio en Render.
-  Configura `R2_*` y cambia a `r2` para que las fotos de los pilotos no se
-  pierdan.
+  `render.yaml` ahora usa R2 y la API rechaza `local` en producción. Antes de
+  cambiar de almacén, copia los objetos que aún existan en `.storage` al bucket
+  usando las mismas rutas que figuran en `conductores_documentos`; el cambio de
+  driver por sí solo no transfiere archivos.
 - **Pago Móvil:** reemplaza los valores de prueba `PAGO_MOVIL_*` por los datos
   reales del negocio.
 - **Migraciones:** el despliegue no las ejecuta. Cuando cambie `db/migrations`,
-  corre `npm run db:migrate` desde `server/` con la `DATABASE_URL` de Neon.
+  corre `npm run db:migrate` desde `server/` con la `DATABASE_URL` de Neon antes
+  de desplegar una versión que dependa de ellas.
 - **Subdominios:** si Render asigna otro nombre porque `llegate-app-api` o
   `llegate-app-web` ya están tomados, actualiza `CORS_ORIGIN` y
   `PUBLIC_API_URL` con las URLs reales y vuelve a desplegar.

@@ -118,6 +118,48 @@ data class PriceEstimate(
     val priceBs: Double
 )
 
+data class VehicleCategory(
+    val id: String,
+    val title: String,
+    val description: String,
+    val priceUsd: Double,
+    val tag: String? = null,
+    val icon: String
+)
+
+val VEHICLE_CATEGORIES = listOf(
+    VehicleCategory(
+        id = "car_vip",
+        title = "Full Cacheroso / VIP",
+        description = "Vehículos premium, aire acondicionado y comodidad para viajar a tu gusto.",
+        priceUsd = 5.00,
+        tag = "Recomendado",
+        icon = "✨🚗"
+    ),
+    VehicleCategory(
+        id = "car_ac",
+        title = "Aire Fuerte",
+        description = "Viaja fresco y tranquilo con aire acondicionado.",
+        priceUsd = 3.50,
+        icon = "❄️🚗"
+    ),
+    VehicleCategory(
+        id = "car_eco",
+        title = "Económico",
+        description = "Una opción cómoda y accesible para moverte.",
+        priceUsd = 2.50,
+        tag = "Ahorro",
+        icon = "🚘"
+    ),
+    VehicleCategory(
+        id = "car_short",
+        title = "Carrera Corta",
+        description = "Tarifa especial para tramos rápidos y sectores cercanos.",
+        priceUsd = 1.80,
+        icon = "⚡"
+    )
+)
+
 enum class PaymentMethod(
     val title: String,
     val subtitle: String,

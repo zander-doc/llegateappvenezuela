@@ -22,6 +22,8 @@ import com.llegate.model.ServiceType
 import com.llegate.model.StateRegion
 import com.llegate.model.tarifaUsd
 import com.llegate.model.UpcomingService
+import com.llegate.model.VehicleCategory
+import com.llegate.model.VEHICLE_CATEGORIES
 import com.llegate.network.ApiException
 import com.llegate.network.activeTripDe
 import com.llegate.network.AuthRepository
@@ -29,6 +31,7 @@ import com.llegate.network.BcvRateService
 import com.llegate.network.Billetera
 import com.llegate.network.ConfigApp
 import com.llegate.network.ConfigRepository
+import com.llegate.network.DriverRepository
 import com.llegate.network.EstadoPago
 import com.llegate.network.EstadoViaje
 import com.llegate.network.FavoriteAddress
@@ -55,6 +58,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.CancellationException
+import com.mapbox.geojson.Point
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -85,6 +89,12 @@ enum class PasoInicio {
     CODIGO
 }
 
+enum class ServicioConductor(val titulo: String, val tipoVehiculo: String) {
+    MOTO("Piloto de Moto", "moto"),
+    CARRO("Conductor de Carro", "carro"),
+    DELIVERY("Delivery & Encomiendas", "carro")
+}
+
 /** Los pasos de una recarga: elegir monto, pagar en el banco y reportar la referencia. */
 enum class PasoRecarga {
     MONTO,
@@ -95,28 +105,29 @@ enum class PasoRecarga {
 data class LlegateUiState(
     val currentScreen: AppScreen = AppScreen.HOME,
     val selectedService: ServiceType = ServiceType.MOTO,
-    // CENTRAL REGION STATES RESTRICTED INITIALLY TO ARAGUA, CARABOBO, GUÁRICO & DISTRITO CAPITAL
+    val selectedVehicleCategoryId: String? = null,
+    // CENTRAL REGION STATES RESTRICTED INITIALLY TO ARAGUA, CARABOBO, GUÃRICO & DISTRITO CAPITAL
     val availableStates: List<StateRegion> = listOf(
         StateRegion(
             id = "aragua",
             name = "Aragua",
-            isLaunchHub = true, // Sede Principal de Lanzamiento Llégate 🇻🇪
+            isLaunchHub = true, // Sede Principal de Lanzamiento LlÃ©gate ðŸ‡»ðŸ‡ª
             isAvailableNow = true,
-            subtitle = "Sede Principal de Lanzamiento Llégate 🇻🇪",
+            subtitle = "Sede Principal de Lanzamiento LlÃ©gate ðŸ‡»ðŸ‡ª",
             citiesAndTowns = listOf(
                 "Maracay", "Turmero", "Cagua", "La Victoria", "Palo Negro",
-                "Villa de Cura", "Santa Cruz", "El Limón", "San Mateo",
-                "Ocumare de la Costa", "Choroní", "San Sebastián"
+                "Villa de Cura", "Santa Cruz", "El LimÃ³n", "San Mateo",
+                "Ocumare de la Costa", "ChoronÃ­", "San SebastiÃ¡n"
             ),
             cities = listOf(
                 CityInfo(
                     name = "Maracay",
-                    municipalityOrZone = "Municipio Girardot • Capital de Aragua",
+                    municipalityOrZone = "Municipio Girardot â€¢ Capital de Aragua",
                     points = listOf(
-                        LocationPoint("CC Parque Aragua", "Av. Bolívar Este, Maracay", 10.2458, -67.5855, stateName = "Aragua", cityName = "Maracay"),
-                        LocationPoint("Las Delicias / CC Las Américas", "Av. Las Delicias, Maracay", 10.2612, -67.5991, stateName = "Aragua", cityName = "Maracay"),
-                        LocationPoint("Terminal Central de Maracay", "Av. Constitución, Rutas Interurbanas", 10.2425, -67.5950, stateName = "Aragua", cityName = "Maracay"),
-                        LocationPoint("Plaza Bolívar de Maracay", "Av. Miranda con Bolívar", 10.2480, -67.6000, stateName = "Aragua", cityName = "Maracay")
+                        LocationPoint("CC Parque Aragua", "Av. BolÃ­var Este, Maracay", 10.2458, -67.5855, stateName = "Aragua", cityName = "Villa de Cura"),
+                        LocationPoint("Las Delicias / CC Las AmÃ©ricas", "Av. Las Delicias, Maracay", 10.2612, -67.5991, stateName = "Aragua", cityName = "Villa de Cura"),
+                        LocationPoint("Terminal Central de Maracay", "Av. ConstituciÃ³n, Rutas Interurbanas", 10.2425, -67.5950, stateName = "Aragua", cityName = "Villa de Cura"),
+                        LocationPoint("Plaza BolÃ­var de Maracay", "Av. Miranda con BolÃ­var", 10.2480, -67.6000, stateName = "Aragua", cityName = "Villa de Cura")
                     )
                 ),
                 CityInfo(
@@ -124,73 +135,73 @@ data class LlegateUiState(
                     municipalityOrZone = "Municipio Sucre",
                     points = listOf(
                         LocationPoint("Centro de Cagua", "Plaza Sucre / Carretera Nacional", 10.1873, -67.4589, stateName = "Aragua", cityName = "Cagua"),
-                        LocationPoint("Zona Industrial Santa Rosalía", "Av. Principal de Cagua", 10.1920, -67.4650, stateName = "Aragua", cityName = "Cagua")
+                        LocationPoint("Zona Industrial Santa RosalÃ­a", "Av. Principal de Cagua", 10.1920, -67.4650, stateName = "Aragua", cityName = "Cagua")
                     )
                 ),
                 CityInfo(
                     name = "Turmero",
-                    municipalityOrZone = "Municipio Santiago Mariño",
+                    municipalityOrZone = "Municipio Santiago MariÃ±o",
                     points = listOf(
-                        LocationPoint("Turmero Casco Central", "Plaza Mariño / Calle Bolívar", 10.2289, -67.4735, stateName = "Aragua", cityName = "Turmero"),
-                        LocationPoint("San Mateo", "Ingenio Bolívar / Carretera Nacional", 10.2120, -67.4210, stateName = "Aragua", cityName = "Turmero")
+                        LocationPoint("Turmero Casco Central", "Plaza MariÃ±o / Calle BolÃ­var", 10.2289, -67.4735, stateName = "Aragua", cityName = "Turmero"),
+                        LocationPoint("San Mateo", "Ingenio BolÃ­var / Carretera Nacional", 10.2120, -67.4210, stateName = "Aragua", cityName = "Turmero")
                     )
                 ),
                 CityInfo(
                     name = "La Victoria",
-                    municipalityOrZone = "Municipio José Félix Ribas",
+                    municipalityOrZone = "Municipio JosÃ© FÃ©lix Ribas",
                     points = listOf(
                         LocationPoint("La Victoria - Peaje ARC", "Zona Colonial y Comercial", 10.2272, -67.3314, stateName = "Aragua", cityName = "La Victoria"),
-                        LocationPoint("Plaza José Félix Ribas", "Casco Histórico", 10.2290, -67.3350, stateName = "Aragua", cityName = "La Victoria")
+                        LocationPoint("Plaza JosÃ© FÃ©lix Ribas", "Casco HistÃ³rico", 10.2290, -67.3350, stateName = "Aragua", cityName = "La Victoria")
                     )
                 ),
                 CityInfo(
                     name = "Palo Negro",
                     municipalityOrZone = "Municipio Libertador",
                     points = listOf(
-                        LocationPoint("Palo Negro - BAEL", "Plaza Bolívar / Base Aérea", 10.1742, -67.5503, stateName = "Aragua", cityName = "Palo Negro")
+                        LocationPoint("Palo Negro - BAEL", "Plaza BolÃ­var / Base AÃ©rea", 10.1742, -67.5503, stateName = "Aragua", cityName = "Palo Negro")
                     )
                 ),
                 CityInfo(
                     name = "Villa de Cura",
-                    municipalityOrZone = "Municipio Zamora • Puerta del Llano",
+                    municipalityOrZone = "Municipio Zamora â€¢ Puerta del Llano",
                     points = listOf(
                         LocationPoint("Villa de Cura", "Puerta del Llano / Calle Comercio", 10.0381, -67.4897, stateName = "Aragua", cityName = "Villa de Cura")
                     )
                 ),
                 CityInfo(
-                    name = "El Limón",
-                    municipalityOrZone = "Municipio Mario Briceño Iragorry",
+                    name = "El LimÃ³n",
+                    municipalityOrZone = "Municipio Mario BriceÃ±o Iragorry",
                     points = listOf(
-                        LocationPoint("El Limón - MBI", "Av. Universidad / Entrada a Ocumare", 10.2785, -67.6322, stateName = "Aragua", cityName = "El Limón")
+                        LocationPoint("El LimÃ³n - MBI", "Av. Universidad / Entrada a Ocumare", 10.2785, -67.6322, stateName = "Aragua", cityName = "El LimÃ³n")
                     )
                 ),
                 CityInfo(
                     name = "Ocumare de la Costa",
                     municipalityOrZone = "Municipio Costa de Oro",
                     points = listOf(
-                        LocationPoint("Bahía de Cata / El Playón", "Costa de Aragua", 10.4936, -67.7428, stateName = "Aragua", cityName = "Ocumare de la Costa")
+                        LocationPoint("BahÃ­a de Cata / El PlayÃ³n", "Costa de Aragua", 10.4936, -67.7428, stateName = "Aragua", cityName = "Ocumare de la Costa")
                     )
                 ),
                 CityInfo(
-                    name = "Choroní",
+                    name = "ChoronÃ­",
                     municipalityOrZone = "Pueblo y Playas de Aragua",
                     points = listOf(
-                        LocationPoint("Playa Grande / Puerto Colombia", "Choroní, Aragua", 10.5050, -67.6150, stateName = "Aragua", cityName = "Choroní")
+                        LocationPoint("Playa Grande / Puerto Colombia", "ChoronÃ­, Aragua", 10.5050, -67.6150, stateName = "Aragua", cityName = "ChoronÃ­")
                     )
                 )
             ),
             popularPoints = listOf(
-                LocationPoint("CC Parque Aragua", "Av. Bolívar Este, Maracay", 10.2458, -67.5855, stateName = "Aragua", cityName = "Maracay"),
-                LocationPoint("Las Delicias / CC Las Américas", "Av. Las Delicias, Maracay", 10.2612, -67.5991, stateName = "Aragua", cityName = "Maracay"),
+                LocationPoint("CC Parque Aragua", "Av. BolÃ­var Este, Maracay", 10.2458, -67.5855, stateName = "Aragua", cityName = "Villa de Cura"),
+                LocationPoint("Las Delicias / CC Las AmÃ©ricas", "Av. Las Delicias, Maracay", 10.2612, -67.5991, stateName = "Aragua", cityName = "Villa de Cura"),
                 LocationPoint("Centro de Cagua", "Plaza Sucre / Carretera Nacional", 10.1873, -67.4589, stateName = "Aragua", cityName = "Cagua"),
-                LocationPoint("Turmero Casco Central", "Plaza Mariño / Calle Bolívar", 10.2289, -67.4735, stateName = "Aragua", cityName = "Turmero"),
+                LocationPoint("Turmero Casco Central", "Plaza MariÃ±o / Calle BolÃ­var", 10.2289, -67.4735, stateName = "Aragua", cityName = "Turmero"),
                 LocationPoint("La Victoria - Peaje ARC", "Zona Colonial y Comercial", 10.2272, -67.3314, stateName = "Aragua", cityName = "La Victoria"),
-                LocationPoint("Palo Negro - BAEL", "Plaza Bolívar / Base Aérea", 10.1742, -67.5503, stateName = "Aragua", cityName = "Palo Negro"),
+                LocationPoint("Palo Negro - BAEL", "Plaza BolÃ­var / Base AÃ©rea", 10.1742, -67.5503, stateName = "Aragua", cityName = "Palo Negro"),
                 LocationPoint("Villa de Cura", "Puerta del Llano / Calle Comercio", 10.0381, -67.4897, stateName = "Aragua", cityName = "Villa de Cura"),
-                LocationPoint("El Limón - MBI", "Av. Universidad / Entrada a Ocumare", 10.2785, -67.6322, stateName = "Aragua", cityName = "El Limón"),
-                LocationPoint("Terminal Central de Maracay", "Av. Constitución, Rutas Interurbanas", 10.2425, -67.5950, stateName = "Aragua", cityName = "Maracay"),
-                LocationPoint("Bahía de Cata / El Playón", "Costa de Aragua", 10.4936, -67.7428, stateName = "Aragua", cityName = "Ocumare de la Costa"),
-                LocationPoint("Choroní / Playa Grande", "Pueblo y Costa de Aragua", 10.5050, -67.6150, stateName = "Aragua", cityName = "Choroní")
+                LocationPoint("El LimÃ³n - MBI", "Av. Universidad / Entrada a Ocumare", 10.2785, -67.6322, stateName = "Aragua", cityName = "El LimÃ³n"),
+                LocationPoint("Terminal Central de Maracay", "Av. ConstituciÃ³n, Rutas Interurbanas", 10.2425, -67.5950, stateName = "Aragua", cityName = "Villa de Cura"),
+                LocationPoint("BahÃ­a de Cata / El PlayÃ³n", "Costa de Aragua", 10.4936, -67.7428, stateName = "Aragua", cityName = "Ocumare de la Costa"),
+                LocationPoint("ChoronÃ­ / Playa Grande", "Pueblo y Costa de Aragua", 10.5050, -67.6150, stateName = "Aragua", cityName = "ChoronÃ­")
             )
         ),
         StateRegion(
@@ -198,41 +209,41 @@ data class LlegateUiState(
             name = "Carabobo",
             isLaunchHub = false,
             isAvailableNow = true,
-            subtitle = "Región Central • Eje Industrial",
+            subtitle = "RegiÃ³n Central â€¢ Eje Industrial",
             citiesAndTowns = listOf("Valencia", "Naguanagua", "San Diego", "Guacara", "Puerto Cabello", "Los Guayos"),
             cities = listOf(
-                CityInfo("Valencia", "Capital de Carabobo", listOf(LocationPoint("Centro de Valencia", "Av. Cedeño con Av. Bolívar", 10.1820, -68.0010, stateName = "Carabobo", cityName = "Valencia"))),
+                CityInfo("Valencia", "Capital de Carabobo", listOf(LocationPoint("Centro de Valencia", "Av. CedeÃ±o con Av. BolÃ­var", 10.1820, -68.0010, stateName = "Carabobo", cityName = "Valencia"))),
                 CityInfo("Naguanagua", "Zona Comercial Norte", listOf(LocationPoint("CC Sambil Valencia", "Naguanagua, Autopista del Este", 10.2580, -67.9950, stateName = "Carabobo", cityName = "Naguanagua"))),
                 CityInfo("San Diego", "Municipio San Diego", listOf(LocationPoint("San Diego", "Av. Don Julio Centeno", 10.2510, -67.9520, stateName = "Carabobo", cityName = "San Diego"))),
                 CityInfo("Guacara", "Carretera Nacional", listOf(LocationPoint("Guacara Centro", "Carretera Nacional Valencia-Maracay", 10.2310, -67.8770, stateName = "Carabobo", cityName = "Guacara"))),
-                CityInfo("Puerto Cabello", "Eje Costero", listOf(LocationPoint("Puerto Cabello", "Malecón y Terminal Marítimo", 10.4720, -68.0120, stateName = "Carabobo", cityName = "Puerto Cabello")))
+                CityInfo("Puerto Cabello", "Eje Costero", listOf(LocationPoint("Puerto Cabello", "MalecÃ³n y Terminal MarÃ­timo", 10.4720, -68.0120, stateName = "Carabobo", cityName = "Puerto Cabello")))
             ),
             popularPoints = listOf(
                 LocationPoint("CC Sambil Valencia", "Naguanagua, Autopista del Este", 10.2580, -67.9950, stateName = "Carabobo", cityName = "Naguanagua"),
-                LocationPoint("Centro de Valencia", "Av. Cedeño con Av. Bolívar", 10.1820, -68.0010, stateName = "Carabobo", cityName = "Valencia"),
+                LocationPoint("Centro de Valencia", "Av. CedeÃ±o con Av. BolÃ­var", 10.1820, -68.0010, stateName = "Carabobo", cityName = "Valencia"),
                 LocationPoint("San Diego", "Av. Don Julio Centeno", 10.2510, -67.9520, stateName = "Carabobo", cityName = "San Diego"),
                 LocationPoint("Guacara Centro", "Carretera Nacional Valencia-Maracay", 10.2310, -67.8770, stateName = "Carabobo", cityName = "Guacara"),
-                LocationPoint("Puerto Cabello", "Malecón y Terminal Marítimo", 10.4720, -68.0120, stateName = "Carabobo", cityName = "Puerto Cabello")
+                LocationPoint("Puerto Cabello", "MalecÃ³n y Terminal MarÃ­timo", 10.4720, -68.0120, stateName = "Carabobo", cityName = "Puerto Cabello")
             )
         ),
         StateRegion(
             id = "guarico",
-            name = "Guárico",
+            name = "GuÃ¡rico",
             isLaunchHub = false,
             isAvailableNow = true,
-            subtitle = "Conexión Llanos Centrales",
+            subtitle = "ConexiÃ³n Llanos Centrales",
             citiesAndTowns = listOf("San Juan de los Morros", "Calabozo", "Valle de la Pascua", "Ortiz"),
             cities = listOf(
-                CityInfo("San Juan de los Morros", "Capital de Guárico", listOf(LocationPoint("San Juan de los Morros", "Av. Bolívar / San Juanote", 9.9110, -67.3540, stateName = "Guárico", cityName = "San Juan de los Morros"))),
-                CityInfo("Calabozo", "Ciudad Colonial", listOf(LocationPoint("Calabozo Centro", "Plaza Bolívar / Villa Colonial", 8.9240, -67.4280, stateName = "Guárico", cityName = "Calabozo"))),
-                CityInfo("Valle de la Pascua", "Llanos Nororientales", listOf(LocationPoint("Valle de la Pascua", "Av. Rómulo Gallegos", 9.2150, -66.0120, stateName = "Guárico", cityName = "Valle de la Pascua"))),
-                CityInfo("Ortiz", "Pueblo Histórico", listOf(LocationPoint("Ortiz", "Pueblo Histórico, Carretera Nacional", 9.6220, -67.2880, stateName = "Guárico", cityName = "Ortiz")))
+                CityInfo("San Juan de los Morros", "Capital de GuÃ¡rico", listOf(LocationPoint("San Juan de los Morros", "Av. BolÃ­var / San Juanote", 9.9110, -67.3540, stateName = "GuÃ¡rico", cityName = "San Juan de los Morros"))),
+                CityInfo("Calabozo", "Ciudad Colonial", listOf(LocationPoint("Calabozo Centro", "Plaza BolÃ­var / Villa Colonial", 8.9240, -67.4280, stateName = "GuÃ¡rico", cityName = "Calabozo"))),
+                CityInfo("Valle de la Pascua", "Llanos Nororientales", listOf(LocationPoint("Valle de la Pascua", "Av. RÃ³mulo Gallegos", 9.2150, -66.0120, stateName = "GuÃ¡rico", cityName = "Valle de la Pascua"))),
+                CityInfo("Ortiz", "Pueblo HistÃ³rico", listOf(LocationPoint("Ortiz", "Pueblo HistÃ³rico, Carretera Nacional", 9.6220, -67.2880, stateName = "GuÃ¡rico", cityName = "Ortiz")))
             ),
             popularPoints = listOf(
-                LocationPoint("San Juan de los Morros", "Av. Bolívar / San Juanote", 9.9110, -67.3540, stateName = "Guárico", cityName = "San Juan de los Morros"),
-                LocationPoint("Calabozo Centro", "Plaza Bolívar / Villa Colonial", 8.9240, -67.4280, stateName = "Guárico", cityName = "Calabozo"),
-                LocationPoint("Valle de la Pascua", "Av. Rómulo Gallegos", 9.2150, -66.0120, stateName = "Guárico", cityName = "Valle de la Pascua"),
-                LocationPoint("Ortiz", "Pueblo Histórico, Carretera Nacional", 9.6220, -67.2880, stateName = "Guárico", cityName = "Ortiz")
+                LocationPoint("San Juan de los Morros", "Av. BolÃ­var / San Juanote", 9.9110, -67.3540, stateName = "GuÃ¡rico", cityName = "San Juan de los Morros"),
+                LocationPoint("Calabozo Centro", "Plaza BolÃ­var / Villa Colonial", 8.9240, -67.4280, stateName = "GuÃ¡rico", cityName = "Calabozo"),
+                LocationPoint("Valle de la Pascua", "Av. RÃ³mulo Gallegos", 9.2150, -66.0120, stateName = "GuÃ¡rico", cityName = "Valle de la Pascua"),
+                LocationPoint("Ortiz", "Pueblo HistÃ³rico, Carretera Nacional", 9.6220, -67.2880, stateName = "GuÃ¡rico", cityName = "Ortiz")
             )
         ),
         StateRegion(
@@ -240,10 +251,10 @@ data class LlegateUiState(
             name = "Distrito Capital",
             isLaunchHub = false,
             isAvailableNow = true,
-            subtitle = "Conexión Capitalina",
+            subtitle = "ConexiÃ³n Capitalina",
             citiesAndTowns = listOf("Caracas", "Chacao", "El Silencio", "Petare"),
             cities = listOf(
-                CityInfo("Caracas", "Capital de la República", listOf(
+                CityInfo("Caracas", "Capital de la RepÃºblica", listOf(
                     LocationPoint("Plaza Venezuela", "Torre La Previsora, Caracas", 10.4969, -66.8837, stateName = "Distrito Capital", cityName = "Caracas"),
                     LocationPoint("Terminal La Bandera", "Salidas hacia Maracay y Valencia", 10.4770, -66.9050, stateName = "Distrito Capital", cityName = "Caracas")
                 )),
@@ -261,30 +272,21 @@ data class LlegateUiState(
         )
     ),
     val otherStatesRoadmap: List<String> = listOf(
-        "Anzoátegui", "Apure", "Barinas", "Bolívar", "Cojedes", "Delta Amacuro",
-        "Falcón", "Lara", "Mérida", "Miranda", "Monagas", "Nueva Esparta",
-        "Portuguesa", "Sucre", "Táchira", "Trujillo", "La Guaira", "Yaracuy",
+        "AnzoÃ¡tegui", "Apure", "Barinas", "BolÃ­var", "Cojedes", "Delta Amacuro",
+        "FalcÃ³n", "Lara", "MÃ©rida", "Miranda", "Monagas", "Nueva Esparta",
+        "Portuguesa", "Sucre", "TÃ¡chira", "Trujillo", "La Guaira", "Yaracuy",
         "Zulia", "Amazonas"
     ),
     val selectedStateId: String = "aragua", // Default Launch Hub
-    val selectedCityName: String = "Maracay", // Default City in Aragua
-    // Origin configured for Maracay, Aragua (Sede de Lanzamiento)
-    val origin: LocationPoint = LocationPoint(
-        title = "Av. Bolívar Este, Maracay",
-        subtitle = "Maracay, Estado Aragua (Sede Principal Llégate)",
-        lat = 10.2458,
-        lng = -67.5855,
-        isCurrentGps = false,
-        stateName = "Aragua",
-        cityName = "Maracay"
-    ),
+    val selectedCityName: String = "Villa de Cura",
+    val origin: LocationPoint = VenezuelaLocationDefaults.defaultOriginLocationPoint(),
     val destination: LocationPoint = LocationPoint(
-        title = "CC Parque Aragua",
-        subtitle = "Av. Bolívar Este, Maracay, Aragua",
-        lat = 10.2465,
-        lng = -67.5800,
+        title = "",
+        subtitle = "",
+        lat = 0.0,
+        lng = 0.0,
         stateName = "Aragua",
-        cityName = "Maracay"
+        cityName = "Villa de Cura"
     ),
     val routeDistanceKm: Double? = null,
     val showCitySelectorModal: Boolean = false,
@@ -292,33 +294,33 @@ data class LlegateUiState(
     val upcomingServices: List<UpcomingService> = listOf(
         UpcomingService(
             id = "vans",
-            title = "Vans Turísticas & Ejecutivas",
-            subtitle = "Playas de Ocumare, Choroní, Morrocoy o traslados corporativos",
-            description = "Unidades de 6 a 14 puestos equipadas para turismo hacia playas de Ocumare de la Costa, Choroní, Colonia Tovar, Morrocoy o traslados entre Maracay, Valencia y Caracas con asistencia en carretera.",
+            title = "Vans TurÃ­sticas & Ejecutivas",
+            subtitle = "Playas de Ocumare, ChoronÃ­, Morrocoy o traslados corporativos",
+            description = "Unidades de 6 a 14 puestos equipadas para turismo hacia playas de Ocumare de la Costa, ChoronÃ­, Colonia Tovar, Morrocoy o traslados entre Maracay, Valencia y Caracas con asistencia en carretera.",
             iconType = "van",
-            highlightPerk = "Turismo Costero Ocumare & Choroní"
+            highlightPerk = "Turismo Costero Ocumare & ChoronÃ­"
         ),
         UpcomingService(
             id = "buses",
-            title = "Autobús Interurbano Central & Frontera",
-            subtitle = "Rutas ARC: Maracay ↔ Valencia ↔ San Juan ↔ Caracas",
-            description = "Salidas programadas y boletos digitales para viajes de media y larga distancia por la Autopista Regional del Centro, conexión a los Llanos (Guárico) y cruce internacional hacia San Cristóbal / Cúcuta.",
+            title = "AutobÃºs Interurbano Central & Frontera",
+            subtitle = "Rutas ARC: Maracay â†” Valencia â†” San Juan â†” Caracas",
+            description = "Salidas programadas y boletos digitales para viajes de media y larga distancia por la Autopista Regional del Centro, conexiÃ³n a los Llanos (GuÃ¡rico) y cruce internacional hacia San CristÃ³bal / CÃºcuta.",
             iconType = "bus",
-            highlightPerk = "Maracay ↔ Valencia ↔ San Juan"
+            highlightPerk = "Maracay â†” Valencia â†” San Juan"
         ),
         UpcomingService(
             id = "encomiendas",
             title = "Encomiendas & Moto Express",
-            subtitle = "Envíos en menos de 45 min en Aragua y ciudades aliadas",
-            description = "Entrega rápida de comida, medicinas y documentos confidenciales en moto. Cobertura en Maracay, Cagua, Turmero, La Victoria y Valencia con cajón hermético impermeable de hasta 15 kg.",
+            subtitle = "EnvÃ­os en menos de 45 min en Aragua y ciudades aliadas",
+            description = "Entrega rÃ¡pida de comida, medicinas y documentos confidenciales en moto. Cobertura en Maracay, Cagua, Turmero, La Victoria y Valencia con cajÃ³n hermÃ©tico impermeable de hasta 15 kg.",
             iconType = "package",
-            highlightPerk = "Cajón térmico con aislamiento"
+            highlightPerk = "CajÃ³n tÃ©rmico con aislamiento"
         ),
         UpcomingService(
             id = "carga_repuestos",
             title = "Carga & Repuestos Automotrices",
             subtitle = "Zona Industrial Aragua-Carabobo y mudanzas express",
-            description = "Vehículos tipo pick-up y vans de carga para trasladar piezas de motor, repuestos automotrices de las zonas industriales de Maracay, Cagua y Valencia con guía de despacho rastreable.",
+            description = "VehÃ­culos tipo pick-up y vans de carga para trasladar piezas de motor, repuestos automotrices de las zonas industriales de Maracay, Cagua y Valencia con guÃ­a de despacho rastreable.",
             iconType = "truck",
             highlightPerk = "Eje Industrial Aragua-Carabobo"
         )
@@ -327,23 +329,23 @@ data class LlegateUiState(
         AutomotivePartner(
             name = "Bera Motors Maracay - Concesionario Central",
             category = "Agencia Central de Motos",
-            location = "Av. Bolívar Oeste, Maracay, Edo. Aragua",
-            benefit = "Bono $80 para conductores Llégate",
+            location = "Av. BolÃ­var Oeste, Maracay, Edo. Aragua",
+            benefit = "Bono $80 para conductores LlÃ©gate",
             description = "Financiamiento directo con entrega inmediata para conductores en Aragua. Incluye 3 cambios de aceite gratis en taller autorizado."
         ),
         AutomotivePartner(
             name = "Empire Keeway Motors Valencia & Maracay",
             category = "Agencia de Motos y Repuestos",
-            location = "Av. Bolívar Norte (Valencia) y Av. Los Cedros (Maracay)",
+            location = "Av. BolÃ­var Norte (Valencia) y Av. Los Cedros (Maracay)",
             benefit = "Tasa preferencial para flotas",
-            description = "Modelos de alta durabilidad para mototaxi y encomiendas en la ARC. Servicio técnico especializado y repuestos originales disponibles."
+            description = "Modelos de alta durabilidad para mototaxi y encomiendas en la ARC. Servicio tÃ©cnico especializado y repuestos originales disponibles."
         ),
         AutomotivePartner(
-            name = "Duncan Baterías Express Aragua",
-            category = "Centro de Distribución",
-            location = "Av. Constitución, Maracay (Instalación a domicilio)",
-            benefit = "20% OFF para miembros Llégate",
-            description = "Batería Duncan 800/1000 AMP con instalación a domicilio gratis en Maracay, Cagua y Turmero. Garantía nacional 18 meses."
+            name = "Duncan BaterÃ­as Express Aragua",
+            category = "Centro de DistribuciÃ³n",
+            location = "Av. ConstituciÃ³n, Maracay (InstalaciÃ³n a domicilio)",
+            benefit = "20% OFF para miembros LlÃ©gate",
+            description = "BaterÃ­a Duncan 800/1000 AMP con instalaciÃ³n a domicilio gratis en Maracay, Cagua y Turmero. GarantÃ­a nacional 18 meses."
         )
     ),
     val motoEstimate: PriceEstimate? = null,
@@ -386,6 +388,7 @@ data class LlegateUiState(
     val pagoEnCurso: Pago? = null,
     val enviandoRecarga: Boolean = false,
     val pasoInicio: PasoInicio = PasoInicio.DATOS,
+    val servicioConductor: ServicioConductor? = null,
     val telefono: String = "",
     val nombre: String = "",
     val codigo: String = "",
@@ -394,28 +397,45 @@ data class LlegateUiState(
     val enviandoCodigo: Boolean = false,
     val verificandoCodigo: Boolean = false,
     val reenvioEn: Int = 0,
-    /** Lo que `/auth/otp` contesta por qué canal salió el código; se lee en la pantalla. */
+    /** Lo que `/auth/otp` contesta por quÃ© canal saliÃ³ el cÃ³digo; se lee en la pantalla. */
     val mensajeCanal: String? = null,
-    /** `whatsapp`/`sms` = entregado; `log` = el envío falló y el aviso va en ámbar, no en verde. */
+    /** `whatsapp`/`sms` = entregado; `log` = el envÃ­o fallÃ³ y el aviso va en Ã¡mbar, no en verde. */
     val canalOtp: String? = null,
     /** El error del ingreso se muestra dentro de la hoja, no solo en el aviso flotante. */
     val avisoInicio: String? = null,
     val intentosInvalidos: Int = 0,
     val statusMessage: String? = null,
     val locationSuggestions: List<LocationSuggestion> = listOf(
-        LocationSuggestion("sug_1", "C.C. Las Américas", "Av. Las Delicias • Zona Comercial y Gastronómica", "Centro Comercial", 3.2, 7, 1.80, 10.2612, -67.5991, "🔥 Top Pana", "aragua", "Maracay"),
-        LocationSuggestion("sug_2", "C.C. Parque Aragua", "Av. Bolívar Este • Bancos e Hiper Jumbo", "Centro Comercial", 1.8, 4, 1.40, 10.2458, -67.5855, "📍 Más Cercano", "aragua", "Maracay"),
-        LocationSuggestion("sug_3", "Terminal Central de Maracay", "Av. Constitución • Rutas Urbanas e Interurbanas", "Terminal", 2.5, 6, 1.60, 10.2425, -67.5950, "🚌 Transporte", "aragua", "Maracay"),
-        LocationSuggestion("sug_4", "C.C. Los Aviadores", "Autopista Maracay-Palo Negro • Zona Mall", "Centro Comercial", 6.8, 12, 2.80, 10.1865, -67.5620, "🛡️ Punto Seguro", "aragua", "Palo Negro"),
-        LocationSuggestion("sug_5", "Plaza Bolívar de Maracay", "Teatro de la Ópera y Casco Histórico", "Punto Seguro", 2.1, 5, 1.50, 10.2480, -67.6000, "🏛️ Casco Histórico", "aragua", "Maracay"),
-        LocationSuggestion("sug_6", "Parque Las Ballenas", "Av. Sucre • Food Trucks y Deporte", "Gastronomía", 4.0, 8, 2.00, 10.2580, -67.5850, "🍔 Panas & Food", "aragua", "Maracay"),
-        LocationSuggestion("sug_7", "Hospital Central de Maracay", "Calle José María Vargas • Guardia 24h", "Salud", 2.9, 6, 1.70, 10.2540, -67.6040, "🏥 Urgencias", "aragua", "Maracay"),
-        LocationSuggestion("sug_8", "C.C. Sambil Valencia", "Naguanagua • Autopista del Este", "Centro Comercial", 4.5, 9, 2.20, 10.2580, -67.9950, "🔥 Top Carabobo", "carabobo", "Naguanagua"),
-        LocationSuggestion("sug_9", "Terminal Big Low Center", "San Diego • Salidas nacionales y buses", "Terminal", 5.2, 10, 2.40, 10.2100, -67.9600, "🚌 Terminal", "carabobo", "Valencia"),
-        LocationSuggestion("sug_10", "Sambil Chacao", "Av. Libertador • Metro Chacao", "Centro Comercial", 3.0, 8, 2.00, 10.4905, -66.8601, "🔥 Top Capital", "capital", "Chacao")
+        LocationSuggestion("sug_1", "C.C. Las AmÃ©ricas", "Av. Las Delicias â€¢ Zona Comercial y GastronÃ³mica", "Centro Comercial", 3.2, 7, 1.80, 10.2612, -67.5991, "ðŸ”¥ Top Pana", "aragua", "Maracay"),
+        LocationSuggestion("sug_2", "C.C. Parque Aragua", "Av. BolÃ­var Este â€¢ Bancos e Hiper Jumbo", "Centro Comercial", 1.8, 4, 1.40, 10.2458, -67.5855, "ðŸ“ MÃ¡s Cercano", "aragua", "Maracay"),
+        LocationSuggestion("sug_3", "Terminal Central de Maracay", "Av. ConstituciÃ³n â€¢ Rutas Urbanas e Interurbanas", "Terminal", 2.5, 6, 1.60, 10.2425, -67.5950, "ðŸšŒ Transporte", "aragua", "Maracay"),
+        LocationSuggestion("sug_4", "C.C. Los Aviadores", "Autopista Maracay-Palo Negro â€¢ Zona Mall", "Centro Comercial", 6.8, 12, 2.80, 10.1865, -67.5620, "ðŸ›¡ï¸ Punto Seguro", "aragua", "Palo Negro"),
+        LocationSuggestion("sug_5", "Plaza BolÃ­var de Maracay", "Teatro de la Ã“pera y Casco HistÃ³rico", "Punto Seguro", 2.1, 5, 1.50, 10.2480, -67.6000, "ðŸ›ï¸ Casco HistÃ³rico", "aragua", "Maracay"),
+        LocationSuggestion("sug_6", "Parque Las Ballenas", "Av. Sucre â€¢ Food Trucks y Deporte", "GastronomÃ­a", 4.0, 8, 2.00, 10.2580, -67.5850, "ðŸ” Panas & Food", "aragua", "Maracay"),
+        LocationSuggestion("sug_7", "Hospital Central de Maracay", "Calle JosÃ© MarÃ­a Vargas â€¢ Guardia 24h", "Salud", 2.9, 6, 1.70, 10.2540, -67.6040, "ðŸ¥ Urgencias", "aragua", "Maracay"),
+        LocationSuggestion("sug_8", "C.C. Sambil Valencia", "Naguanagua â€¢ Autopista del Este", "Centro Comercial", 4.5, 9, 2.20, 10.2580, -67.9950, "ðŸ”¥ Top Carabobo", "carabobo", "Naguanagua"),
+        LocationSuggestion("sug_9", "Terminal Big Low Center", "San Diego â€¢ Salidas nacionales y buses", "Terminal", 5.2, 10, 2.40, 10.2100, -67.9600, "ðŸšŒ Terminal", "carabobo", "Valencia"),
+        LocationSuggestion("sug_10", "Sambil Chacao", "Av. Libertador â€¢ Metro Chacao", "Centro Comercial", 3.0, 8, 2.00, 10.4905, -66.8601, "ðŸ”¥ Top Capital", "capital", "Chacao")
     ),
     val showFullMapExpanded: Boolean = false,
 ) {
+    val selectedVehicleCategory: VehicleCategory?
+        get() = VEHICLE_CATEGORIES.firstOrNull { it.id == selectedVehicleCategoryId }
+
+    val selectedEstimate: PriceEstimate?
+        get() {
+            val estimate = when (selectedService) {
+                ServiceType.MOTO -> motoEstimate
+                ServiceType.CAR -> carEstimate
+                ServiceType.DELIVERY -> deliveryEstimate
+            } ?: return null
+            val category = selectedVehicleCategory
+                ?.takeIf { selectedService != ServiceType.DELIVERY }
+                ?: return estimate
+            val priceBs = (category.priceUsd * bcvExchangeRate * 100).roundToInt() / 100.0
+            return estimate.copy(priceUsd = category.priceUsd, priceBs = priceBs)
+        }
+
     val currentState: StateRegion
         get() = availableStates.firstOrNull { it.id == selectedStateId } ?: availableStates[0]
 
@@ -425,7 +445,21 @@ data class LlegateUiState(
             ?: CityInfo(selectedCityName, currentState.name, currentState.popularPoints)
 
     val currentPopularLocations: List<LocationPoint>
-        get() = currentCity.points.ifEmpty { currentState.popularPoints }
+        get() {
+            val cityLocations = currentCity.points.ifEmpty { currentState.popularPoints }
+            if (selectedStateId != "aragua") return cityLocations
+            val localPlaces = VenezuelaLocationDefaults.ARAGUA_PLACES.map { it.toLocationPoint() }
+            val localPlacesByTitle = localPlaces.associateBy { it.title.trim().lowercase() }
+            val cityTitleKeys = cityLocations.map { it.title.trim().lowercase() }.toSet()
+            val cityLocationsWithLocalCoordinates = cityLocations.map { location ->
+                localPlacesByTitle[location.title.trim().lowercase()] ?: location
+            }
+            val additionalLocalPlaces = localPlaces.filterNot {
+                it.title.trim().lowercase() in cityTitleKeys
+            }
+            return (cityLocationsWithLocalCoordinates + additionalLocalPlaces)
+                .distinctBy { it.title.trim().lowercase() }
+        }
 
     val currentSuggestions: List<LocationSuggestion>
         get() = locationSuggestions.filter { it.stateId.equals(selectedStateId, ignoreCase = true) }
@@ -434,29 +468,106 @@ data class LlegateUiState(
     val currentSafeMeetingPoints: List<SafeMeetingPoint>
         get() = when (selectedStateId) {
             "capital" -> listOf(
-                SafeMeetingPoint("smp_cap_1", "Obelisco de Plaza Francia", "Bien iluminado · 20 m", "20 m", 10.4960, -66.8524),
-                SafeMeetingPoint("smp_cap_2", "Salida Metro Altamira", "Zona concurrida · 60 m", "60 m", 10.4972, -66.8530),
-                SafeMeetingPoint("smp_cap_3", "Esquina C.C. San Ignacio", "Fácil acceso vehicular · 120 m", "120 m", 10.4942, -66.8568),
-                SafeMeetingPoint("smp_cap_4", "Torre La Previsora (Plaza Vzla)", "Punto seguro y concurrido · 45 m", "45 m", 10.4969, -66.8837)
+                SafeMeetingPoint("smp_cap_1", "Obelisco de Plaza Francia", "Bien iluminado Â· 20 m", "20 m", 10.4960, -66.8524),
+                SafeMeetingPoint("smp_cap_2", "Salida Metro Altamira", "Zona concurrida Â· 60 m", "60 m", 10.4972, -66.8530),
+                SafeMeetingPoint("smp_cap_3", "Esquina C.C. San Ignacio", "FÃ¡cil acceso vehicular Â· 120 m", "120 m", 10.4942, -66.8568),
+                SafeMeetingPoint("smp_cap_4", "Torre La Previsora (Plaza Vzla)", "Punto seguro y concurrido Â· 45 m", "45 m", 10.4969, -66.8837)
             )
             "carabobo" -> listOf(
-                SafeMeetingPoint("smp_car_1", "Entrada Sambil Valencia", "Vigilancia y bahía de taxis · 25 m", "25 m", 10.2580, -67.9950),
-                SafeMeetingPoint("smp_car_2", "Metro Francisco de Miranda (Cedeño)", "Bien iluminado · 50 m", "50 m", 10.1820, -68.0010),
-                SafeMeetingPoint("smp_car_3", "Redoma de Guaparo", "Punto concurrido y seguro · 70 m", "70 m", 10.2240, -68.0060)
+                SafeMeetingPoint("smp_car_1", "Entrada Sambil Valencia", "Vigilancia y bahÃ­a de taxis Â· 25 m", "25 m", 10.2580, -67.9950),
+                SafeMeetingPoint("smp_car_2", "Metro Francisco de Miranda (CedeÃ±o)", "Bien iluminado Â· 50 m", "50 m", 10.1820, -68.0010),
+                SafeMeetingPoint("smp_car_3", "Redoma de Guaparo", "Punto concurrido y seguro Â· 70 m", "70 m", 10.2240, -68.0060)
             )
             "guarico" -> listOf(
-                SafeMeetingPoint("smp_gua_1", "Plaza Bolívar San Juan", "Zona concurrida y alumbrada · 30 m", "30 m", 9.9110, -67.3540),
-                SafeMeetingPoint("smp_gua_2", "Redoma El Hambre San Juan", "Fácil parada vehicular · 60 m", "60 m", 9.9050, -67.3610)
+                SafeMeetingPoint("smp_gua_1", "Plaza BolÃ­var San Juan", "Zona concurrida y alumbrada Â· 30 m", "30 m", 9.9110, -67.3540),
+                SafeMeetingPoint("smp_gua_2", "Redoma El Hambre San Juan", "FÃ¡cil parada vehicular Â· 60 m", "60 m", 9.9050, -67.3610)
             )
             else -> listOf(
-                SafeMeetingPoint("smp_ara_1", "Entrada Principal Parque Aragua", "Bien iluminado · 20 m", "20 m", 10.2458, -67.5855),
-                SafeMeetingPoint("smp_ara_2", "Parada TransAragua Av. Bolívar", "Zona concurrida · 45 m", "45 m", 10.2465, -67.5870),
-                SafeMeetingPoint("smp_ara_3", "Plaza Bolívar de Maracay", "Patrullaje y alumbrado led · 30 m", "30 m", 10.2480, -67.6000),
-                SafeMeetingPoint("smp_ara_4", "Boulevard Las Delicias (CC Américas)", "Fácil acceso vehicular · 60 m", "60 m", 10.2612, -67.5991)
+                SafeMeetingPoint("smp_ara_1", "Entrada Principal Parque Aragua", "Bien iluminado Â· 20 m", "20 m", 10.2458, -67.5855),
+                SafeMeetingPoint("smp_ara_2", "Parada TransAragua Av. BolÃ­var", "Zona concurrida Â· 45 m", "45 m", 10.2465, -67.5870),
+                SafeMeetingPoint("smp_ara_3", "Plaza BolÃ­var de Maracay", "Patrullaje y alumbrado led Â· 30 m", "30 m", 10.2480, -67.6000),
+                SafeMeetingPoint("smp_ara_4", "Boulevard Las Delicias (CC AmÃ©ricas)", "FÃ¡cil acceso vehicular Â· 60 m", "60 m", 10.2612, -67.5991)
             )
         }
 }
 
+
+/**
+ * Valores predeterminados de ubicación para Venezuela (Villa de Cura, Aragua)
+ * y catálogo local de sitios para búsqueda instantánea.
+ */
+object VenezuelaLocationDefaults {
+    val DEFAULT_ORIGIN = Point.fromLngLat(-67.4894, 10.0386)
+    const val DEFAULT_ORIGIN_LABEL = "Villa de Cura, Aragua"
+
+    fun defaultOriginLocationPoint() = LocationPoint(
+        title = DEFAULT_ORIGIN_LABEL,
+        subtitle = DEFAULT_ORIGIN_LABEL,
+        lat = DEFAULT_ORIGIN.latitude(),
+        lng = DEFAULT_ORIGIN.longitude(),
+        stateName = "Aragua",
+        cityName = "Villa de Cura"
+    )
+
+    data class LocalPlace(
+        val name: String,
+        val address: String,
+        val point: Point,
+        val cityName: String
+    ) {
+        fun toLocationPoint() = LocationPoint(
+            title = name,
+            subtitle = address,
+            lat = point.latitude(),
+            lng = point.longitude(),
+            stateName = "Aragua",
+            cityName = cityName
+        )
+    }
+
+    val ARAGUA_PLACES = listOf(
+        LocalPlace(
+            "Plaza Bolívar Villa de Cura", "Centro, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4889, 10.0392), "Villa de Cura"
+        ),
+        LocalPlace(
+            "Frigorífico El Avión", "Av. Bolívar, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4852, 10.0415), "Villa de Cura"
+        ),
+        LocalPlace(
+            "Panadería El Búcaro", "Calle Comercio, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4910, 10.0378), "Villa de Cura"
+        ),
+        LocalPlace(
+            "Hospital Dr. José Rangel", "Av. Sucre, Villa de Cura, Aragua",
+            Point.fromLngLat(-67.4925, 10.0401), "Villa de Cura"
+        ),
+        LocalPlace(
+            "CC Parque Aragua", "Av. Bolívar Este, Maracay, Aragua",
+            Point.fromLngLat(-67.5908, 10.2469), "Maracay"
+        ),
+        LocalPlace(
+            "CC Las Américas", "Av. Las Delicias, Maracay, Aragua",
+            Point.fromLngLat(-67.5786, 10.2736), "Maracay"
+        ),
+        LocalPlace(
+            "Terminal de Maracay", "Av. Constitución, Maracay, Aragua",
+            Point.fromLngLat(-67.5961, 10.2412), "Maracay"
+        )
+    )
+
+    fun sanitizeGpsPoint(lat: Double, lng: Double): Point {
+        val isEmulatorDefault = (lat in 37.3..37.5) && (lng in -122.2..-121.9)
+        val isInvalid = !lat.isFinite() || !lng.isFinite() ||
+            lat !in -90.0..90.0 || lng !in -180.0..180.0 ||
+            (lat == 0.0 && lng == 0.0)
+        return if (isEmulatorDefault || isInvalid) {
+            DEFAULT_ORIGIN
+        } else {
+            Point.fromLngLat(lng, lat)
+        }
+    }
+}
 class LlegateViewModel(
     private val auth: AuthRepository,
     private val configRepo: ConfigRepository = ConfigRepository(),
@@ -464,7 +575,8 @@ class LlegateViewModel(
     private val pagoRepo: PagoRepository = PagoRepository(auth.http),
     private val tripRepo: TripRepository = TripRepository(auth.http),
     private val scheduledRideRepo: ScheduledRideRepository = ScheduledRideRepository(auth.http),
-    private val favoriteRepo: FavoriteRepository = FavoriteRepository(auth.http)
+    private val favoriteRepo: FavoriteRepository = FavoriteRepository(auth.http),
+    private val driverRepo: DriverRepository = DriverRepository(auth.http)
 ) : ViewModel() {
 
     private val bcvRateService = BcvRateService()
@@ -516,19 +628,27 @@ class LlegateViewModel(
     }
 
     fun onTelefono(valor: String) {
-        _uiState.update { it.copy(telefono = valor) }
+        _uiState.update { it.copy(telefono = valor, avisoInicio = null, statusMessage = null) }
     }
 
     fun onNombre(valor: String) {
-        _uiState.update { it.copy(nombre = valor) }
+        _uiState.update { it.copy(nombre = valor, avisoInicio = null, statusMessage = null) }
+    }
+
+    fun seleccionarServicioConductor(servicio: ServicioConductor) {
+        _uiState.update { it.copy(servicioConductor = servicio, avisoInicio = null, statusMessage = null) }
+    }
+
+    fun continuarComoPasajero() {
+        _uiState.update { it.copy(servicioConductor = null, avisoInicio = null, statusMessage = null) }
     }
 
     fun onCodigo(valor: String) {
-        _uiState.update { it.copy(codigo = valor.filter(Char::isDigit).take(6), avisoInicio = null) }
+        _uiState.update { it.copy(codigo = valor.filter(Char::isDigit).take(6), avisoInicio = null, statusMessage = null) }
     }
 
     fun setAceptaTerminos(valor: Boolean) {
-        _uiState.update { it.copy(aceptaTerminos = valor, avisoInicio = null) }
+        _uiState.update { it.copy(aceptaTerminos = valor, avisoInicio = null, statusMessage = null) }
     }
 
     fun volverAEditarTelefono() {
@@ -552,15 +672,20 @@ class LlegateViewModel(
         val state = _uiState.value
         val e164 = aE164Venezuela(state.telefono)
         when {
-            e164 == null -> avisarInicio("Escribe un número venezolano, por ejemplo 0414 1234567.")
+            e164 == null -> avisarInicio("Escribe un nÃºmero venezolano, por ejemplo 0414 1234567.")
             state.nombre.isNotBlank() && !esNombrePersona(state.nombre) ->
-                avisarInicio("Escribe tu nombre y apellido como aparecen en tu cédula.")
+                avisarInicio("Escribe tu nombre y apellido como aparecen en tu cÃ©dula.")
             !state.aceptaTerminos ->
-                avisarInicio("Debes aceptar los términos para usar Llégate.")
+                avisarInicio("Debes aceptar los tÃ©rminos para usar LlÃ©gate.")
             else -> viewModelScope.launch {
                 _uiState.update { it.copy(enviandoCodigo = true, avisoInicio = null) }
                 try {
-                    val envio = auth.pedirCodigo(e164, nombre = state.nombre.trim().ifBlank { null })
+                    val rol = if (state.servicioConductor != null) "conductor" else "cliente"
+                    val envio = auth.pedirCodigo(
+                        e164,
+                        rol = rol,
+                        nombre = state.nombre.trim().ifBlank { null }
+                    )
                     _uiState.update {
                         it.copy(
                             pasoInicio = PasoInicio.CODIGO,
@@ -589,8 +714,8 @@ class LlegateViewModel(
         val state = _uiState.value
         val e164 = aE164Venezuela(state.telefono)
         when {
-            e164 == null -> avisarInicio("Escribe un número venezolano, por ejemplo 0414 1234567.")
-            state.codigo.length != 6 -> avisarInicio("El código tiene 6 dígitos.")
+            e164 == null -> avisarInicio("Escribe un nÃºmero venezolano, por ejemplo 0414 1234567.")
+            state.codigo.length != 6 -> avisarInicio("El cÃ³digo tiene 6 dÃ­gitos.")
             else -> viewModelScope.launch {
                 _uiState.update { it.copy(verificandoCodigo = true, avisoInicio = null) }
                 try {
@@ -601,10 +726,11 @@ class LlegateViewModel(
                             cuenta = perfil,
                             revisandoSesion = false,
                             pasoInicio = PasoInicio.DATOS,
+                            servicioConductor = null,
                             codigo = "",
                             avisoInicio = null,
                             mensajeCanal = null, canalOtp = null,
-                            statusMessage = "Listo, ${perfil.nombre?.substringBefore(' ') ?: "pana"}. Tu cuenta está activa."
+                            statusMessage = "Listo, ${perfil.nombre?.substringBefore(' ') ?: "pana"}. Tu cuenta estÃ¡ activa."
                         )
                     }
                     refrescarBilletera(silencioso = true)
@@ -650,10 +776,15 @@ class LlegateViewModel(
                     nombre = "",
                     avisoInicio = null,
                     mensajeCanal = null, canalOtp = null,
-                    statusMessage = "Sesión cerrada."
+                    statusMessage = "SesiÃ³n cerrada."
                 )
             }
+
         }
+    }
+
+    suspend fun registrarPerfilConductor(datos: Map<String, String>) {
+        driverRepo.registrarPerfil(datos)
     }
 
     // BILLETERA Y RECARGAS: /wallet y /payments, el mismo saldo que ve la web
@@ -690,7 +821,7 @@ class LlegateViewModel(
 
     /**
      * El historial y el viaje abierto salen de `/trips`. Si la llamada falla se queda
-     * con lo que ya tenía: un problema leyendo viajes no puede tapar el saldo.
+     * con lo que ya tenÃ­a: un problema leyendo viajes no puede tapar el saldo.
      */
     private suspend fun refrescarViajes() {
         if (!auth.tieneSesion) return
@@ -729,11 +860,7 @@ class LlegateViewModel(
             avisar("Entra a tu cuenta para programar un viaje.")
             return
         }
-        val estimate = when (state.selectedService) {
-            ServiceType.MOTO -> state.motoEstimate
-            ServiceType.CAR -> state.carEstimate
-            ServiceType.DELIVERY -> state.deliveryEstimate
-        }
+        val estimate = state.selectedEstimate
         if (estimate == null) {
             avisar("Toca un origen y un destino para conocer la tarifa.")
             return
@@ -790,8 +917,8 @@ class LlegateViewModel(
     }
 
     /**
-     * Si la app se cerró a mitad de un viaje, `/trips` todavía lo tiene abierto: se
-     * reconstruye la pantalla con los datos del servidor y se sigue preguntando por él.
+     * Si la app se cerrÃ³ a mitad de un viaje, `/trips` todavÃ­a lo tiene abierto: se
+     * reconstruye la pantalla con los datos del servidor y se sigue preguntando por Ã©l.
      * Solo salta a la carrera si el pana estaba en su casa, no a mitad de una reserva.
      */
     private fun reanudarViajeAbierto(viajes: List<Viaje>) {
@@ -853,7 +980,7 @@ class LlegateViewModel(
         _uiState.update { it.copy(recargaReferencia = digitos(valor).take(12)) }
     }
 
-    /** Crea la intención de pago real; Pago Móvil muestra los datos del comercio. */
+    /** Crea la intenciÃ³n de pago real; Pago MÃ³vil muestra los datos del comercio. */
     fun iniciarRecarga() {
         val state = _uiState.value
         if (state.enviandoRecarga) return
@@ -876,7 +1003,7 @@ class LlegateViewModel(
         }
     }
 
-    /** El pana ya pagó en su banco: pasamos a que escriba la referencia. */
+    /** El pana ya pagÃ³ en su banco: pasamos a que escriba la referencia. */
     fun irAReportarRecarga() {
         _uiState.update { it.copy(pasoRecarga = PasoRecarga.REPORTAR) }
     }
@@ -890,7 +1017,7 @@ class LlegateViewModel(
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (_: Exception) {
-            avisar("No pudimos abrir el pago de Binance Pay en este teléfono.")
+            avisar("No pudimos abrir el pago de Binance Pay en este telÃ©fono.")
         }
     }
 
@@ -899,7 +1026,7 @@ class LlegateViewModel(
         val state = _uiState.value
         val pago = state.pagoEnCurso ?: return
         if (!esReferenciaPagoMovil(state.recargaReferencia)) {
-            avisar("La referencia del Pago Móvil son 6 a 12 dígitos, sin espacios.")
+            avisar("La referencia del Pago MÃ³vil son 6 a 12 dÃ­gitos, sin espacios.")
             return
         }
         if (state.enviandoRecarga) return
@@ -917,7 +1044,7 @@ class LlegateViewModel(
                         showRecargaModal = false,
                         showCuentaModal = it.cuenta != null,
                         statusMessage = "Recarga de ${usd(pago.montoUsd)} reportada. " +
-                            "Queda en revisión y entra al saldo en unos $minutos minutos."
+                            "Queda en revisiÃ³n y entra al saldo en unos $minutos minutos."
                     )
                 }
             } catch (fallo: Exception) {
@@ -928,7 +1055,7 @@ class LlegateViewModel(
         }
     }
 
-    /** Deja sin efecto una intención pendiente para no dejar pagos colgando. */
+    /** Deja sin efecto una intenciÃ³n pendiente para no dejar pagos colgando. */
     fun descartarRecarga() {
         val pago = _uiState.value.pagoEnCurso ?: return
         viewModelScope.launch {
@@ -965,15 +1092,23 @@ class LlegateViewModel(
     companion object {
         const val SEGUNDOS_REENVIO = 30
 
-        /** Cada cuánto se le pregunta al servidor por el viaje abierto. */
+        /** Cada cuÃ¡nto se le pregunta al servidor por el viaje abierto. */
         const val MS_SEGUIMIENTO_VIAJE = 5_000L
-        const val FALLA_GENERICO = "No pudimos comunicarte con Llégate. Intenta de nuevo."
+        const val FALLA_GENERICO = "No pudimos comunicarte con LlÃ©gate. Intenta de nuevo."
     }
 
     fun selectState(stateId: String) {
         val state = _uiState.value.availableStates.firstOrNull { it.id == stateId } ?: return
-        val defaultCity = state.cities.firstOrNull()?.name ?: state.citiesAndTowns.firstOrNull() ?: "Centro"
-        val newDefaultOrigin = state.popularPoints.firstOrNull() ?: _uiState.value.origin
+        val defaultCity = if (state.id == "aragua") {
+            "Villa de Cura"
+        } else {
+            state.cities.firstOrNull()?.name ?: state.citiesAndTowns.firstOrNull() ?: "Centro"
+        }
+        val newDefaultOrigin = if (state.id == "aragua") {
+            VenezuelaLocationDefaults.defaultOriginLocationPoint()
+        } else {
+            state.popularPoints.firstOrNull() ?: _uiState.value.origin
+        }
         val newDefaultDest = state.popularPoints.getOrNull(1) ?: state.popularPoints.firstOrNull() ?: _uiState.value.destination
 
         _uiState.update {
@@ -984,7 +1119,7 @@ class LlegateViewModel(
                 destination = newDefaultDest,
                 routeDistanceKm = null,
                 showStateSelectorModal = false,
-                statusMessage = "Región: ${state.name} • ${defaultCity}"
+                statusMessage = "RegiÃ³n: ${state.name} â€¢ ${defaultCity}"
             )
         }
         recalculateEstimates()
@@ -1051,7 +1186,7 @@ class LlegateViewModel(
 
     fun guardarDireccionFavorita(etiqueta: String, punto: LocationPoint) {
         if (etiqueta.isBlank() || !punto.tieneCoordenadas) {
-            avisar("Elige una etiqueta y una ubicación con coordenadas.")
+            avisar("Elige una etiqueta y una ubicaciÃ³n con coordenadas.")
             return
         }
         viewModelScope.launch {
@@ -1063,7 +1198,7 @@ class LlegateViewModel(
                         favoriteAddresses = (state.favoriteAddresses.filterNot {
                             it.label.equals(saved.label, ignoreCase = true)
                         } + saved).sortedBy { it.label.lowercase() },
-                        statusMessage = "Dirección ${saved.label} guardada."
+                        statusMessage = "DirecciÃ³n ${saved.label} guardada."
                     )
                 }
             } catch (fallo: Exception) {
@@ -1083,7 +1218,7 @@ class LlegateViewModel(
                 _uiState.update { state ->
                     state.copy(
                         favoriteAddresses = state.favoriteAddresses.filterNot { it.id == id },
-                        statusMessage = "Dirección favorita eliminada."
+                        statusMessage = "DirecciÃ³n favorita eliminada."
                     )
                 }
             } catch (fallo: Exception) {
@@ -1127,7 +1262,7 @@ class LlegateViewModel(
 
     fun compartirCodigoReferido(context: Context) {
         val code = _uiState.value.referralSummary?.code ?: return
-        val texto = "¡Épanale! Únete a Llégate con mi código $code y llévate saldo para tus carreras en Maracay y la ARC 🚗💨"
+        val texto = "Â¡Ã‰panale! Ãšnete a LlÃ©gate con mi cÃ³digo $code y llÃ©vate saldo para tus carreras en Maracay y la ARC ðŸš—ðŸ’¨"
         val whatsapp = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, texto)
@@ -1140,16 +1275,16 @@ class LlegateViewModel(
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, texto)
             }
-            abrir(context, Intent.createChooser(compartir, "Compartir código de Llégate"))
+            abrir(context, Intent.createChooser(compartir, "Compartir cÃ³digo de LlÃ©gate"))
         } catch (_: SecurityException) {
-            avisar("No pudimos abrir WhatsApp. Inténtalo desde el menú de compartir.")
+            avisar("No pudimos abrir WhatsApp. IntÃ©ntalo desde el menÃº de compartir.")
         }
     }
 
     fun aplicarCodigoReferido() {
         val code = _uiState.value.referralCodeInput.trim()
         if (code.isBlank()) {
-            avisar("Escribe el código de tu pana.")
+            avisar("Escribe el cÃ³digo de tu pana.")
             return
         }
         viewModelScope.launch {
@@ -1157,7 +1292,7 @@ class LlegateViewModel(
             try {
                 favoriteRepo.applyReferral(code)
                 _uiState.update {
-                    it.copy(referralCodeInput = "", statusMessage = "Código aplicado. El bono se acredita al completar tu primera carrera válida.")
+                    it.copy(referralCodeInput = "", statusMessage = "CÃ³digo aplicado. El bono se acredita al completar tu primera carrera vÃ¡lida.")
                 }
             } catch (fallo: Exception) {
                 if (fallo is CancellationException) throw fallo
@@ -1211,7 +1346,15 @@ class LlegateViewModel(
         _uiState.update { it.copy(selectedService = serviceType) }
     }
 
+    fun selectVehicleCategory(category: VehicleCategory) {
+        _uiState.update { it.copy(selectedVehicleCategoryId = category.id) }
+    }
+
     fun openBooking(serviceType: ServiceType? = null) {
+        if (!_uiState.value.destination.tieneCoordenadas) {
+            avisar("Elige un destino para continuar.")
+            return
+        }
         if (serviceType != null) {
             _uiState.update { it.copy(selectedService = serviceType) }
         }
@@ -1233,13 +1376,31 @@ class LlegateViewModel(
         recalculateEstimates()
     }
 
+    fun clearDestination() {
+        val state = _uiState.value
+        _uiState.update {
+            it.copy(
+                destination = LocationPoint(
+                    title = "",
+                    subtitle = "",
+                    lat = 0.0,
+                    lng = 0.0,
+                    stateName = state.currentState.name,
+                    cityName = state.selectedCityName
+                ),
+                routeDistanceKm = null
+            )
+        }
+        recalculateEstimates()
+    }
+
     fun updateDestinationFromMap(context: Context, lat: Double, lng: Double) {
         if (!lat.isFinite() || !lng.isFinite() || lat !in -90.0..90.0 || lng !in -180.0..180.0) return
         val state = _uiState.value
         updateDestination(
             LocationPoint(
-                title = "Destino en el mapa",
-                subtitle = String.format(Locale.US, "%.5f, %.5f", lat, lng),
+                title = "Buscando direcciÃ³nâ€¦",
+                subtitle = "${state.selectedCityName}, ${state.currentState.name}",
                 lat = lat,
                 lng = lng,
                 stateName = state.currentState.name,
@@ -1257,14 +1418,14 @@ class LlegateViewModel(
                 null
             } ?: return@launch
             val title = address.thoroughfare
-                ?: address.featureName
+                ?: address.premises
                 ?: address.subLocality
                 ?: address.locality
-                ?: return@launch
+                ?: "Punto seleccionado"
             val subtitle = listOfNotNull(address.subLocality ?: address.locality, address.adminArea)
                 .distinct()
                 .joinToString(", ")
-                .ifBlank { String.format(Locale.US, "%.5f, %.5f", lat, lng) }
+                .ifBlank { "${state.selectedCityName}, ${state.currentState.name}" }
             _uiState.update { current ->
                 if (kotlin.math.abs(current.destination.lat - lat) > 0.000001 ||
                     kotlin.math.abs(current.destination.lng - lng) > 0.000001
@@ -1304,12 +1465,12 @@ class LlegateViewModel(
         _uiState.update { it.copy(showCancelDialog = show) }
     }
 
-    /** El piloto terminó en el servidor: se suelta la pantalla y el historial se recarga solo. */
-    fun cerrarViaje() = limpiarViaje("¡Carrera terminada! Ya está en tu historial.")
+    /** El piloto terminÃ³ en el servidor: se suelta la pantalla y el historial se recarga solo. */
+    fun cerrarViaje() = limpiarViaje("Â¡Carrera terminada! Ya estÃ¡ en tu historial.")
 
     /**
-     * Cancelar también es una llamada. Si el servidor la rechaza —el piloto ya arrancó el
-     * viaje, por ejemplo— la carrera sigue abierta y el motivo se muestra tal cual.
+     * Cancelar tambiÃ©n es una llamada. Si el servidor la rechaza â€”el piloto ya arrancÃ³ el
+     * viaje, por ejemploâ€” la carrera sigue abierta y el motivo se muestra tal cual.
      */
     fun cancelarViaje(motivo: String) {
         val id = _uiState.value.activeTrip?.viajeId
@@ -1359,7 +1520,7 @@ class LlegateViewModel(
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
         if (!hasFineLocation && !hasCoarseLocation) {
-            avisar("Permite el acceso a tu ubicación para usar el GPS.")
+            avisar("Permite el acceso a tu ubicaciÃ³n para usar el GPS.")
             return
         }
 
@@ -1373,17 +1534,24 @@ class LlegateViewModel(
                         _uiState.update {
                             it.copy(
                                 isFetchingGps = false,
-                                statusMessage = "No se pudo obtener tu ubicación actual. Comprueba el GPS e inténtalo otra vez."
+                                statusMessage = "No se pudo obtener tu ubicaciÃ³n actual. Comprueba el GPS e intÃ©ntalo otra vez."
                             )
                         }
                         return@addOnSuccessListener
                     }
 
                     viewModelScope.launch {
+                        val sanitizedPoint = VenezuelaLocationDefaults.sanitizeGpsPoint(
+                            location.latitude,
+                            location.longitude
+                        )
+                        val latitude = sanitizedPoint.latitude()
+                        val longitude = sanitizedPoint.longitude()
+                        val gpsWasSanitized = latitude != location.latitude || longitude != location.longitude
                         val address = try {
                             withContext(Dispatchers.IO) {
                                 Geocoder(context, Locale.getDefault())
-                                    .getFromLocation(location.latitude, location.longitude, 1)
+                                    .getFromLocation(latitude, longitude, 1)
                                     ?.firstOrNull()
                             }
                         } catch (_: Exception) {
@@ -1393,25 +1561,29 @@ class LlegateViewModel(
                         val point = LocationPoint(
                             title = address?.thoroughfare
                                 ?: address?.featureName
-                                ?: "Mi ubicación actual",
+                                ?: if (gpsWasSanitized) VenezuelaLocationDefaults.DEFAULT_ORIGIN_LABEL else "Mi ubicaciÃ³n actual",
                             subtitle = listOfNotNull(
                                 address?.subLocality ?: address?.locality,
                                 address?.adminArea
                             ).joinToString(", ").ifBlank {
-                                String.format(Locale.US, "%.5f, %.5f", location.latitude, location.longitude)
+                                if (gpsWasSanitized) {
+                                    VenezuelaLocationDefaults.DEFAULT_ORIGIN_LABEL
+                                } else {
+                                    String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
+                                }
                             },
-                            lat = location.latitude,
-                            lng = location.longitude,
+                            lat = latitude,
+                            lng = longitude,
                             isCurrentGps = true,
-                            stateName = address?.adminArea ?: state.currentState.name,
-                            cityName = address?.locality ?: state.selectedCityName
+                            stateName = if (gpsWasSanitized) "Aragua" else address?.adminArea ?: state.currentState.name,
+                            cityName = if (gpsWasSanitized) "Villa de Cura" else address?.locality ?: state.selectedCityName
                         )
                         _uiState.update {
                             it.copy(
                                 origin = point,
                                 isFetchingGps = false,
                                 routeDistanceKm = null,
-                                statusMessage = "Ubicación GPS actualizada."
+                                statusMessage = "UbicaciÃ³n GPS actualizada."
                             )
                         }
                         recalculateEstimates()
@@ -1423,13 +1595,13 @@ class LlegateViewModel(
                         it.copy(
                             isFetchingGps = false,
                             statusMessage = failure.localizedMessage
-                                ?: "No pudimos obtener tu ubicación GPS."
+                                ?: "No pudimos obtener tu ubicaciÃ³n GPS."
                         )
                     }
             }
         } catch (failure: SecurityException) {
             _uiState.update {
-                it.copy(isFetchingGps = false, statusMessage = "Permite el acceso a tu ubicación para usar el GPS.")
+                it.copy(isFetchingGps = false, statusMessage = "Permite el acceso a tu ubicaciÃ³n para usar el GPS.")
             }
         }
     }
@@ -1442,6 +1614,17 @@ class LlegateViewModel(
 
     private fun recalculateEstimates() {
         val state = _uiState.value
+        if (!state.destination.tieneCoordenadas) {
+            _uiState.update {
+                it.copy(
+                    routeDistanceKm = null,
+                    motoEstimate = null,
+                    carEstimate = null,
+                    deliveryEstimate = null
+                )
+            }
+            return
+        }
         val distance = state.routeDistanceKm ?: calculateDistanceKm(
             state.origin.lat,
             state.origin.lng,
@@ -1493,14 +1676,14 @@ class LlegateViewModel(
     }
 
     fun toggleDriverMode(isDriver: Boolean) {
-        val msg = if (isDriver) "Modo Piloto Llégate activado. ¡A rodar con los panas!" else "Modo Pasajero activado. ¡Listo para tu carrera!"
+        val msg = if (isDriver) "Modo Piloto LlÃ©gate activado. Â¡A rodar con los panas!" else "Modo Pasajero activado. Â¡Listo para tu carrera!"
         _uiState.update { it.copy(isDriverMode = isDriver, statusMessage = msg) }
     }
 
     fun selectSafeMeetingPoint(meetingPoint: SafeMeetingPoint) {
         val newOrigin = LocationPoint(
             title = meetingPoint.title,
-            subtitle = "${meetingPoint.tag} • ${meetingPoint.distanceText}",
+            subtitle = "${meetingPoint.tag} â€¢ ${meetingPoint.distanceText}",
             lat = meetingPoint.lat,
             lng = meetingPoint.lng,
             isCurrentGps = false,
@@ -1532,7 +1715,7 @@ class LlegateViewModel(
 
     fun requestStateExpansion(stateName: String) {
         _uiState.update {
-            it.copy(statusMessage = "¡Voto registrado para activar $stateName! Gracias por apoyar la expansión 🇻🇪")
+            it.copy(statusMessage = "Â¡Voto registrado para activar $stateName! Gracias por apoyar la expansiÃ³n ðŸ‡»ðŸ‡ª")
         }
     }
 
@@ -1555,7 +1738,7 @@ class LlegateViewModel(
                 origin = curDest,
                 destination = curOrigin,
                 routeDistanceKm = null,
-                statusMessage = "Ruta invertida: ${curDest.title} ⇄ ${curOrigin.title}"
+                statusMessage = "Ruta invertida: ${curDest.title} â‡„ ${curOrigin.title}"
             )
         }
         recalculateEstimates()
@@ -1571,11 +1754,11 @@ class LlegateViewModel(
             avisar("Entra a tu cuenta para pedir un viaje.")
             return
         }
-        val estimate = when (state.selectedService) {
-            ServiceType.MOTO -> state.motoEstimate
-            ServiceType.CAR -> state.carEstimate
-            ServiceType.DELIVERY -> state.deliveryEstimate
+        if (!state.destination.tieneCoordenadas) {
+            avisar("Elige un destino para pedir el viaje.")
+            return
         }
+        val estimate = state.selectedEstimate
         if (estimate == null) {
             avisar("Toca un origen y un destino para conocer la tarifa.")
             return
@@ -1618,7 +1801,7 @@ class LlegateViewModel(
                     tripRepo.consultar(id)
                 } catch (fallo: ApiException) {
                     if (fallo.httpStatus == 404) {
-                        limpiarViaje("Ese viaje ya no está en Llégate.")
+                        limpiarViaje("Ese viaje ya no estÃ¡ en LlÃ©gate.")
                         return@launch
                     }
                     continue
@@ -1628,7 +1811,7 @@ class LlegateViewModel(
                 }
                 aplicarViaje(viaje)
                 if (viaje.estado == EstadoViaje.CANCELADO) {
-                    limpiarViaje("El viaje se canceló. Pide otro cuando quieras.")
+                    limpiarViaje("El viaje se cancelÃ³. Pide otro cuando quieras.")
                     return@launch
                 }
                 if (!viaje.abierto) return@launch
@@ -1655,18 +1838,18 @@ class LlegateViewModel(
         abrir(context, Intent(Intent.ACTION_DIAL, Uri.parse("tel:${digitos(phoneNumber)}")))
     }
 
-    /** La API no tiene chat: el mensaje se va por WhatsApp al teléfono real del piloto. */
+    /** La API no tiene chat: el mensaje se va por WhatsApp al telÃ©fono real del piloto. */
     fun enviarWhatsApp(context: Context, telefono: String, mensaje: String) {
         val numero = aE164Venezuela(telefono)?.drop(1) ?: digitos(telefono)
         abrir(context, Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$numero?text=${Uri.encode(mensaje)}")))
     }
 
-    /** Compartir manda lo que el servidor sí tiene del viaje: ruta, tarifa y piloto asignado. */
+    /** Compartir manda lo que el servidor sÃ­ tiene del viaje: ruta, tarifa y piloto asignado. */
     fun shareTrip(context: Context) {
         val trip = _uiState.value.activeTrip ?: return
         val pana = trip.driver
         val texto = buildString {
-            append("Viaje de Llégate: ${trip.origin.title} → ${trip.destination.title}. ")
+            append("Viaje de LlÃ©gate: ${trip.origin.title} â†’ ${trip.destination.title}. ")
             append("Tarifa de referencia ${usd(trip.precioUsd)}, pago ${trip.metodoPagoTexto}.")
             if (pana != null) {
                 append(" Piloto: ${pana.name}")
@@ -1679,14 +1862,14 @@ class LlegateViewModel(
             putExtra(Intent.EXTRA_TEXT, texto)
             type = "text/plain"
         }
-        abrir(context, Intent.createChooser(sendIntent, "Compartir mi viaje con Llégate"))
+        abrir(context, Intent.createChooser(sendIntent, "Compartir mi viaje con LlÃ©gate"))
     }
 
     private fun abrir(context: Context, intent: Intent) {
         try {
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (_: Exception) {
-            avisar("Tu teléfono no pudo abrir esa acción. Inténtalo manualmente.")
+            avisar("Tu telÃ©fono no pudo abrir esa acciÃ³n. IntÃ©ntalo manualmente.")
         }
     }
 
@@ -1718,3 +1901,7 @@ class LlegateViewModel(
         _uiState.update { it.copy(statusMessage = "Mapa centrado en ${it.origin.title}") }
     }
 }
+
+
+
+

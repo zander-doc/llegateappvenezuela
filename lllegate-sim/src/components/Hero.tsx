@@ -13,6 +13,7 @@ import { Logo } from "./Logo";
 import { Reveal, Stagger, StaggerItem } from "./Motion";
 import { useUI } from "../lib/ui";
 import { STATS } from "../data/site";
+import telefono from "../assets/telefono.webp";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -499,7 +500,7 @@ export function Hero() {
                 <div className="relative aspect-[1/2] w-full [filter:drop-shadow(0_28px_50px_rgba(0,0,0,0.6))]">
                   <div className="absolute inset-0 overflow-hidden">
                     <img
-                      src="/telefono.webp"
+                      src={telefono}
                       alt="Vista de la app Llégate con un viaje en curso y la ruta marcada en el mapa"
                       width={1024}
                       height={1024}

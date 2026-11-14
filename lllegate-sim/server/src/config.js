@@ -65,6 +65,32 @@ export function validarDatabaseUrl(valor) {
 const port = Number(process.env.PORT ?? 3000);
 const databaseUrl = validarDatabaseUrl(required("DATABASE_URL"));
 const jwtSecret = required("AUTH_JWT_SECRET");
+const storageDriver = (text("STORAGE_DRIVER") || "local").toLowerCase();
+if (!["local", "r2"].includes(storageDriver)) {
+  throw new Error("STORAGE_DRIVER debe ser 'local' o 'r2'.");
+}
+if (process.env.NODE_ENV === "production" && storageDriver !== "r2") {
+  throw new Error("En producción, STORAGE_DRIVER debe ser 'r2' para conservar los documentos.");
+}
+
+const storageBucket = text("STORAGE_BUCKET");
+const r2 = {
+  accountId: text("R2_ACCOUNT_ID"),
+  accessKeyId: text("R2_ACCESS_KEY_ID"),
+  secretAccessKey: text("R2_SECRET_ACCESS_KEY"),
+  endpoint: text("R2_ENDPOINT"),
+};
+if (process.env.NODE_ENV === "production") {
+  const faltantes = [
+    ...(storageBucket ? [] : ["STORAGE_BUCKET"]),
+    ...(r2.accountId || r2.endpoint ? [] : ["R2_ACCOUNT_ID o R2_ENDPOINT"]),
+    ...(r2.accessKeyId ? [] : ["R2_ACCESS_KEY_ID"]),
+    ...(r2.secretAccessKey ? [] : ["R2_SECRET_ACCESS_KEY"]),
+  ];
+  if (faltantes.length) {
+    throw new Error(`Falta configurar almacenamiento R2: ${faltantes.join(", ")}.`);
+  }
+}
 
 export const config = {
   port,
@@ -131,19 +157,14 @@ export const config = {
   },
   storage: {
     // "local" guarda en disco (desarrollo y pruebas); "r2" usa Cloudflare R2.
-    driver: (text("STORAGE_DRIVER") || "local").toLowerCase(),
-    bucket: text("STORAGE_BUCKET") || "documentos-conductores",
+    driver: storageDriver,
+    bucket: storageBucket || "documentos-conductores",
     localDir: resolve(process.cwd(), text("STORAGE_LOCAL_DIR") || ".storage"),
     // Las URLs de descarga las firma esta API, no el proveedor: así el mismo
     // enlace funciona con R2 o con disco y caduca igual.
     urlSegundos: number("ARCHIVOS_URL_SEGUNDOS", 900),
     secret: text("ARCHIVOS_SECRET") || jwtSecret,
-    r2: {
-      accountId: text("R2_ACCOUNT_ID"),
-      accessKeyId: text("R2_ACCESS_KEY_ID"),
-      secretAccessKey: text("R2_SECRET_ACCESS_KEY"),
-      endpoint: text("R2_ENDPOINT"),
-    },
+    r2,
   },
   payments: {
     // Clave compartida con `configuracion_pagos.clave_servidor_hash`. Solo la

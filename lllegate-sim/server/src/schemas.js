@@ -43,7 +43,7 @@ const contenidoBase64 = z
   // 5 MB en bytes son ~6.7 MB en base64; el límite real se valida al decodificar.
   .max(7_000_000, "El archivo es demasiado grande");
 
-export const uuidSchema = z.string().uuid("Identificador inválido");
+export const uuidSchema = z.string().guid("Identificador inválido");
 
 export const otpRequestSchema = z.object({
   telefono,
@@ -97,6 +97,7 @@ export const driverDetailsSchema = z.object({
     .transform((value) => value.toUpperCase()),
   marca: z.string().trim().min(2).max(60).optional(),
   modelo: z.string().trim().min(1).max(60).optional(),
+  color: textoOpcional(40, "El color no puede superar 40 caracteres"),
   anio: z.coerce
     .number()
     .int()

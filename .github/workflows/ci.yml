@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lllegate-sim/package-lock.json
+      - run: npm ci
+        working-directory: lllegate-sim
+      - run: npm run build
+        working-directory: lllegate-sim
+      - run: npm run test:db
+        working-directory: lllegate-sim
+      - run: npm audit --omit=dev
+        working-directory: lllegate-sim
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            lllegate-sim/package-lock.json
+            lllegate-sim/server/package-lock.json
+      - run: npm ci
+        working-directory: lllegate-sim
+      - run: npm ci
+        working-directory: lllegate-sim/server
+      - run: npm run check
+        working-directory: lllegate-sim/server
+      - run: npm test
+        working-directory: lllegate-sim/server
+      - run: npm audit --omit=dev
+        working-directory: lllegate-sim/server
