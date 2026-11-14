@@ -4,9 +4,5 @@
   "workspaces": [
     "lllegate-sim",
     "packages/*"
-  ],
-  "dependencies": {
-    "pillow": "^0.0.9",
-    "sharp": "^0.35.5"
-  }
+  ]
 }
