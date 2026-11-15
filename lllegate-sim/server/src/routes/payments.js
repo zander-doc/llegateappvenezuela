@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { rpc } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
+import { avisarRecargaAlAdmin } from "../payments/avisoAdmin.js";
 import { binanceDisponible, crearOrdenBinance } from "../payments/binance.js";
 import { crearIntencionPagoMovil, pagoMovilDisponible } from "../payments/pagoMovil.js";
 import { paymentIntentSchema, paymentReportSchema, uuidSchema } from "../schemas.js";
@@ -144,6 +145,11 @@ paymentsRouter.post(
       },
       { usuarioId: req.user.id },
     );
+
+    if (resultado?.ok && !resultado.ya_reportado) {
+      // Sin await: el cliente no espera a WhatsApp.
+      void avisarRecargaAlAdmin({ pagoId: id, referencia: resultado.referencia ?? body.referencia });
+    }
 
     res.json(resultado);
   }),

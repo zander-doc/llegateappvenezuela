@@ -128,6 +128,8 @@ export const config = {
       template: text("WHATSAPP_OTP_TEMPLATE") || "llegate_otp",
       language: text("WHATSAPP_OTP_LANGUAGE") || "es",
       apiVersion: text("WHATSAPP_API_VERSION") || "v21.0",
+      avisoTelefono: text("ADMIN_WHATSAPP_AVISO"),
+      avisoTemplate: text("WHATSAPP_AVISO_TEMPLATE") || "llegate_aviso_recarga",
     },
     limits: {
       porTelefono: number("OTP_MAX_POR_TELEFONO", 3),
