@@ -108,3 +108,64 @@ export function diagnosticoRemitente({ phoneId, numeros }) {
   const opciones = numeros.map((numero) => `${numero.id} (${numero.numero})`).join(", ");
   return `[otp] WHATSAPP_PHONE_ID=${phoneId} no es un número de este WABA. Opciones válidas: ${opciones}`;
 }
+
+export function avisoAdminDisponible(whatsapp = config.otp.whatsapp) {
+  return Boolean(whatsapp.token && whatsapp.phoneId && whatsapp.avisoTelefono);
+}
+
+function textoPlantilla(valor, respaldo) {
+  const limpio = String(valor ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
+  return limpio || respaldo;
+}
+
+/** Avisa al administrador, por WhatsApp, que un cliente reporto una recarga. */
+export async function enviarAvisoRecarga({
+  montoUsd,
+  montoBs,
+  referencia,
+  cliente,
+  fetchImpl = globalThis.fetch,
+  whatsapp = config.otp.whatsapp,
+}) {
+  if (!avisoAdminDisponible(whatsapp)) {
+    throw new Error("aviso_whatsapp_no_configurado");
+  }
+
+  const para = String(whatsapp.avisoTelefono).replace(/\D/g, "");
+  if (para.length < 8) throw new Error("telefono_aviso_invalido");
+
+  const url = `https://graph.facebook.com/${whatsapp.apiVersion}/${whatsapp.phoneId}/messages`;
+  const parametros = [
+    textoPlantilla(Number(montoUsd).toFixed(2), "0.00"),
+    textoPlantilla(montoBs == null ? "-" : Number(montoBs).toFixed(2), "-"),
+    textoPlantilla(referencia, "-"),
+    textoPlantilla(cliente, "Cliente"),
+  ];
+
+  const respuesta = await fetchImpl(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${whatsapp.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: para,
+      type: "template",
+      template: {
+        name: whatsapp.avisoTemplate,
+        language: { code: whatsapp.language },
+        components: [
+          { type: "body", parameters: parametros.map((text) => ({ type: "text", text })) },
+        ],
+      },
+    }),
+  });
+
+  if (!respuesta.ok) {
+    const detalle = await respuesta.text().catch(() => "");
+    throw new Error(`whatsapp_${respuesta.status}: ${detalle.slice(0, 200)}`);
+  }
+
+  return { ok: true };
+}
