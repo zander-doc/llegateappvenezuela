@@ -77,11 +77,26 @@ export const perfilPatchSchema = z
     estado: z.string().trim().min(2, "Elige tu estado").max(60).optional(),
     ciudad: z.string().trim().min(2, "Elige tu ciudad").max(120).optional(),
     whatsapp: telefono.optional(),
+    acepta_promociones: z.boolean().optional(),
+    // Personalización de la cuenta: solo claves conocidas, nada libre.
+    preferencias: z
+      .object({
+        tema: z.enum(["oscuro", "claro", "sistema"]).optional(),
+        avisos_viaje: z.boolean().optional(),
+        avisos_saldo: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .refine((cambios) => Object.values(cambios).some((valor) => valor !== undefined), {
     message: "Envía al menos un dato para cambiar",
     path: ["perfil"],
   });
+
+// Credencial (ID token) que entrega "Ingresar con Google" en el navegador.
+export const googleCredentialSchema = z.object({
+  credential: z.string().trim().min(100, "Credencial de Google inválida").max(4096, "Credencial de Google inválida"),
+});
 
 export const driverDetailsSchema = z.object({
   cedula: z

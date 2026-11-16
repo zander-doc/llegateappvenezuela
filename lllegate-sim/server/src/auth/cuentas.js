@@ -181,3 +181,88 @@ export async function revocarSesion(sesionId, usuarioId) {
     [sesionId, usuarioId],
   );
 }
+
+// Cuentas de Google. Se identifica a la persona por el "sub" de Google. NO se
+// une por correo a una cuenta existente: el correo de un perfil de teléfono lo
+// escribe el usuario sin verificarlo, y unirlas así permitiría tomar la cuenta
+// de otra persona. Para juntar teléfono y Google hay que estar ya dentro de la
+// cuenta (vincularGoogle).
+const UNICA_VIOLADA = "23505";
+
+export async function ingresarConGoogle(google) {
+  const existente = await fila(
+    `select u.id, a.phone
+       from public.usuarios u
+       join auth.users a on a.id = u.id
+      where u.google_sub = $1`,
+    [google.sub],
+  );
+
+  if (existente) {
+    await filas(
+      `update auth.users set last_sign_in_at = now() where id = $1`,
+      [existente.id],
+    );
+    await filas(
+      `update public.usuarios
+          set ultimo_acceso_en = now(),
+              foto_url = coalesce(foto_url, $2)
+        where id = $1`,
+      [existente.id, google.foto],
+    );
+    return { ok: true, usuario: { id: existente.id, phone: existente.phone }, nuevo: false };
+  }
+
+  const metadata = { rol: "cliente", nombre: google.nombre, email: google.email };
+  const creada = await fila(
+    `insert into auth.users (email, email_confirmed_at, raw_user_meta_data, last_sign_in_at)
+     values ($1, now(), $2::jsonb, now())
+     on conflict (email) do nothing
+     returning id, phone`,
+    [google.email, JSON.stringify(metadata)],
+  );
+  if (!creada) return { ok: false, motivo: "correo_ya_registrado" };
+
+  try {
+    await filas(
+      `update public.usuarios
+          set google_sub = $2,
+              foto_url = $3,
+              origen_registro = 'google',
+              ultimo_acceso_en = now()
+        where id = $1`,
+      [creada.id, google.sub, google.foto],
+    );
+  } catch (error) {
+    // Dos pestañas entrando a la vez con la misma cuenta nueva: gana la primera.
+    if (error?.code !== UNICA_VIOLADA) throw error;
+    await filas("delete from auth.users where id = $1", [creada.id]);
+    return ingresarConGoogle(google);
+  }
+
+  return { ok: true, usuario: { id: creada.id, phone: creada.phone }, nuevo: true };
+}
+
+export async function vincularGoogle(usuarioId, google) {
+  const dueno = await fila("select id from public.usuarios where google_sub = $1", [google.sub]);
+  if (dueno) {
+    return dueno.id === usuarioId ? { ok: true } : { ok: false, motivo: "google_ya_vinculado" };
+  }
+
+  try {
+    const [cambio] = await filas(
+      `update public.usuarios
+          set google_sub = $2,
+              foto_url = coalesce(foto_url, $3),
+              email = coalesce(email, $4),
+              updated_at = now()
+        where id = $1 and google_sub is null
+        returning id`,
+      [usuarioId, google.sub, google.foto, google.email],
+    );
+    return cambio ? { ok: true } : { ok: false, motivo: "cuenta_con_google" };
+  } catch (error) {
+    if (error?.code === UNICA_VIOLADA) return { ok: false, motivo: "google_ya_vinculado" };
+    throw error;
+  }
+}

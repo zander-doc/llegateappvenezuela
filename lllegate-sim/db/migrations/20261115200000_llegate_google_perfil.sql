@@ -64,6 +64,7 @@ select
   u.foto_url,
   u.acepta_promociones,
   u.origen_registro,
-  (u.google_sub is not null) as tiene_google
+  (u.google_sub is not null) as tiene_google,
+  u.preferencias
 from public.usuarios u
 left join public.conductores_detalles d on d.usuario_id = u.id;
