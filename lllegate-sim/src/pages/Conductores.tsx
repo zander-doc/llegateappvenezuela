@@ -27,9 +27,7 @@ import {
   PageHero,
   SectionHead,
 } from "../components/ui";
-import { PilotWalletPanel } from "../components/PilotWallet";
 import { EarningsCalculator } from "../components/EarningsCalculator";
-import { useUI } from "../lib/ui";
 import { PILOT_RULES } from "../data/prepaid";
 import { formatUSD } from "../lib/format";
 import { FAQ_GROUPS } from "../data/faqs";
@@ -38,8 +36,6 @@ import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
 const driverFaqs = FAQ_GROUPS.find((g) => g.id === "conductores")!.items;
 
 export function ConductoresPage() {
-  const { openModal } = useUI();
-
   return (
     <>
       <PageHero
@@ -55,10 +51,10 @@ export function ConductoresPage() {
         crumbs={[{ label: "Conductores", to: "/conductores" }]}
         actions={
           <>
-            <Button size="lg" onClick={() => openModal({ type: "driver" })}>
+            <Button size="lg" to="/conductores/verificacion">
               <UserRound className="h-4 w-4" /> Registrarme
             </Button>
-            <Button size="lg" variant="secondary" to="/conductores/planes#billetera">
+            <Button size="lg" variant="secondary" to="/conductores/planes">
               Ver prepago
             </Button>
           </>
@@ -208,7 +204,7 @@ export function ConductoresPage() {
                 );
               })}
             </div>
-            <Button className="mt-4" onClick={() => openModal({ type: "driver" })}>
+            <Button className="mt-4" to="/conductores/verificacion">
               Empezar registro <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -222,7 +218,7 @@ export function ConductoresPage() {
             title="Recarga y maneja"
             text="La comisión sale de tu saldo al completar cada viaje. Si cancelas, la reserva vuelve a tu billetera."
             action={
-              <Button variant="secondary" to="/conductores/planes#billetera">
+              <Button variant="secondary" to="/conductores/planes">
                 Ver mi billetera <ArrowRight className="h-4 w-4" />
               </Button>
             }
@@ -282,7 +278,7 @@ export function ConductoresPage() {
             <p className="heading text-[20px] font-bold text-white">¿Te animas a manejar con Llégate?</p>
             <p className="mt-1 text-[13px] text-ink-400">Tres pasos, unos cuatro minutos. Sin costo de inscripción.</p>
           </div>
-          <Button onClick={() => openModal({ type: "driver" })}>
+          <Button to="/conductores/verificacion">
             Registrarme ahora <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
@@ -292,8 +288,6 @@ export function ConductoresPage() {
 }
 
 export function PlanesPage() {
-  const { openModal } = useUI();
-
   return (
     <>
       <PageHero
@@ -312,11 +306,11 @@ export function PlanesPage() {
         ]}
         actions={
           <>
-            <Button size="lg" onClick={() => openModal({ type: "driver" })}>
+            <Button size="lg" to="/conductores/verificacion">
               Registrarme
             </Button>
-            <Button size="lg" variant="secondary" href="#billetera">
-              Probar la billetera
+            <Button size="lg" variant="secondary" href="#como-funciona">
+              Cómo funciona
             </Button>
           </>
         }
@@ -344,25 +338,14 @@ export function PlanesPage() {
                 <span className="mono text-[12.5px] font-semibold text-white">SLA {PILOT_RULES.approvalSlaMinutes} min</span>
               </div>
             </div>
-            <Button className="mt-4 w-full" variant="secondary" href="#billetera">
-              Ver mi saldo
+            <Button className="mt-4 w-full" variant="secondary" href="#como-funciona">
+              Cómo funciona
             </Button>
           </div>
         }
       />
 
-      <section className="wrap py-12 sm:py-16">
-        <SectionHead
-          kicker="Billetera piloto"
-          title="Tu saldo, siempre a la vista"
-          text="Prueba la recarga y el descuento por viaje en esta simulación. No se procesa ningún pago real."
-        />
-        <div className="mt-6">
-          <PilotWalletPanel />
-        </div>
-      </section>
-
-      <section className="border-y border-white/8 bg-ink-900">
+      <section id="como-funciona" className="scroll-mt-28 border-y border-white/8 bg-ink-900">
         <div className="wrap py-12 sm:py-16">
           <SectionHead
             kicker="Cómo funciona"
@@ -473,7 +456,7 @@ export function PlanesPage() {
               Ajusta tus viajes por semana y el ticket promedio. Te mostramos la comisión semanal, tu neto y la recarga
               que te conviene.
             </p>
-            <Button variant="secondary" className="mt-4" onClick={() => openModal({ type: "driver" })}>
+            <Button variant="secondary" className="mt-4" to="/conductores/verificacion">
               Registrarme <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -500,8 +483,8 @@ export function PlanesPage() {
               <Badge tone="neutral">Acompañamiento del equipo</Badge>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Button onClick={() => openModal({ type: "driver" })}>Registrarme</Button>
-              <Button variant="secondary" href="#billetera">
+              <Button to="/conductores/verificacion">Registrarme</Button>
+              <Button variant="secondary" href="#como-funciona">
                 Cómo funciona el prepago
               </Button>
             </div>
@@ -551,8 +534,6 @@ export function PlanesPage() {
 }
 
 export function RegistroPage() {
-  const { openModal } = useUI();
-
   return (
     <>
       <PageHero
@@ -561,32 +542,33 @@ export function RegistroPage() {
           <>
             Tu cuenta,
             <br />
-            en tres pasos.
+            en cuatro pasos.
           </>
         }
-        description="Elige tu servicio y deja tus datos. No hay plan mensual: al activarte recibes saldo de bienvenida y recargas cuando lo necesites."
+        description="Ingresa con tu teléfono, registra tu vehículo y sube tus documentos. No hay plan mensual: al aprobarte recibes saldo de bienvenida y recargas cuando lo necesites."
         crumbs={[
           { label: "Conductores", to: "/conductores" },
           { label: "Registro", to: "/conductores/registro" },
         ]}
         actions={
           <>
-            <Button size="lg" onClick={() => openModal({ type: "driver" })}>
+            <Button size="lg" to="/conductores/verificacion">
               Empezar registro <ArrowRight className="h-4 w-4" />
             </Button>
-            <Button size="lg" variant="secondary" to="/conductores/planes#billetera">
+            <Button size="lg" variant="secondary" to="/conductores/planes">
               Cómo funciona el prepago
             </Button>
           </>
         }
         aside={
           <div className="card p-5">
-            <Badge tone="brand">Toma ~4 minutos</Badge>
+            <Badge tone="brand">Toma ~10 minutos</Badge>
             <div className="mt-4 grid gap-3">
               {[
-                { n: "01", label: "Servicio y ciudad" },
-                { n: "02", label: "Tus datos de contacto" },
-                { n: "03", label: "Billetera y confirmación" },
+                { n: "01", label: "Ingresa con tu teléfono" },
+                { n: "02", label: "Datos de tu vehículo" },
+                { n: "03", label: "Sube tus documentos" },
+                { n: "04", label: "Revisión del equipo" },
               ].map((s) => (
                 <div key={s.n} className="flex items-center gap-3">
                   <span className="mono flex h-8 w-8 items-center justify-center rounded-full border border-white/12 text-[11px] text-ink-300">
@@ -597,7 +579,7 @@ export function RegistroPage() {
               ))}
             </div>
             <p className="mt-4 border-t border-white/8 pt-3 text-[11px] leading-relaxed text-ink-500">
-              El formulario es una simulación. No se guardan datos en un servidor.
+              Tus datos y documentos se guardan de forma segura y los revisa nuestro equipo. Puedes continuar desde la web o desde la app.
             </p>
           </div>
         }
@@ -608,15 +590,15 @@ export function RegistroPage() {
           <Eyebrow>Antes de empezar</Eyebrow>
           <h2 className="heading mt-3 text-[28px] font-bold text-white sm:text-[34px]">Ten esto a mano</h2>
           <p className="mt-2 text-[13.5px] leading-relaxed text-ink-400">
-            En el flujo real, después de este formulario cargarías los documentos desde la app.
+            Los documentos se suben dentro del mismo proceso, con fotos claras y legibles.
           </p>
           <div className="mt-5 grid gap-2">
             {[
-              "Cédula de identidad vigente",
+              "Cédula de identidad vigente (frente y reverso)",
               "Licencia de conducir vigente",
-              "Documentos del vehículo (título y revisión)",
-              "Foto del vehículo y de la placa",
-              "Un número de teléfono activo",
+              "Certificado médico",
+              "Datos del vehículo: placa, marca, modelo y año",
+              "Un número de teléfono con WhatsApp activo",
             ].map((item) => (
               <div key={item} className="flex items-start gap-2.5 rounded-xl border border-white/8 bg-white/[0.025] px-3.5 py-3 text-[13px] text-ink-200">
                 <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" /> {item}
@@ -646,7 +628,7 @@ export function RegistroPage() {
               </div>
             ))}
           </div>
-          <Button className="mt-4 w-full" onClick={() => openModal({ type: "driver" })}>
+          <Button className="mt-4 w-full" to="/conductores/verificacion">
             Empezar registro <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

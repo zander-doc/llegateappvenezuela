@@ -582,10 +582,10 @@ function DriversMenu({ onNavigate }: { onNavigate: () => void }) {
           Sin mensualidad: la comisión del 10% sale de tu saldo al completar cada viaje. Empiezas con $2.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="yellow" to="/conductores/planes#billetera" onClick={onNavigate}>
-            Ver billetera
+          <Button size="sm" variant="yellow" to="/conductores/planes" onClick={onNavigate}>
+            Ver prepago
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => onNavigate()} to="/conductores/registro">
+          <Button size="sm" variant="secondary" onClick={() => onNavigate()} to="/conductores/verificacion">
             Registrarme
           </Button>
         </div>

@@ -3,7 +3,6 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 export type ModalState =
   | { type: "download"; intent?: "download" | "signin" }
   | { type: "bcv" }
-  | { type: "driver" }
   | { type: "plan"; planId: string }
   | { type: "fare"; serviceSlug?: string }
   | { type: "coverage"; city?: string }
