@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { ArrowRight, Calculator, Percent, ReceiptText, Wallet } from "lucide-react";
 import { Badge, Button, Money } from "./ui";
-import { useUI } from "../lib/ui";
 import { PILOT_RULES, commissionFor, rechargeCoverageWeeks, suggestRechargePack } from "../data/prepaid";
 import { LAUNCH_SERVICES } from "../data/services";
 import { formatUSD } from "../lib/format";
 
 export function EarningsCalculator() {
-  const { openModal } = useUI();
   const [trips, setTrips] = useState(25);
   const [ticket, setTicket] = useState(2);
 
@@ -140,11 +138,11 @@ export function EarningsCalculator() {
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <Button full onClick={() => openModal({ type: "driver" })} className="sm:flex-1">
+          <Button full to="/conductores/verificacion" className="sm:flex-1">
             Registrarme <ArrowRight className="h-4 w-4" />
           </Button>
-          <Button full variant="secondary" to="/conductores/planes#billetera" className="sm:w-auto">
-            Probar la billetera
+          <Button full variant="secondary" to="/conductores/planes" className="sm:w-auto">
+            Cómo funciona el prepago
           </Button>
         </div>
         <p className="mt-2 text-[10.5px] leading-relaxed text-ink-500">

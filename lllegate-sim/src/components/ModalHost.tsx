@@ -3,7 +3,6 @@ import { DownloadModal } from "./modals/DownloadModal";
 import { BcvModal } from "./modals/BcvModal";
 import { FareModal } from "./modals/FareModal";
 import { CoverageModal } from "./modals/CoverageModal";
-import { DriverWizard } from "./modals/DriverWizard";
 import { PlanModal } from "./modals/PlanModal";
 import { LeadModal } from "./modals/LeadModal";
 
@@ -20,8 +19,6 @@ export function ModalHost() {
       return <FareModal serviceSlug={modal.serviceSlug} onClose={closeModal} />;
     case "coverage":
       return <CoverageModal city={modal.city} onClose={closeModal} />;
-    case "driver":
-      return <DriverWizard onClose={closeModal} />;
     case "plan":
       return <PlanModal planId={modal.planId} onClose={closeModal} />;
     case "lead":
