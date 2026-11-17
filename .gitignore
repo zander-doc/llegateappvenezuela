@@ -29,3 +29,5 @@ backups/
 # Sistema
 .DS_Store
 Thumbs.db
+cliente de OAuth.json
+cliente de OAuth.txt

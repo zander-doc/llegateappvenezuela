@@ -2,16 +2,27 @@ import { Router } from "express";
 import {
   crearSesion,
   guardarCodigo,
+  ingresarConGoogle,
   revocarSesion,
   rotarSesion,
   validarCodigo,
+  vincularGoogle,
 } from "../auth/cuentas.js";
+import { etiquetaRol } from "../auth/etiquetaRol.js";
+import { GoogleTokenError, googleDisponible, verificarTokenGoogle } from "../auth/google.js";
 import { generarCodigo, hashCodigo } from "../auth/tokens.js";
 import { config } from "../config.js";
 import { fila, filas } from "../db.js";
+import { registrarEvento } from "../eventos.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
-import { otpRequestSchema, otpVerifySchema, perfilPatchSchema, refreshTokenSchema } from "../schemas.js";
+import {
+  googleCredentialSchema,
+  otpRequestSchema,
+  otpVerifySchema,
+  perfilPatchSchema,
+  refreshTokenSchema,
+} from "../schemas.js";
 import { canalOtp, enviarCodigoOtp } from "../security/otp-delivery.js";
 import { hitRateLimit, resetRateLimit } from "../security/rateLimit.js";
 
@@ -90,6 +101,11 @@ const PERFIL_COLUMNS = [
   "verificado_en",
   "puede_pedir_viajes",
   "puede_conducir",
+  "foto_url",
+  "acepta_promociones",
+  "origen_registro",
+  "tiene_google",
+  "preferencias",
 ].join(", ");
 
 // GET /me y PATCH /auth/perfil responden con el mismo envoltorio, así que el
@@ -114,7 +130,10 @@ async function leerPerfil(usuarioId) {
 
   return {
     ok: true,
-    usuario,
+    usuario: {
+      ...usuario,
+      etiqueta_rol: etiquetaRol({ rol: usuario.rol, es_conductor, tipo_vehiculo, puede_conducir }),
+    },
     conductor: es_conductor
       ? {
           tipo_vehiculo,
@@ -185,7 +204,84 @@ authRouter.post(
     resetRateLimit(`otp:verificar:${body.telefono}`);
 
     const tokens = await crearSesion(resultado.usuario, req.get("user-agent"));
+    void registrarEvento(resultado.usuario.id, "ingreso", { via: "telefono" });
     res.json({ ok: true, ...tokens });
+  }),
+);
+
+// ---- Ingresar con Google ---------------------------------------------------
+
+const MOTIVOS_GOOGLE = {
+  google_no_configurado: [503, "google_no_disponible", "Ingresar con Google aún no está disponible"],
+  claves_no_disponibles: [503, "google_no_disponible", "No pudimos validar con Google. Intenta de nuevo"],
+  token_vencido: [401, "google_token_invalido", "La sesión de Google venció. Intenta de nuevo"],
+  correo_no_verificado: [401, "google_correo_no_verificado", "Tu correo de Google no está verificado"],
+};
+
+async function validarCredencialGoogle(req, res) {
+  if (!googleDisponible()) {
+    throw new HttpError(503, "google_no_disponible", "Ingresar con Google aún no está disponible");
+  }
+
+  const limite = hitRateLimit(`google:ip:${ipDe(req)}`, { limit: 20, windowMs: 10 * 60_000 });
+  if (!limite.ok) {
+    bloquearPorLimite(res, limite.retryAfter, `Demasiados intentos. Espera ${limite.retryAfter} segundos.`);
+  }
+
+  const { credential } = parse(googleCredentialSchema, req.body);
+  try {
+    return await verificarTokenGoogle(credential);
+  } catch (error) {
+    if (!(error instanceof GoogleTokenError)) throw error;
+    const [status, code, mensaje] =
+      MOTIVOS_GOOGLE[error.motivo] ?? [401, "google_token_invalido", "No pudimos validar tu cuenta de Google"];
+    throw new HttpError(status, code, mensaje);
+  }
+}
+
+// La web necesita el ID de cliente para dibujar el botón. No es un secreto.
+authRouter.get("/google/config", (_req, res) => {
+  const disponible = googleDisponible();
+  res.json({ ok: true, disponible, client_id: disponible ? config.google.clientIds[0] : null });
+});
+
+authRouter.post(
+  "/google",
+  asyncHandler(async (req, res) => {
+    const google = await validarCredencialGoogle(req, res);
+
+    const resultado = await ingresarConGoogle(google);
+    if (!resultado.ok) {
+      throw new HttpError(
+        409,
+        "correo_ya_registrado",
+        "Ese correo ya tiene una cuenta. Ingresa con tu teléfono y vincula Google desde tu perfil.",
+      );
+    }
+
+    const tokens = await crearSesion(resultado.usuario, req.get("user-agent"));
+    void registrarEvento(resultado.usuario.id, resultado.nuevo ? "registro" : "ingreso", { via: "google" });
+    res.json({ ok: true, nuevo: resultado.nuevo, ...tokens });
+  }),
+);
+
+authRouter.post(
+  "/google/vincular",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const google = await validarCredencialGoogle(req, res);
+
+    const resultado = await vincularGoogle(req.user.id, google);
+    if (!resultado.ok) {
+      const mensajes = {
+        google_ya_vinculado: "Esa cuenta de Google ya está vinculada a otro usuario",
+        cuenta_con_google: "Tu cuenta ya tiene una cuenta de Google vinculada",
+      };
+      throw new HttpError(409, resultado.motivo, mensajes[resultado.motivo] ?? "No pudimos vincular Google");
+    }
+
+    void registrarEvento(req.user.id, "google_vinculado", {});
+    res.json(await leerPerfil(req.user.id));
   }),
 );
 
@@ -234,6 +330,8 @@ authRouter.patch(
               estado = coalesce($3, estado),
               ciudad = coalesce($4, ciudad),
               whatsapp = coalesce($5, whatsapp),
+              acepta_promociones = coalesce($6, acepta_promociones),
+              preferencias = preferencias || coalesce($7::jsonb, '{}'::jsonb),
               updated_at = now()
         where id = $1`,
       [
@@ -242,6 +340,8 @@ authRouter.patch(
         cambios.estado ?? null,
         cambios.ciudad ?? null,
         cambios.whatsapp ?? null,
+        cambios.acepta_promociones ?? null,
+        cambios.preferencias ? JSON.stringify(cambios.preferencias) : null,
       ],
     );
 

@@ -108,6 +108,12 @@ describe("cliente de API", () => {
       nombre: "María Rodríguez",
       telefonoVerificado: true,
       saldoBilletera: 9.9,
+      fotoUrl: null,
+      etiquetaRol: "Pasajero",
+      aceptaPromociones: false,
+      origenRegistro: "telefono",
+      tieneGoogle: false,
+      preferencias: {},
     });
     expect(cuenta.conductor).toBeNull();
     expect(cuenta.capacidades).toEqual({ puedePedirViajes: true, puedeConducir: false });

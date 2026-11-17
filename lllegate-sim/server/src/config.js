@@ -108,6 +108,15 @@ export const config = {
     accessTtlSegundos: number("AUTH_ACCESS_TTL_SEGUNDOS", 3600),
     refreshTtlDias: number("AUTH_REFRESH_TTL_DIAS", 30),
   },
+  google: {
+    // ID de cliente de OAuth aceptado (web y, más adelante, Android); varios
+    // se separan con coma. Sin ninguno, "Ingresar con Google" queda apagado.
+    clientIds: text("GOOGLE_CLIENT_ID")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+    jwksUrl: text("GOOGLE_JWKS_URL") || "https://www.googleapis.com/oauth2/v3/certs",
+  },
   otp: {
     // Pepper propio del código OTP; si no se define usa el secreto de sesión.
     secret: text("OTP_SECRET") || jwtSecret,

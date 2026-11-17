@@ -29,6 +29,18 @@ export interface Perfil {
   estado: string | null;
   ciudad: string | null;
   saldoBilletera: number;
+  fotoUrl: string | null;
+  etiquetaRol: string;
+  aceptaPromociones: boolean;
+  origenRegistro: "telefono" | "google" | "admin";
+  tieneGoogle: boolean;
+  preferencias: Preferencias;
+}
+
+export interface Preferencias {
+  tema?: "oscuro" | "claro" | "sistema";
+  avisos_viaje?: boolean;
+  avisos_saldo?: boolean;
 }
 
 export interface Conductor {
@@ -145,6 +157,12 @@ interface MeResponse {
     estado: string | null;
     ciudad: string | null;
     saldo_billetera: number | string;
+    foto_url?: string | null;
+    etiqueta_rol?: string;
+    acepta_promociones?: boolean;
+    origen_registro?: "telefono" | "google" | "admin";
+    tiene_google?: boolean;
+    preferencias?: Preferencias | null;
   };
   conductor: {
     tipo_vehiculo: "moto" | "carro" | null;
@@ -330,6 +348,12 @@ function mapCuenta(data: MeResponse): Cuenta {
       estado: usuario.estado ?? null,
       ciudad: usuario.ciudad ?? null,
       saldoBilletera: Number(usuario.saldo_billetera ?? 0),
+      fotoUrl: usuario.foto_url ?? null,
+      etiquetaRol: usuario.etiqueta_rol ?? (usuario.rol === "conductor" ? "Conductor" : "Pasajero"),
+      aceptaPromociones: Boolean(usuario.acepta_promociones),
+      origenRegistro: usuario.origen_registro ?? "telefono",
+      tieneGoogle: Boolean(usuario.tiene_google),
+      preferencias: usuario.preferencias ?? {},
     },
     conductor: data.conductor
       ? {
@@ -364,11 +388,16 @@ export async function updatePerfil(input: {
   estado?: string;
   ciudad?: string;
   whatsapp?: string;
+  aceptaPromociones?: boolean;
+  preferencias?: Preferencias;
 }): Promise<Cuenta> {
   const token = await accessToken();
-  const body = Object.fromEntries(
-    Object.entries(input).filter(([, valor]) => typeof valor === "string" && valor.trim().length > 0),
+  const { aceptaPromociones, preferencias, ...texto } = input;
+  const body: Record<string, unknown> = Object.fromEntries(
+    Object.entries(texto).filter(([, valor]) => typeof valor === "string" && valor.trim().length > 0),
   );
+  if (typeof aceptaPromociones === "boolean") body.acepta_promociones = aceptaPromociones;
+  if (preferencias && Object.keys(preferencias).length > 0) body.preferencias = preferencias;
   if (Object.keys(body).length === 0) {
     throw new ApiError("sin_cambios", 422, "No hay ningún dato nuevo que guardar.");
   }
@@ -394,6 +423,34 @@ export async function verifyOtp(input: { telefono: string; token: string }): Pro
     expires_at: data.expires_at,
   });
 
+  return getCuenta();
+}
+
+export async function getGoogleConfig(): Promise<{ disponible: boolean; clientId: string | null }> {
+  try {
+    const data = await request<{ disponible: boolean; client_id: string | null }>("/auth/google/config");
+    return { disponible: Boolean(data.disponible && data.client_id), clientId: data.client_id ?? null };
+  } catch {
+    return { disponible: false, clientId: null };
+  }
+}
+
+export async function loginWithGoogle(credential: string): Promise<{ cuenta: Cuenta; nuevo: boolean }> {
+  const data = await request<VerifyResponse & { nuevo?: boolean }>("/auth/google", {
+    method: "POST",
+    body: { credential },
+  });
+  saveSession({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: data.expires_at,
+  });
+  return { cuenta: await getCuenta(), nuevo: Boolean(data.nuevo) };
+}
+
+export async function linkGoogle(credential: string): Promise<Cuenta> {
+  const token = await accessToken();
+  await request("/auth/google/vincular", { method: "POST", token, body: { credential } });
   return getCuenta();
 }
 
