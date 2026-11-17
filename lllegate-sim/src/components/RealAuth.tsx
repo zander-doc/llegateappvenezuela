@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Badge, Button } from "./ui";
 import { RealWallet } from "./RealWallet";
+import { GoogleButton } from "./GoogleButton";
 import { formatUSD } from "../lib/format";
 import { VENEZUELA_LOCATIONS } from "../data/locations";
 import { isPersonName, isVenezuelanPhone, toVenezuelanE164 } from "../lib/validation";
@@ -24,22 +25,16 @@ import {
   clearSession,
   getCuenta,
   loadSession,
+  loginWithGoogle,
   logout,
   maskPhone,
   requestOtp,
   updatePerfil,
   verifyOtp,
   type Cuenta,
-  type Rol,
 } from "../lib/api";
 
 type Paso = "datos" | "codigo" | "cuenta";
-
-const ROL_LABEL: Record<Rol, string> = {
-  cliente: "Pasajero",
-  conductor: "Piloto",
-  admin: "Administrador",
-};
 
 const RESEND_SECONDS = 30;
 
@@ -197,6 +192,20 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
     }
   }
 
+  async function entrarConGoogle(credential: string) {
+    setError("");
+    setCargando(true);
+    try {
+      const { cuenta: actual } = await loginWithGoogle(credential);
+      setCuenta(actual);
+      setPaso("cuenta");
+    } catch (fallo) {
+      setError(fallo instanceof ApiError ? fallo.message : "No pudimos entrar con Google. Intenta de nuevo.");
+    } finally {
+      setCargando(false);
+    }
+  }
+
   async function reenviar() {
     if (!e164 || resendIn > 0) return;
     setError("");
@@ -304,11 +313,23 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
 
     return (
       <div className="animate-pop py-2 text-center">
-        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
-          <CheckCircle2 className="h-8 w-8" />
-        </span>
+        {usuario.fotoUrl ? (
+          <img
+            src={usuario.fotoUrl}
+            alt={`Foto de ${usuario.nombre}`}
+            referrerPolicy="no-referrer"
+            className="mx-auto h-20 w-20 rounded-full border-2 border-emerald-400/40 object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-[28px] font-extrabold text-emerald-300"
+          >
+            {primerNombre.charAt(0).toUpperCase()}
+          </span>
+        )}
         <Badge tone="success" className="mt-5 uppercase tracking-[0.14em]">
-          Cuenta real
+          {usuario.etiquetaRol}
         </Badge>
         <h2 className="heading mt-4 text-[26px] font-extrabold text-white sm:text-[30px]">Listo, {primerNombre}.</h2>
         <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ink-300">
@@ -322,7 +343,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
           </div>
           <div className="rounded-xl border border-asphalt-800 bg-asphalt-950/70 p-3">
             <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500">Rol</dt>
-            <dd className="mt-1 text-[13px] text-ink-200">{ROL_LABEL[usuario.rol]}</dd>
+            <dd className="mt-1 text-[13px] text-ink-200">{usuario.etiquetaRol}</dd>
           </div>
           <div className="rounded-xl border border-asphalt-800 bg-asphalt-950/70 p-3">
             <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500">Teléfono</dt>
@@ -600,7 +621,14 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
         Sin contraseñas: te enviamos un código por WhatsApp o SMS. La misma cuenta funciona en la web y en la app.
       </p>
 
-      <form className="mt-5 grid gap-4" onSubmit={enviarCodigo} noValidate>
+      <div className="mt-5">
+        <GoogleButton
+          onCredential={entrarConGoogle}
+          text={mode === "register" ? "signup_with" : "signin_with"}
+        />
+      </div>
+
+      <form className="mt-1 grid gap-4" onSubmit={enviarCodigo} noValidate>
         {mode === "register" && (
           <div>
             <label htmlFor={nombreId} className="label">
