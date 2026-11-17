@@ -187,8 +187,7 @@ describe("RealAuth", () => {
 
     expect(await screen.findByRole("heading", { name: "Listo, María." })).toBeInTheDocument();
     expect(api.verifyOtp).toHaveBeenCalledWith({ telefono: "+584141234567", token: "123456" });
-    expect(screen.getByText("Cuenta real")).toBeInTheDocument();
-    expect(screen.getByText("Pasajero")).toBeInTheDocument();
+    expect(screen.getAllByText("Pasajero")).toHaveLength(2);
     expect(screen.getByText("$9,90")).toBeInTheDocument();
   });
 
