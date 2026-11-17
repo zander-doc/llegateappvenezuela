@@ -47,7 +47,10 @@ export function GoogleButton({
   const contenedor = useRef<HTMLDivElement>(null);
   const [listo, setListo] = useState(false);
   const alCredencial = useRef(onCredential);
-  alCredencial.current = onCredential;
+
+  useEffect(() => {
+    alCredencial.current = onCredential;
+  }, [onCredential]);
 
   useEffect(() => {
     let activo = true;
