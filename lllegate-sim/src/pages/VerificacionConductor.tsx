@@ -37,6 +37,7 @@ import {
   type TipoDocumentoConductor,
   type VerificacionConductor,
 } from "../lib/api";
+import { pasosRegistro, type PasoRegistro } from "../lib/registroPiloto";
 
 const DOCUMENTOS: Array<{
   tipo: TipoDocumentoConductor;
@@ -83,6 +84,46 @@ function fecha(iso: string | null) {
   if (!iso) return "";
   const value = new Date(iso);
   return Number.isNaN(value.getTime()) ? "" : fechaFmt.format(value);
+}
+
+function PasosRegistro({ pasos, actual }: { pasos: PasoRegistro[]; actual: number }) {
+  return (
+    <nav aria-label="Pasos del registro de piloto" className="card p-4 sm:p-5">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-400">
+        Paso {actual + 1} de {pasos.length}
+      </p>
+      <ol className="mt-3 grid grid-cols-4 gap-2">
+        {pasos.map((paso, indice) => {
+          const hecho = paso.estado === "hecho";
+          const enCurso = paso.estado === "actual";
+          return (
+            <li key={paso.id} aria-current={enCurso ? "step" : undefined} className="min-w-0">
+              <span
+                className={`block h-1.5 rounded-full ${hecho ? "bg-emerald-400" : enCurso ? "bg-brand-500" : "bg-white/10"}`}
+              />
+              <span className="mt-2 flex items-center gap-1.5">
+                <span
+                  className={`mono flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                    hecho
+                      ? "bg-emerald-400/15 text-emerald-300"
+                      : enCurso
+                        ? "bg-brand-500/15 text-brand-400"
+                        : "bg-white/[0.05] text-ink-500"
+                  }`}
+                >
+                  {hecho ? <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> : indice + 1}
+                </span>
+                <span className={`truncate text-[12px] font-semibold ${enCurso || hecho ? "text-white" : "text-ink-500"}`}>
+                  {paso.titulo}
+                </span>
+              </span>
+              <span className="mt-0.5 block truncate pl-[26px] text-[10.5px] text-ink-500">{paso.nota}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
 }
 
 function ErrorBox({ children }: { children: string }) {
@@ -304,6 +345,14 @@ export function VerificacionConductorPage() {
     }
   }
 
+  const progreso = pasosRegistro({
+    conSesion: sesion !== null,
+    conVehiculo: conductor !== null && !sinRegistro,
+    documentosCargados: documentos.length,
+    enviadoEn: conductor?.enviadoEn ?? null,
+    verificacion: conductor?.verificacion ?? null,
+  });
+
   if (!realAuthEnabled) {
     return (
       <>
@@ -390,6 +439,7 @@ export function VerificacionConductorPage() {
           ) : (
             <div className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:items-start">
               <div className="grid min-w-0 gap-5">
+                <PasosRegistro pasos={progreso.pasos} actual={progreso.actual} />
                 <div className="card p-5 sm:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
