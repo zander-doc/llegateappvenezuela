@@ -26,6 +26,8 @@ vi.mock("../lib/api", () => {
     getCuenta: vi.fn(),
     requestOtp: vi.fn(),
     verifyOtp: vi.fn(),
+    getGoogleConfig: vi.fn().mockResolvedValue({ disponible: false, clientId: null }),
+    loginWithGoogle: vi.fn(),
     updatePerfil: vi.fn(),
     logout: vi.fn(),
     getWallet: vi.fn(),
