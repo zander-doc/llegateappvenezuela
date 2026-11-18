@@ -72,6 +72,13 @@ const ESTADO_COPY: Record<
   },
 };
 
+// Antes de enviar, el registro es un borrador: todavía nadie lo está revisando.
+const BORRADOR_COPY: (typeof ESTADO_COPY)["pendiente"] = {
+  titulo: "Borrador",
+  detalle: "Aún no has enviado tu registro. Sube los 4 documentos y envíalo a revisión; tu avance queda guardado.",
+  tone: "neutral",
+};
+
 const NIVEL_RIESGO: Record<ResultadoEnvioVerificacion["riesgoNivel"], { label: string; tone: "success" | "yellow" | "danger" }> = {
   bajo: { label: "Riesgo bajo", tone: "success" },
   medio: { label: "Riesgo medio", tone: "yellow" },
@@ -353,6 +360,12 @@ export function VerificacionConductorPage() {
     verificacion: conductor?.verificacion ?? null,
   });
 
+  const estadoCopy = conductor
+    ? conductor.verificacion === "pendiente" && !conductor.enviadoEn
+      ? BORRADOR_COPY
+      : ESTADO_COPY[conductor.verificacion]
+    : null;
+
   if (!realAuthEnabled) {
     return (
       <>
@@ -452,16 +465,16 @@ export function VerificacionConductorPage() {
                       </p>
                     </div>
                     {conductor && (
-                      <Badge tone={ESTADO_COPY[conductor.verificacion].tone}>
-                        {ESTADO_COPY[conductor.verificacion].titulo}
+                      <Badge tone={estadoCopy?.tone ?? "neutral"}>
+                        {estadoCopy?.titulo}
                       </Badge>
                     )}
                   </div>
 
                   {conductor && (
                     <div className="mt-4 rounded-xl border border-white/8 bg-white/[0.02] px-3.5 py-3">
-                      <p className="text-[12.5px] font-semibold text-white">{ESTADO_COPY[conductor.verificacion].titulo}</p>
-                      <p className="mt-1 text-[12px] leading-relaxed text-ink-400">{ESTADO_COPY[conductor.verificacion].detalle}</p>
+                      <p className="text-[12.5px] font-semibold text-white">{estadoCopy?.titulo}</p>
+                      <p className="mt-1 text-[12px] leading-relaxed text-ink-400">{estadoCopy?.detalle}</p>
                       {conductor.verificacion === "rechazado" && conductor.motivoRechazo && (
                         <p className="mt-2 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] leading-relaxed text-red-300">
                           {conductor.motivoRechazo}
