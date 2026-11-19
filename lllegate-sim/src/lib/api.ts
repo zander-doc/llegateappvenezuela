@@ -383,6 +383,32 @@ export async function getCuenta(): Promise<Cuenta> {
   }
 }
 
+export interface PilotoFavorito {
+  id: string;
+  nombre: string;
+  tipoVehiculo: "moto" | "carro";
+  placa: string;
+}
+
+export async function getPilotosFavoritos(): Promise<PilotoFavorito[]> {
+  const token = await accessToken();
+  const data = await request<{
+    conductores: Array<{ conductor_id: string; nombre: string; tipo_vehiculo: "moto" | "carro"; placa: string }>;
+  }>("/api/favoritos/conductores", { token });
+  return (data.conductores ?? []).map((item) => ({
+    id: item.conductor_id,
+    nombre: item.nombre,
+    tipoVehiculo: item.tipo_vehiculo,
+    placa: item.placa,
+  }));
+}
+
+export async function getCodigoReferido(): Promise<string | null> {
+  const token = await accessToken();
+  const data = await request<{ resumen?: { codigo_referido?: string | null } }>("/api/referidos", { token });
+  return data.resumen?.codigo_referido ?? null;
+}
+
 export async function updatePerfil(input: {
   nombre?: string;
   estado?: string;
