@@ -15,7 +15,7 @@ import {
   User,
 } from "lucide-react";
 import { Badge, Button } from "./ui";
-import { RealWallet } from "./RealWallet";
+import { PanelRol } from "./PanelRol";
 import { GoogleButton } from "./GoogleButton";
 import { formatUSD } from "../lib/format";
 import { VENEZUELA_LOCATIONS } from "../data/locations";
@@ -530,7 +530,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
           <RealNote />
         </div>
 
-        <RealWallet onCuentaActualizada={actualizarCuenta} />
+        <PanelRol cuenta={cuenta} onCuentaActualizada={actualizarCuenta} />
       </div>
     );
   }
@@ -615,7 +615,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
   return (
     <div className="mt-5">
       <h2 className="heading text-3xl font-extrabold text-white sm:text-[34px]">
-        {mode === "register" ? "Crea tu cuenta real." : "Entra con tu teléfono."}
+        {mode === "register" ? "Crea tu cuenta real." : "Entra a tu cuenta."}
       </h2>
       <p className="mt-2 text-[14px] leading-relaxed text-ink-300">
         Sin contraseñas: te enviamos un código por WhatsApp o SMS. La misma cuenta funciona en la web y en la app.

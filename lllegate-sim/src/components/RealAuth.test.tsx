@@ -31,6 +31,8 @@ vi.mock("../lib/api", () => {
     updatePerfil: vi.fn(),
     logout: vi.fn(),
     getWallet: vi.fn(),
+    getPilotosFavoritos: vi.fn(),
+    getCodigoReferido: vi.fn(),
     getPaymentMethods: vi.fn(),
     listPayments: vi.fn(),
     createPaymentIntent: vi.fn(),
@@ -99,6 +101,8 @@ beforeEach(() => {
   vi.mocked(api.updatePerfil).mockResolvedValue(CUENTA);
   vi.mocked(api.logout).mockResolvedValue();
   vi.mocked(api.getWallet).mockResolvedValue(BILLETERA);
+  vi.mocked(api.getPilotosFavoritos).mockResolvedValue([]);
+  vi.mocked(api.getCodigoReferido).mockResolvedValue(null);
   vi.mocked(api.getPaymentMethods).mockResolvedValue([
     { id: "pago_movil", disponible: true, revision: "manual" },
     { id: "binance_pay", disponible: false, revision: "automatica" },
@@ -110,7 +114,7 @@ describe("RealAuth", () => {
   it("muestra el formulario de teléfono en modo ingreso", async () => {
     renderAuth();
 
-    expect(await screen.findByRole("heading", { name: "Entra con tu teléfono." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Entra a tu cuenta." })).toBeInTheDocument();
     expect(screen.queryByLabelText("Nombre y apellido")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /enviar código/i })).toBeInTheDocument();
   });
@@ -206,7 +210,7 @@ describe("RealAuth", () => {
     vi.mocked(api.getCuenta).mockRejectedValueOnce(new api.ApiError("sesion_invalida", 401, "Expirada"));
     renderAuth();
 
-    expect(await screen.findByRole("heading", { name: "Entra con tu teléfono." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Entra a tu cuenta." })).toBeInTheDocument();
     expect(api.clearSession).toHaveBeenCalled();
   });
 
@@ -217,7 +221,7 @@ describe("RealAuth", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /cerrar sesión/i }));
 
-    expect(await screen.findByRole("heading", { name: "Entra con tu teléfono." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Entra a tu cuenta." })).toBeInTheDocument();
     expect(api.logout).toHaveBeenCalled();
   });
 
