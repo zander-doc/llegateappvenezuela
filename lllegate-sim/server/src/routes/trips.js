@@ -88,6 +88,31 @@ tripsRouter.post(
   }),
 );
 
+// Viajes disponibles para conductores: pendientes y sin piloto asignado.
+// Solo accesible para conductores verificados (verificacion = 'aprobado' y no bloqueado).
+tripsRouter.get(
+  "/disponibles",
+  asyncHandler(async (req, res) => {
+    const detalle = await fila(
+      `select verificacion, estado from public.conductores_detalles where usuario_id = $1`,
+      [req.user.id],
+    );
+    if (!detalle || detalle.verificacion !== "aprobado" || detalle.estado === "bloqueado") {
+      throw new HttpError(403, "conductor_no_verificado", "Solo conductores verificados pueden ver viajes disponibles");
+    }
+
+    const viajes = await filas(
+      `select id, origen, destino, distancia_km, precio_usd, created_at
+       from public.viajes
+       where estado = 'solicitado' and conductor_id is null
+       order by created_at desc
+       limit 20`,
+    );
+
+    res.json({ ok: true, viajes });
+  }),
+);
+
 tripsRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
