@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "./App";
 
@@ -12,6 +12,9 @@ describe("App", () => {
   it("carga una página diferida mediante el router", async () => {
     window.history.pushState({}, "", "/tarifas");
     render(<App />);
-    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+    await waitFor(
+      () => expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
   });
 });

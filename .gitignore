@@ -31,3 +31,11 @@ backups/
 Thumbs.db
 cliente de OAuth.json
 cliente de OAuth.txt
+
+# Artefactos sueltos y auditoría
+K[0-9]*.txt
+*.patch
+vibe_images/
+
+# ViewModels de Android deben vivir solo en apps/android/
+/LlegateViewModel.kt
