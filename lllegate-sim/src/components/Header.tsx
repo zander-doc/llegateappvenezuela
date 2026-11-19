@@ -9,17 +9,16 @@ import {
   CircleHelp,
   Download,
   Home,
-  LogIn,
   MapPin,
   Menu,
   MessageCircle,
   ShieldCheck,
   Smartphone,
-  UserPlus,
   Wallet,
   X,
 } from "lucide-react";
 import { Badge, Button, ServiceIcon } from "./ui";
+import { CuentaMenu } from "./CuentaMenu";
 import { LAUNCH_SERVICES, UPCOMING_SERVICES } from "../data/services";
 import { realAuthEnabled } from "../lib/api";
 import { useUI } from "../lib/ui";
@@ -184,13 +183,7 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              to="/ingresar"
-              className="hidden h-10 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold text-ink-200 transition hover:bg-white/[0.06] hover:text-white lg:inline-flex"
-            >
-              <LogIn className="h-4 w-4 text-brand-400" />
-              Ingresar
-            </Link>
+            <CuentaMenu variante="barra" />
             <div className="hidden lg:block">
               <Button
                 size="sm"
@@ -280,24 +273,7 @@ export function Header() {
                   </div>
                 </div>
 
-                <div className="mb-4 grid grid-cols-2 gap-2">
-                  <Link
-                    to="/ingresar"
-                    onClick={() => setDrawer(false)}
-                    className="flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-asphalt-800 bg-asphalt-900 text-[14px] font-semibold text-white"
-                  >
-                    <LogIn className="h-4 w-4 text-brand-400" />
-                    Ingresar
-                  </Link>
-                  <Link
-                    to="/registro"
-                    onClick={() => setDrawer(false)}
-                    className="flex min-h-[52px] items-center justify-center gap-2 rounded-xl bg-brand-500 text-[14px] font-bold text-asphalt-950"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Crear cuenta
-                  </Link>
-                </div>
+                <CuentaMenu variante="cajon" />
 
                 <nav aria-label="Menú móvil" className="divide-y divide-white/8">
                   <DrawerSection
