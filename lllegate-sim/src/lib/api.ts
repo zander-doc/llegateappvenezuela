@@ -260,12 +260,24 @@ export function loadSession(): Session | null {
   }
 }
 
+// Aviso interno para que el menú de la cuenta se actualice al entrar o salir.
+export const SESSION_EVENT = "llegate:sesion";
+
+function avisarCambioDeSesion() {
+  try {
+    window.dispatchEvent(new Event(SESSION_EVENT));
+  } catch {
+    // Entornos sin window: nada que avisar.
+  }
+}
+
 export function saveSession(session: Session) {
   try {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   } catch {
     // Sin almacenamiento la sesión dura lo que dure la pestaña.
   }
+  avisarCambioDeSesion();
 }
 
 export function clearSession() {
@@ -274,6 +286,7 @@ export function clearSession() {
   } catch {
     // Nada que limpiar.
   }
+  avisarCambioDeSesion();
 }
 
 export async function requestOtp(input: {
