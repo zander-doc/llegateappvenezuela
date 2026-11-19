@@ -14,6 +14,7 @@ import {
   verifyDriverSchema,
 } from "../schemas.js";
 import { urlFirmada } from "../storage.js";
+import { avisoVerificacion, notificar } from "../notificaciones.js";
 
 export const adminRouter = Router();
 
@@ -226,6 +227,11 @@ adminRouter.post(
       },
       { usuarioId: req.user.id },
     );
+
+    // Un reenvío de la misma decisión no vuelve a avisar al piloto.
+    if (!resultado?.ya_verificado) {
+      await notificar(usuarioId, avisoVerificacion({ aprobado: body.aprobado, motivo: body.motivo }));
+    }
 
     res.json(resultado);
   }),

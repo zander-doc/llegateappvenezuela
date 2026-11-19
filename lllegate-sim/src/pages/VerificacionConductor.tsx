@@ -37,6 +37,7 @@ import {
   type TipoDocumentoConductor,
   type VerificacionConductor,
 } from "../lib/api";
+import { Avisos } from "../components/Avisos";
 import { pasosRegistro, type PasoRegistro } from "../lib/registroPiloto";
 
 const DOCUMENTOS: Array<{
@@ -452,6 +453,7 @@ export function VerificacionConductorPage() {
           ) : (
             <div className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:items-start">
               <div className="grid min-w-0 gap-5">
+                <Avisos />
                 <PasosRegistro pasos={progreso.pasos} actual={progreso.actual} />
                 <div className="card p-5 sm:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
