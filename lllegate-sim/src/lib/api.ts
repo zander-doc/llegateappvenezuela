@@ -448,6 +448,39 @@ export async function getCodigoReferido(): Promise<string | null> {
   return data.resumen?.codigo_referido ?? null;
 }
 
+export interface Aviso {
+  id: number;
+  tipo: string;
+  titulo: string;
+  cuerpo: string;
+  leida: boolean;
+  creadoEn: string;
+}
+
+export async function getAvisos(): Promise<{ sinLeer: number; avisos: Aviso[] }> {
+  const token = await accessToken();
+  const data = await request<{
+    sin_leer: number;
+    notificaciones: Array<{ id: number | string; tipo: string; titulo: string; cuerpo: string; leida_en: string | null; creado_en: string }>;
+  }>("/notificaciones", { token });
+  return {
+    sinLeer: Number(data.sin_leer ?? 0),
+    avisos: (data.notificaciones ?? []).map((item) => ({
+      id: Number(item.id),
+      tipo: item.tipo,
+      titulo: item.titulo,
+      cuerpo: item.cuerpo ?? "",
+      leida: item.leida_en !== null,
+      creadoEn: item.creado_en,
+    })),
+  };
+}
+
+export async function marcarAvisosLeidos(): Promise<void> {
+  const token = await accessToken();
+  await request("/notificaciones/leer", { method: "POST", token, body: {} });
+}
+
 export async function updatePerfil(input: {
   nombre?: string;
   estado?: string;

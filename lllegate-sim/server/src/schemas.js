@@ -352,3 +352,7 @@ export const negociosQuerySchema = z.object({
     .max(100, "La vitrina entrega máximo 100 fichas por página")
     .optional(),
 });
+
+export const leerNotificacionSchema = z
+  .object({ id: z.number().int().positive().optional() })
+  .strict();
