@@ -7,6 +7,9 @@ import * as api from "../lib/api";
 vi.mock("../lib/api", () => ({
   getPilotosFavoritos: vi.fn(),
   getCodigoReferido: vi.fn(),
+  getEnLinea: vi.fn(),
+  setEnLinea: vi.fn(),
+  updatePerfil: vi.fn(),
 }));
 
 vi.mock("./RealWallet", () => ({
@@ -15,7 +18,7 @@ vi.mock("./RealWallet", () => ({
 
 function cuentaDe(extra: Partial<api.Cuenta> = {}, puedeConducir = false): api.Cuenta {
   return {
-    usuario: { nombre: "Ana" },
+    usuario: { nombre: "Ana", preferencias: { rol_inicial: "pasajero" } },
     conductor: null,
     capacidades: { puedePedirViajes: true, puedeConducir },
     ...extra,
@@ -33,8 +36,10 @@ function renderPanel(cuenta: api.Cuenta) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getPilotosFavoritos).mockResolvedValue([
-    { id: "p1", nombre: "Luis Moto", tipoVehiculo: "moto", placa: "AB123CD" },
+    { id: "p1", nombre: "Luis Moto", tipoVehiculo: "moto", placa: "AB123CD", enLinea: true },
   ]);
+  vi.mocked(api.getEnLinea).mockResolvedValue(false);
+  vi.mocked(api.setEnLinea).mockResolvedValue(true);
   vi.mocked(api.getCodigoReferido).mockResolvedValue("ANA123");
 });
 
@@ -52,6 +57,37 @@ describe("PanelRol", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Piloto" }));
     expect(screen.getByRole("link", { name: /ser piloto/i })).toHaveAttribute("href", "/conductores/verificacion");
+  });
+
+  it("marca en línea a los favoritos conectados", async () => {
+    renderPanel(cuentaDe());
+
+    expect(await screen.findByText("1 en línea ahora")).toBeInTheDocument();
+    expect(screen.getByText("En línea")).toBeInTheDocument();
+  });
+
+  it("quien no ha elegido rol lo elige una vez y se guarda en su perfil", async () => {
+    vi.mocked(api.updatePerfil).mockResolvedValue(cuentaDe());
+    const cuenta = cuentaDe({ usuario: { nombre: "Ana", preferencias: {} } as unknown as api.Perfil });
+    renderPanel(cuenta);
+
+    fireEvent.click(screen.getByRole("button", { name: /tengo un negocio/i }));
+
+    expect(await screen.findByRole("tab", { name: "Comercio", selected: true })).toBeInTheDocument();
+    expect(api.updatePerfil).toHaveBeenCalledWith({ preferencias: { rol_inicial: "comercio" } });
+  });
+
+  it("el piloto verificado se conecta y desconecta con el interruptor", async () => {
+    renderPanel(cuentaDe({}, true));
+
+    const interruptor = await screen.findByRole("switch", { name: "Estar en línea" });
+    await vi.waitFor(() => expect(interruptor).not.toBeDisabled());
+    expect(interruptor).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(interruptor);
+
+    await vi.waitFor(() => expect(interruptor).toHaveAttribute("aria-checked", "true"));
+    expect(api.setEnLinea).toHaveBeenCalledWith(true);
   });
 
   it("el piloto verificado abre en su pestaña y ve la billetera para recargar", () => {

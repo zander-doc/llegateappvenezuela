@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import { fila, filas, rpc } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
 import { requireUser } from "../middleware.js";
-import { driverDetailsSchema, driverDocumentSchema } from "../schemas.js";
+import { driverDetailsSchema, driverDocumentSchema, enLineaSchema } from "../schemas.js";
 import { borrar, subir } from "../storage.js";
 import {
   decodificarDocumento,
@@ -15,7 +15,7 @@ import { extraerTexto } from "../verification/ocr.js";
 export const driversRouter = Router();
 
 const DRIVER_COLUMNS =
-  "usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, color, anio, cedula_url, licencia_url, certificado_medico_url, verificacion, estado, motivo_rechazo, riesgo_puntaje, riesgo_motivos, enviado_en, intentos_verificacion, created_at";
+  "usuario_id, cedula, tipo_vehiculo, placa, marca, modelo, color, anio, cedula_url, licencia_url, certificado_medico_url, verificacion, estado, motivo_rechazo, riesgo_puntaje, riesgo_motivos, enviado_en, intentos_verificacion, created_at, (en_linea and en_linea_actualizado_en > now() - interval '12 hours') as en_linea";
 
 const DOCUMENT_COLUMNS = "tipo, mime, bytes, ocr_estado, ocr_confianza, created_at, updated_at";
 
@@ -86,6 +86,41 @@ driversRouter.post(
   asyncHandler(async (req, res) => {
     const resultado = await rpc("enviar_verificacion_conductor", {}, { usuarioId: req.user.id });
     res.json(resultado);
+  }),
+);
+
+// "En línea": el piloto avisa que está disponible. Para conectarse debe estar
+// aprobado y con saldo (estado activo); desconectarse siempre se permite.
+driversRouter.put(
+  "/me/en-linea",
+  asyncHandler(async (req, res) => {
+    const { en_linea } = parse(enLineaSchema, req.body);
+
+    const actual = await fila(
+      "select verificacion, estado from public.conductores_detalles where usuario_id = $1",
+      [req.user.id],
+    );
+    if (!actual) throw new HttpError(404, "conductor_no_registrado", "Aún no tienes registro de conductor");
+
+    if (en_linea) {
+      if (actual.verificacion !== "aprobado") {
+        throw new HttpError(409, "conductor_no_verificado", "Tu registro de piloto aún no está aprobado");
+      }
+      if (actual.estado !== "activo") {
+        throw new HttpError(409, "conductor_sin_saldo", "Recarga tu saldo para conectarte");
+      }
+    }
+
+    const conductor = await fila(
+      `update public.conductores_detalles
+          set en_linea = $2,
+              en_linea_actualizado_en = now(),
+              updated_at = now()
+        where usuario_id = $1
+        returning en_linea, en_linea_actualizado_en`,
+      [req.user.id, en_linea],
+    );
+    res.json({ ok: true, en_linea: conductor.en_linea, actualizado_en: conductor.en_linea_actualizado_en });
   }),
 );
 

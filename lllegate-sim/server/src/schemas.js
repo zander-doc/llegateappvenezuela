@@ -84,6 +84,7 @@ export const perfilPatchSchema = z
         tema: z.enum(["oscuro", "claro", "sistema"]).optional(),
         avisos_viaje: z.boolean().optional(),
         avisos_saldo: z.boolean().optional(),
+        rol_inicial: z.enum(["pasajero", "piloto", "comercio"]).optional(),
       })
       .strict()
       .optional(),
@@ -201,6 +202,10 @@ export const favoriteAddressSchema = z.object({
   direccion_texto: z.string().trim().min(3).max(300),
   lat: coordenadaLatitud,
   lng: coordenadaLongitud,
+});
+
+export const enLineaSchema = z.object({
+  en_linea: z.boolean(),
 });
 
 export const favoriteDriverSchema = z.object({

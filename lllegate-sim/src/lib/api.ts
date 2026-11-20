@@ -41,6 +41,7 @@ export interface Preferencias {
   tema?: "oscuro" | "claro" | "sistema";
   avisos_viaje?: boolean;
   avisos_saldo?: boolean;
+  rol_inicial?: "pasajero" | "piloto" | "comercio";
 }
 
 export interface Conductor {
@@ -176,7 +177,7 @@ interface MeResponse {
 }
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "PUT";
   body?: unknown;
   token?: string;
 }
@@ -401,19 +402,44 @@ export interface PilotoFavorito {
   nombre: string;
   tipoVehiculo: "moto" | "carro";
   placa: string;
+  enLinea: boolean;
 }
 
 export async function getPilotosFavoritos(): Promise<PilotoFavorito[]> {
   const token = await accessToken();
   const data = await request<{
-    conductores: Array<{ conductor_id: string; nombre: string; tipo_vehiculo: "moto" | "carro"; placa: string }>;
+    conductores: Array<{
+      conductor_id: string;
+      nombre: string;
+      tipo_vehiculo: "moto" | "carro";
+      placa: string;
+      en_linea?: boolean | null;
+    }>;
   }>("/api/favoritos/conductores", { token });
   return (data.conductores ?? []).map((item) => ({
     id: item.conductor_id,
     nombre: item.nombre,
     tipoVehiculo: item.tipo_vehiculo,
     placa: item.placa,
+    enLinea: Boolean(item.en_linea),
   }));
+}
+
+// "En línea" del piloto: avisa a sus pasajeros favoritos que está disponible.
+export async function getEnLinea(): Promise<boolean> {
+  const token = await accessToken();
+  const data = await request<{ conductor: { en_linea?: boolean | null } }>("/drivers/me", { token });
+  return Boolean(data.conductor?.en_linea);
+}
+
+export async function setEnLinea(enLinea: boolean): Promise<boolean> {
+  const token = await accessToken();
+  const data = await request<{ en_linea: boolean }>("/drivers/me/en-linea", {
+    method: "PUT",
+    token,
+    body: { en_linea: enLinea },
+  });
+  return Boolean(data.en_linea);
 }
 
 export async function getCodigoReferido(): Promise<string | null> {
