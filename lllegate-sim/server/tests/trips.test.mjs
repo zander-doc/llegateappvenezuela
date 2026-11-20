@@ -99,7 +99,7 @@ after(async () => {
   await pg.terminar();
 });
 
-test("conductor verificado puede ver viajes disponibles", async (t) => {
+test("conductor verificado puede ver viajes disponibles", async () => {
   const tokenPasajero = await obtenerToken(PASAJERO.telefono);
   assert.ok(tokenPasajero, "debe obtener token de pasajero");
 
@@ -131,7 +131,7 @@ test("conductor verificado puede ver viajes disponibles", async (t) => {
   );
 });
 
-test("pasajero no puede ver viajes disponibles", async (t) => {
+test("pasajero no puede ver viajes disponibles", async () => {
   const tokenPasajero = await obtenerToken(PASAJERO.telefono);
   assert.ok(tokenPasajero);
 
@@ -141,7 +141,7 @@ test("pasajero no puede ver viajes disponibles", async (t) => {
   assert.equal(respuesta.status, 403, JSON.stringify(respuesta.cuerpo));
 });
 
-test("conductor no verificado no puede ver viajes disponibles", async (t) => {
+test("conductor no verificado no puede ver viajes disponibles", async () => {
   await sql(
     `insert into public.usuarios (id, telefono, telefono_verificado, rol, estado, ciudad, saldo_billetera)
      values ('66666666-6666-6666-6666-666666666666', '+584146666666', true, 'conductor', 'Aragua', 'Maracay', 0)
