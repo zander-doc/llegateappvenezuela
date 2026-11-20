@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Bike, Car, ShieldCheck, Store } from "lucide-react";
 import { RealWallet } from "./RealWallet";
-import { getCodigoReferido, getPilotosFavoritos, type Cuenta, type PilotoFavorito } from "../lib/api";
+import {
+  getCodigoReferido,
+  getEnLinea,
+  getPilotosFavoritos,
+  setEnLinea,
+  updatePerfil,
+  type Cuenta,
+  type PilotoFavorito,
+} from "../lib/api";
 
 // Panel de la cuenta por rol: la misma cabecera para todos y, debajo, solo lo
 // que cada rol necesita (el pasajero sus pilotos, el piloto su saldo).
@@ -46,6 +54,11 @@ function Pasajero() {
 
       <section className={tarjeta} aria-label="Mis pilotos favoritos">
         <h3 className="heading text-[15px] font-bold text-white">Mis pilotos favoritos</h3>
+        {favoritos !== null && favoritos.some((piloto) => piloto.enLinea) && (
+          <p className="mt-1 text-[12px] font-semibold text-emerald-300">
+            {favoritos.filter((piloto) => piloto.enLinea).length} en línea ahora
+          </p>
+        )}
         {favoritos === null ? (
           <p className="mt-2 text-[12.5px] text-ink-500">Cargando…</p>
         ) : favoritos.length === 0 ? (
@@ -69,6 +82,12 @@ function Pasajero() {
                     {piloto.tipoVehiculo === "moto" ? "Moto" : "Carro"} · {piloto.placa}
                   </span>
                 </span>
+                {piloto.enLinea && (
+                  <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                    En línea
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -85,6 +104,70 @@ function Pasajero() {
   );
 }
 
+function InterruptorEnLinea() {
+  const [enLinea, setValor] = useState<boolean | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let activo = true;
+    getEnLinea()
+      .then((valor) => activo && setValor(valor))
+      .catch(() => activo && setValor(false));
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  async function cambiar() {
+    if (enLinea === null || guardando) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      setValor(await setEnLinea(!enLinea));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No pudimos cambiar tu estado. Inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <section className={tarjeta} aria-label="Estado en línea">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="heading text-[15px] font-bold text-white">{enLinea ? "Estás en línea" : "Estás desconectado"}</h3>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-400">
+            {enLinea
+              ? "Tus pasajeros favoritos ven que estás disponible. Se desconecta solo tras 12 horas."
+              : "Conéctate para que tus pasajeros favoritos sepan que estás disponible."}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enLinea === true}
+          aria-label="Estar en línea"
+          disabled={enLinea === null || guardando}
+          onClick={cambiar}
+          className={`relative h-8 w-14 shrink-0 rounded-full transition disabled:opacity-50 ${
+            enLinea ? "bg-emerald-400" : "bg-asphalt-700"
+          }`}
+        >
+          <span
+            className={`absolute top-1 h-6 w-6 rounded-full bg-white transition-all ${enLinea ? "left-7" : "left-1"}`}
+          />
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-[12.5px] text-red-300">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function Piloto({ cuenta, onCuentaActualizada }: { cuenta: Cuenta; onCuentaActualizada: () => void }) {
   const { conductor, capacidades } = cuenta;
 
@@ -95,6 +178,7 @@ function Piloto({ cuenta, onCuentaActualizada }: { cuenta: Cuenta; onCuentaActua
           <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-300" aria-hidden="true" />
           Piloto verificado. La comisión de cada viaje se descuenta de tu saldo prepago.
         </p>
+        <InterruptorEnLinea />
         <RealWallet onCuentaActualizada={onCuentaActualizada} />
       </div>
     );
@@ -135,9 +219,61 @@ function Comercio() {
   );
 }
 
+function ElegirRol({ onElegir }: { onElegir: (rol: Rol) => Promise<void> }) {
+  const [guardando, setGuardando] = useState<Rol | null>(null);
+  const opciones: Array<{ id: Rol; titulo: string; detalle: string }> = [
+    { id: "pasajero", titulo: "Quiero pedir viajes", detalle: "Moto o carro, y mis pilotos favoritos." },
+    { id: "piloto", titulo: "Quiero manejar", detalle: "Registro de piloto y saldo prepago." },
+    { id: "comercio", titulo: "Tengo un negocio", detalle: "Anunciarme en el Mercado de Llégate." },
+  ];
+
+  return (
+    <section className={`${tarjeta} mt-6`} aria-label="Cómo vas a usar Llégate">
+      <h3 className="heading text-[15px] font-bold text-white">¿Cómo vas a usar Llégate?</h3>
+      <p className="mt-1 text-[12.5px] text-ink-400">Elige lo principal; luego puedes cambiar de rol cuando quieras.</p>
+      <div className="mt-3 grid gap-2">
+        {opciones.map(({ id, titulo, detalle }) => (
+          <button
+            key={id}
+            type="button"
+            disabled={guardando !== null}
+            onClick={async () => {
+              setGuardando(id);
+              try {
+                await onElegir(id);
+              } finally {
+                setGuardando(null);
+              }
+            }}
+            className="min-h-[52px] rounded-xl border border-asphalt-800 bg-white/[0.03] px-3.5 py-2.5 text-left transition hover:border-brand-500/60 disabled:opacity-60"
+          >
+            <span className="block text-[14px] font-semibold text-white">{titulo}</span>
+            <span className="block text-[12px] text-ink-500">{detalle}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function PanelRol({ cuenta, onCuentaActualizada }: { cuenta: Cuenta; onCuentaActualizada: () => void }) {
-  // Quien ya es piloto abre directo en su pestaña; el resto, en la de pasajero.
-  const [rol, setRol] = useState<Rol>(cuenta.capacidades.puedeConducir ? "piloto" : "pasajero");
+  const rolGuardado = cuenta.usuario.preferencias.rol_inicial;
+  // Quien ya es piloto abre directo en su pestaña; el resto, en el rol que eligió (o pasajero).
+  const [rol, setRol] = useState<Rol>(cuenta.capacidades.puedeConducir ? "piloto" : (rolGuardado ?? "pasajero"));
+  const [eligiendo, setEligiendo] = useState(!rolGuardado && !cuenta.capacidades.puedeConducir);
+
+  async function elegirRol(nuevo: Rol) {
+    try {
+      await updatePerfil({ preferencias: { rol_inicial: nuevo } });
+      onCuentaActualizada();
+    } catch {
+      // Si no se pudo guardar, igual mostramos el rol elegido en esta sesión.
+    }
+    setRol(nuevo);
+    setEligiendo(false);
+  }
+
+  if (eligiendo) return <ElegirRol onElegir={elegirRol} />;
 
   return (
     <div className="mt-6">

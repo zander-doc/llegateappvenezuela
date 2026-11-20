@@ -63,7 +63,8 @@ favoritesRouter.get(
   asyncHandler(async (req, res) => {
     const conductores = await filas(
       `select u.id as conductor_id, u.nombre, d.tipo_vehiculo, d.placa, d.marca, d.modelo,
-              d.verificacion, f.created_at
+              d.verificacion, f.created_at,
+              (d.en_linea and d.en_linea_actualizado_en > now() - interval '12 hours') as en_linea
          from public.conductores_favoritos f
          join public.usuarios u on u.id = f.conductor_id
          join public.conductores_detalles d on d.usuario_id = u.id
