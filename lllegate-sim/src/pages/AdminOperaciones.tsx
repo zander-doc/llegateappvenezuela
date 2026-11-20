@@ -626,6 +626,9 @@ export function AdminOperacionesPage() {
             <Button variant="secondary" to="/admin/solicitudes">
               Bandeja de solicitudes <ArrowRight className="h-4 w-4" />
             </Button>
+            <Button variant="secondary" to="/admin/pilotos">
+              Meta de pilotos <ArrowRight className="h-4 w-4" />
+            </Button>
             <Button variant="secondary" to="/admin/cobros">
               Cobros pendientes <ArrowRight className="h-4 w-4" />
             </Button>

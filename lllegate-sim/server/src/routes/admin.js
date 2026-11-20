@@ -23,6 +23,65 @@ const DRIVER_ADMIN_COLUMNS =
 
 adminRouter.use(requireUser, requireAdmin);
 
+// Meta de arranque: 90 pilotos activos con prepago recurrente al cierre del mes 3.
+// "Activo" = piloto aprobado con una recarga confirmada en los últimos 30 días.
+const META_PILOTOS_ACTIVOS = 90;
+
+adminRouter.get(
+  "/metricas/pilotos",
+  asyncHandler(async (_req, res) => {
+    const resumen = await fila(
+      `select
+         count(*) filter (where d.verificacion = 'aprobado')::int as aprobados,
+         count(*) filter (where d.verificacion = 'pendiente')::int as pendientes,
+         count(*) filter (where d.verificacion = 'aprobado' and d.estado = 'activo')::int as con_saldo,
+         count(*) filter (
+           where d.verificacion = 'aprobado'
+             and d.en_linea
+             and d.en_linea_actualizado_en > now() - interval '12 hours'
+         )::int as en_linea,
+         count(*) filter (
+           where d.verificacion = 'aprobado'
+             and (
+               exists (
+                 select 1 from public.pagos p
+                  where p.usuario_id = d.usuario_id
+                    and p.estado = 'confirmado'
+                    and p.confirmado_en > now() - interval '30 days'
+               )
+               or exists (
+                 select 1 from public.transacciones_billetera t
+                  where t.usuario_id = d.usuario_id
+                    and t.tipo = 'recarga'
+                    and t.estado = 'aprobada'
+                    and t.created_at > now() - interval '30 days'
+               )
+             )
+         )::int as activos_30d
+       from public.conductores_detalles d`,
+    );
+
+    // Pilotos aprobados por semana, las últimas 8 (la más reciente al final).
+    const semanas = await filas(
+      `select to_char(s.semana, 'YYYY-MM-DD') as semana,
+              count(d.usuario_id)::int as aprobados
+         from generate_series(
+                date_trunc('week', now()) - interval '7 weeks',
+                date_trunc('week', now()),
+                interval '1 week'
+              ) as s(semana)
+         left join public.conductores_detalles d
+           on d.verificacion = 'aprobado'
+          and d.verificado_en >= s.semana
+          and d.verificado_en < s.semana + interval '1 week'
+        group by s.semana
+        order by s.semana`,
+    );
+
+    res.json({ ok: true, meta: META_PILOTOS_ACTIVOS, ...resumen, semanas });
+  }),
+);
+
 adminRouter.get(
   "/recargas",
   asyncHandler(async (req, res) => {

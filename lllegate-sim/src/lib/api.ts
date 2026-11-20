@@ -1191,6 +1191,38 @@ export async function listAdminPayments(estado: EstadoPago = "en_revision"): Pro
   }));
 }
 
+export interface MetricasPilotos {
+  meta: number;
+  aprobados: number;
+  pendientes: number;
+  conSaldo: number;
+  enLinea: number;
+  activos30d: number;
+  semanas: Array<{ semana: string; aprobados: number }>;
+}
+
+export async function getMetricasPilotos(): Promise<MetricasPilotos> {
+  const token = await accessToken();
+  const data = await request<{
+    meta: number;
+    aprobados: number;
+    pendientes: number;
+    con_saldo: number;
+    en_linea: number;
+    activos_30d: number;
+    semanas: Array<{ semana: string; aprobados: number }> | null;
+  }>("/admin/metricas/pilotos", { token });
+  return {
+    meta: Number(data.meta),
+    aprobados: Number(data.aprobados),
+    pendientes: Number(data.pendientes),
+    conSaldo: Number(data.con_saldo),
+    enLinea: Number(data.en_linea),
+    activos30d: Number(data.activos_30d),
+    semanas: (data.semanas ?? []).map((item) => ({ semana: item.semana, aprobados: Number(item.aprobados) })),
+  };
+}
+
 export async function listAdminRecharges(estado: EstadoRecarga = "pendiente"): Promise<RecargaAdmin[]> {
   const token = await accessToken();
   const data = await request<{ ok: boolean; recargas: AdminRecargaRow[] | null }>(
