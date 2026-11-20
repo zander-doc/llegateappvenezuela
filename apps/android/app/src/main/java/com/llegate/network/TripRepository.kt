@@ -199,6 +199,18 @@ class TripRepository(private val http: AuthorizedClient) {
   suspend fun pagarConSaldo(id: String): EstadoViaje =
     accion("/trips/$id/pagar-saldo", JSONObject())
 
+  /** Conductor: ve los viajes pendientes sin piloto asignado. */
+  suspend fun obtenerViajesDisponibles(): List<Viaje> =
+    http.get("/trips/disponibles").optJSONArray("viajes")?.listar(::viajeFrom) ?: emptyList()
+
+  /** Conductor: acepta un viaje pendiente. Llama POST /trips/:id/aceptar y devuelve el viaje actualizado. */
+  suspend fun aceptarViaje(id: String): Viaje = try {
+    accion("/trips/$id/aceptar", JSONObject())
+    consultar(id)
+  } catch (e: ApiException) {
+    throw e
+  }
+
   /** Los RPC de viaje contestan 409 con `motivo`; ahí se traduce a algo que entienda el pana. */
   private suspend fun accion(path: String, body: JSONObject): EstadoViaje = try {
     val json = http.post(path, body)

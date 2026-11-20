@@ -102,6 +102,7 @@ import com.llegate.model.UpcomingService
 import com.llegate.network.EstadoPago
 import com.llegate.network.Movimiento
 import com.llegate.network.PaqueteRecarga
+import com.llegate.network.Viaje
 import com.llegate.ui.components.CommunityAlertsSection
 import com.llegate.ui.navigation.BookingFlowState
 import com.llegate.ui.components.MapboxDarkMapScreen
@@ -186,6 +187,12 @@ fun HomeScreen(
             Log.e("HomeScreen", "La respuesta de actualización no contiene JSON válido.", exception)
         } catch (exception: IllegalArgumentException) {
             Log.e("HomeScreen", "La respuesta de actualización contiene datos inválidos.", exception)
+        }
+    }
+
+    LaunchedEffect(uiState.isDriverMode) {
+        if (uiState.isDriverMode && uiState.cuenta?.rol == "conductor") {
+            viewModel.cargarViajesDisponibles()
         }
     }
 
@@ -1321,6 +1328,88 @@ fun HomeScreen(
                                     fontSize = 11.sp,
                                     color = Stone400
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // VIAJES DISPONIBLES PARA CONDUCTORES
+            if (uiState.isDriverMode) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "VIAJES DISPONIBLES",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Stone100
+                        )
+                        TextButton(onClick = { viewModel.cargarViajesDisponibles() }) {
+                            Text("Actualizar", color = RacingYellow500, fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                if (uiState.cargandoViajesDisponibles) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = RacingYellow500, strokeWidth = 4.dp)
+                        }
+                    }
+                } else if (uiState.viajesDisponibles.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No hay viajes disponibles en este momento.",
+                            color = Stone400,
+                            fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    items(uiState.viajesDisponibles) { viaje ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Asphalt950),
+                            border = BorderStroke(1.dp, Asphalt700)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${viaje.origen} → ${viaje.destino}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Stone100,
+                                        maxLines = 2
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Distancia: ${viaje.distanciaKm?.let { "%.1f".format(it) } ?: "?"} km • Precio: \$${"%.2f".format(viaje.precioUsd)}",
+                                        fontSize = 12.sp,
+                                        color = Stone400
+                                    )
+                                }
+                                Button(
+                                    onClick = { viewModel.aceptarViaje(viaje.id) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = RacingYellow500)
+                                ) {
+                                    Text("Aceptar", color = Asphalt950, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
