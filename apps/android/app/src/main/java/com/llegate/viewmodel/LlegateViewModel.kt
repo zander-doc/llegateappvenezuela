@@ -371,6 +371,8 @@ data class LlegateUiState(
     val viajes: List<Viaje> = emptyList(),
     val viajesProgramados: List<ViajeProgramado> = emptyList(),
     val cargandoViajesProgramados: Boolean = false,
+    val viajesDisponibles: List<Viaje> = emptyList(),
+    val cargandoViajesDisponibles: Boolean = false,
     val favoriteAddresses: List<FavoriteAddress> = emptyList(),
     val favoriteDrivers: List<FavoriteDriver> = emptyList(),
     val loadingFavorites: Boolean = false,
@@ -911,6 +913,65 @@ class LlegateViewModel(
                 }
             } catch (fallo: Exception) {
                 if (fallo is CancellationException) throw fallo
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
+    }
+
+    fun cargarViajesDisponibles() {
+        val state = _uiState.value
+        if (!auth.tieneSesion) {
+            avisar("Entra a tu cuenta para ver viajes disponibles.")
+            return
+        }
+        if (state.cuenta?.rol != "conductor") {
+            avisar("Solo los conductores pueden ver viajes disponibles.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(cargandoViajesDisponibles = true) }
+            try {
+                val viajes = tripRepo.obtenerViajesDisponibles()
+                _uiState.update { it.copy(viajesDisponibles = viajes, cargandoViajesDisponibles = false) }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                _uiState.update { it.copy(cargandoViajesDisponibles = false) }
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
+    }
+
+    fun aceptarViaje(id: String) {
+        val state = _uiState.value
+        if (!auth.tieneSesion || state.cuenta?.rol != "conductor") {
+            avisar("Solo los conductores pueden aceptar viajes.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(cargandoViajesDisponibles = true) }
+            try {
+                val viajeAceptado = tripRepo.aceptarViaje(id)
+
+                val tripActivo = activeTripDe(
+                    viaje = viajeAceptado,
+                    origen = puntoDeTexto(viajeAceptado.origen, "Origen del viaje"),
+                    destino = puntoDeTexto(viajeAceptado.destino, "Destino del viaje"),
+                    bcv = state.bcvExchangeRate
+                )
+
+                _uiState.update {
+                    it.copy(
+                        activeTrip = tripActivo,
+                        viajesDisponibles = it.viajesDisponibles.filterNot { v -> v.id == id },
+                        cargandoViajesDisponibles = false,
+                        currentScreen = AppScreen.TRIP_ACTIVE,
+                        statusMessage = "¡Viaje aceptado!"
+                    )
+                }
+                seguirViaje(id)
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                _uiState.update { it.copy(cargandoViajesDisponibles = false) }
                 avisar(fallo.message ?: FALLA_GENERICO)
             }
         }
