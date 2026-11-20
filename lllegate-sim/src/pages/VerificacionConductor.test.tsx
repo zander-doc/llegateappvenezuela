@@ -26,6 +26,8 @@ vi.mock("../lib/api", () => {
     saveDriverDetails: vi.fn(),
     uploadDriverDocument: vi.fn(),
     submitDriverVerification: vi.fn(),
+    getAvisos: vi.fn(),
+    marcarAvisosLeidos: vi.fn(),
     verificationErrorMessage: (error: unknown) => (error instanceof Error ? error.message : "Error de verificación"),
   };
 });
@@ -103,6 +105,8 @@ beforeEach(() => {
   vi.mocked(api.loadSession).mockReturnValue(SESION);
   vi.mocked(api.getCuenta).mockResolvedValue(CUENTA);
   vi.mocked(api.getDriverVerification).mockResolvedValue(VERIFICACION);
+  vi.mocked(api.getAvisos).mockResolvedValue({ sinLeer: 0, avisos: [] });
+  vi.mocked(api.marcarAvisosLeidos).mockResolvedValue(undefined);
   vi.mocked(api.submitDriverVerification).mockResolvedValue({
     ok: true,
     verificacion: "pendiente",
@@ -146,5 +150,27 @@ describe("VerificacionConductor", () => {
 
     await waitFor(() => expect(api.submitDriverVerification).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/verificación enviada/i)).toBeInTheDocument();
+  });
+
+  it("muestra los avisos pendientes y permite marcarlos como leídos", async () => {
+    vi.mocked(api.getAvisos).mockResolvedValue({
+      sinLeer: 1,
+      avisos: [
+        {
+          id: 7,
+          tipo: "conductor_rechazado",
+          titulo: "Necesitamos correcciones en tu registro",
+          cuerpo: "La licencia está vencida.",
+          leida: false,
+          creadoEn: "2026-11-19T10:00:00.000Z",
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByText("Necesitamos correcciones en tu registro")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /marcar como leídos/i }));
+    expect(api.marcarAvisosLeidos).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Necesitamos correcciones en tu registro")).not.toBeInTheDocument();
   });
 });
