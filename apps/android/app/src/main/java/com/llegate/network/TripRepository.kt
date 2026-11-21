@@ -211,6 +211,22 @@ class TripRepository(private val http: AuthorizedClient) {
     throw e
   }
 
+  /** Conductor: arranca el servicio con el pasajero a bordo. Llama POST /trips/:id/iniciar y devuelve el viaje actualizado. */
+  suspend fun iniciarViaje(id: String): Viaje = try {
+    accion("/trips/$id/iniciar", JSONObject())
+    consultar(id)
+  } catch (e: ApiException) {
+    throw e
+  }
+
+  /** Conductor: termina el servicio y dispara el cobro y la comisión. Llama POST /trips/:id/finalizar y devuelve el viaje actualizado. */
+  suspend fun finalizarViaje(id: String): Viaje = try {
+    accion("/trips/$id/finalizar", JSONObject())
+    consultar(id)
+  } catch (e: ApiException) {
+    throw e
+  }
+
   /** Los RPC de viaje contestan 409 con `motivo`; ahí se traduce a algo que entienda el pana. */
   private suspend fun accion(path: String, body: JSONObject): EstadoViaje = try {
     val json = http.post(path, body)

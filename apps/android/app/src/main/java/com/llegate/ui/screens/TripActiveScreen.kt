@@ -140,7 +140,35 @@ fun TripActiveScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
-                    if (trip.currentStep != TripStep.TRIP_COMPLETED) {
+                    if (uiState.isDriverMode) {
+                        when (trip.currentStep) {
+                            TripStep.DRIVER_EN_ROUTE -> {
+                                Button(
+                                    onClick = { viewModel.iniciarViaje(trip.viajeId) },
+                                    modifier = Modifier.fillMaxWidth().height(50.dp).testTag("start_trip_button"),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = RacingYellow500)
+                                ) { Text("Iniciar Viaje", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Asphalt950) }
+                            }
+                            TripStep.TRIP_IN_PROGRESS -> {
+                                Button(
+                                    onClick = { viewModel.finalizarViaje(trip.viajeId) },
+                                    modifier = Modifier.fillMaxWidth().height(50.dp).testTag("finish_trip_button"),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald500)
+                                ) { Text("Finalizar Viaje", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White) }
+                            }
+                            TripStep.TRIP_COMPLETED -> {
+                                Button(
+                                    onClick = { viewModel.cerrarViaje() },
+                                    modifier = Modifier.fillMaxWidth().height(52.dp).testTag("close_trip_button"),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald500)
+                                ) { Text("¡Listo, volver al inicio!", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Asphalt950) }
+                            }
+                            else -> {}
+                        }
+                    } else if (trip.currentStep != TripStep.TRIP_COMPLETED) {
                         OutlinedButton(
                             onClick = { viewModel.showCancelPrompt(true) },
                             modifier = Modifier

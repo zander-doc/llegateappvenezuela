@@ -977,6 +977,57 @@ class LlegateViewModel(
         }
     }
 
+    /** Conductor: arranca el servicio con el pasajero a bordo. */
+    fun iniciarViaje(id: String) {
+        val state = _uiState.value
+        if (!auth.tieneSesion || state.cuenta?.rol != "conductor") {
+            avisar("Solo los conductores pueden iniciar viajes.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(cargandoViajesDisponibles = true) }
+            try {
+                val viaje = tripRepo.iniciarViaje(id)
+                _uiState.update {
+                    it.copy(
+                        cargandoViajesDisponibles = false,
+                        statusMessage = "Viaje iniciado: ${viaje.estadoTexto}"
+                    )
+                }
+                seguirViaje(id)
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                _uiState.update { it.copy(cargandoViajesDisponibles = false) }
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
+    }
+
+    /** Conductor: termina el servicio y dispara el cobro y la comisión. */
+    fun finalizarViaje(id: String) {
+        val state = _uiState.value
+        if (!auth.tieneSesion || state.cuenta?.rol != "conductor") {
+            avisar("Solo los conductores pueden finalizar viajes.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(cargandoViajesDisponibles = true) }
+            try {
+                val viaje = tripRepo.finalizarViaje(id)
+                _uiState.update {
+                    it.copy(
+                        cargandoViajesDisponibles = false,
+                        statusMessage = "Viaje finalizado: ${viaje.estadoTexto}"
+                    )
+                }
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                _uiState.update { it.copy(cargandoViajesDisponibles = false) }
+                avisar(fallo.message ?: FALLA_GENERICO)
+            }
+        }
+    }
+
     /**
      * Si la app se cerrÃ³ a mitad de un viaje, `/trips` todavÃ­a lo tiene abierto: se
      * reconstruye la pantalla con los datos del servidor y se sigue preguntando por Ã©l.
