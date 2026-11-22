@@ -19,6 +19,9 @@ const RegistroPage = lazy(() => import("./pages/Conductores").then((m) => ({ def
 const VerificacionPage = lazy(() =>
   import("./pages/VerificacionConductor").then((m) => ({ default: m.VerificacionConductorPage })),
 );
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })));
+const AdminResumenPage = lazy(() => import("./pages/admin/AdminResumen").then((m) => ({ default: m.AdminResumenPage })));
+const AdminPersonalPage = lazy(() => import("./pages/admin/AdminPersonal").then((m) => ({ default: m.AdminPersonalPage })));
 const AdminPage = lazy(() => import("./pages/AdminOperaciones").then((m) => ({ default: m.AdminOperacionesPage })));
 const AdminPilotosPage = lazy(() =>
   import("./pages/AdminPilotos").then((m) => ({ default: m.AdminPilotosPage })),
@@ -49,6 +52,14 @@ export default function App() {
         <UIProvider>
           <PilotWalletProvider>
             <Routes>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminResumenPage />} />
+                <Route path="verificacion" element={<AdminPage />} />
+                <Route path="cobros" element={<AdminCobrosPage />} />
+                <Route path="pilotos" element={<AdminPilotosPage />} />
+                <Route path="solicitudes" element={<AdminSolicitudesPage />} />
+                <Route path="personal" element={<AdminPersonalPage />} />
+              </Route>
               <Route element={<Layout />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/billetera" element={<WalletScreen />} />
@@ -62,10 +73,6 @@ export default function App() {
                 <Route path="/conductores/planes" element={<PlanesPage />} />
                 <Route path="/conductores/registro" element={<RegistroPage />} />
                 <Route path="/conductores/verificacion" element={<VerificacionPage />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="/admin/cobros" element={<AdminCobrosPage />} />
-                <Route path="/admin/pilotos" element={<AdminPilotosPage />} />
-                <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
                 <Route path="/pasajeros/club-vip" element={<ClubVipPage />} />
                 <Route path="/seguridad" element={<SeguridadPage />} />
                 <Route path="/mercado" element={<MercadoPage />} />

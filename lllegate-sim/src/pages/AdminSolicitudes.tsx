@@ -153,7 +153,7 @@ export function AdminSolicitudesPage() {
         title={<>Solicitudes de los formularios.</>}
         description="Cada formulario público (contacto, empresas, alianzas, lanzamiento, conductores, cobertura y plan) llega aquí con el contacto que dio la persona. Clasificarla deja la fecha de gestión."
         actions={
-          <Button variant="secondary" to="/admin">
+          <Button variant="secondary" to="/admin/verificacion">
             Cola de pilotos <ArrowRight className="h-4 w-4" />
           </Button>
         }
