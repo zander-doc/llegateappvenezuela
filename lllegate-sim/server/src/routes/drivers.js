@@ -120,6 +120,23 @@ driversRouter.put(
         returning en_linea, en_linea_actualizado_en`,
       [req.user.id, en_linea],
     );
+    // Registro de conexiones: base para medir horas en línea.
+    if (conductor.en_linea) {
+      await filas(
+        `insert into public.sesiones_en_linea (usuario_id)
+         select $1::uuid
+          where not exists (
+            select 1 from public.sesiones_en_linea where usuario_id = $1::uuid and hasta is null
+          )`,
+        [req.user.id],
+      );
+    } else {
+      await filas(
+        "update public.sesiones_en_linea set hasta = now() where usuario_id = $1 and hasta is null",
+        [req.user.id],
+      );
+    }
+
     res.json({ ok: true, en_linea: conductor.en_linea, actualizado_en: conductor.en_linea_actualizado_en });
   }),
 );
