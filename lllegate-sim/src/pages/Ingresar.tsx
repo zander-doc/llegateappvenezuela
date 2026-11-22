@@ -9,12 +9,11 @@ import {
   Loader2,
   LockKeyhole,
   Mail,
-  MapPin,
   ShieldCheck,
   Smartphone,
   Sparkles,
 } from "lucide-react";
-import { Badge, Button, DemoNote, Money } from "../components/ui";
+import { Badge, Button, DemoNote } from "../components/ui";
 import { Reveal } from "../components/Motion";
 import { RealAuth } from "../components/RealAuth";
 import { realAuthEnabled } from "../lib/api";
@@ -204,71 +203,10 @@ export function IngresarPage() {
         className="pointer-events-none absolute -right-32 top-[-10%] h-[420px] w-[420px] rounded-full bg-brand-500/[0.08] blur-3xl"
         aria-hidden="true"
       />
-      <div className="wrap relative grid gap-8 py-10 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch lg:gap-10 lg:py-14">
-        <Reveal className="hidden lg:block">
-          <aside className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-asphalt-800 bg-asphalt-900/80 p-8">
-            <div className="flex items-center justify-between">
-              <Badge tone="brand" className="uppercase tracking-[0.14em]">
-                <span className="h-2 w-2 rounded-full bg-brand-500 animate-pulse-dot" aria-hidden="true" />
-                Venezuela · Próximo lanzamiento
-              </Badge>
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-500">Acceso</span>
-            </div>
-
-            <div className="mt-14 max-w-md">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-400">Tu cuenta Llégate</p>
-              <h2 className="heading mt-4 text-[54px] font-black uppercase leading-[0.95] tracking-tight text-white">
-                Tu viaje
-                <br />
-                empieza
-                <br />
-                <span className="italic text-brand-500">aquí.</span>
-              </h2>
-              <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-ink-300">
-                Una sola cuenta para pedir moto, carro o delivery; pagar en bolívares o dólares y seguir
-                cada viaje con la ruta compartida.
-              </p>
-            </div>
-
-            <ul className="mt-8 grid gap-3">
-              {[
-                { icon: ShieldCheck, title: "Conductores verificados", text: "Identidad y vehículo revisados antes de activar la cuenta." },
-                { icon: MapPin, title: "Precio antes de pedir", text: "Ves el total en dólares y bolívares con la tasa BCV." },
-                { icon: Smartphone, title: "Todo desde el móvil", text: "Viajes, pagos y soporte en la misma app." },
-              ].map((item) => (
-                <li key={item.title} className="flex items-start gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-brand-500/25 bg-brand-500/10 text-brand-400">
-                    <item.icon className="h-4.5 w-4.5" />
-                  </span>
-                  <span>
-                    <span className="block text-[13.5px] font-semibold text-white">{item.title}</span>
-                    <span className="mt-0.5 block text-[12px] leading-snug text-ink-400">{item.text}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-auto pt-8">
-              <div className="rounded-2xl border border-asphalt-800 bg-asphalt-950/80 p-4">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em]">
-                  <span className="text-ink-500">Tu próximo viaje</span>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Precio confirmado
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
-                  <Money usd={6.2} size="sm" showBoth={false} />
-                  <span className="text-[11px] text-ink-400">Taxi Pana · 4,2 km · 24 min</span>
-                </div>
-              </div>
-              <div className="mt-4 h-[3px] w-full stripes-h rounded-full opacity-70" aria-hidden="true" />
-            </div>
-          </aside>
-        </Reveal>
-
+      <div className="wrap relative py-10 lg:py-14">
         <Reveal
           delay={0.08}
-          className="mx-auto flex w-full min-w-0 max-w-[500px] flex-col justify-center lg:mx-0 lg:max-w-none"
+          className="mx-auto flex w-full min-w-0 max-w-[520px] flex-col justify-center"
         >
           <div className="card relative overflow-hidden p-5 sm:p-7 lg:p-8">
             <div className="flex items-center justify-between gap-3">

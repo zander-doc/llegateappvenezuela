@@ -62,7 +62,7 @@ const CUENTA: api.Cuenta = {
     aceptaPromociones: false,
     origenRegistro: "telefono",
     tieneGoogle: false,
-    preferencias: { rol_inicial: "pasajero" },
+    preferencias: {},
   },
   conductor: null,
   capacidades: { puedePedirViajes: true, puedeConducir: false },
