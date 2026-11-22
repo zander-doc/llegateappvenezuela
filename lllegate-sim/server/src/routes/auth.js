@@ -132,7 +132,7 @@ async function leerPerfil(usuarioId) {
     ok: true,
     usuario: {
       ...usuario,
-      etiqueta_rol: etiquetaRol({ rol: usuario.rol, es_conductor, tipo_vehiculo, puede_conducir }),
+      etiqueta_rol: etiquetaRol({ rol: usuario.rol, rol_personal: usuario.rol_personal, es_conductor, tipo_vehiculo, puede_conducir }),
     },
     conductor: es_conductor
       ? {

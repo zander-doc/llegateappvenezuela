@@ -29,11 +29,34 @@ export const requireUser = asyncHandler(async (req, _res, next) => {
   next();
 });
 
+// Qué módulos puede usar cada rol de personal. "operaciones" revisa documentos
+// pero no ve dinero; "finanzas" ve cobros pero no documentos de identidad.
+export const PERMISOS_PERSONAL = {
+  superadmin: ["documentos", "dinero", "soporte", "negocios", "metricas", "personal"],
+  operaciones: ["documentos", "soporte", "negocios", "metricas"],
+  finanzas: ["dinero", "metricas"],
+  soporte: ["soporte"],
+};
+
+// La puerta de entrada sigue siendo rol = 'admin'. Un admin sin rol_personal
+// (cuentas anteriores a los roles de personal) se trata como superadmin.
 export const requireAdmin = asyncHandler(async (req, _res, next) => {
-  const perfil = await fila("select rol from public.usuarios where id = $1", [req.user.id]);
+  const perfil = await fila("select rol, rol_personal from public.usuarios where id = $1", [req.user.id]);
 
   if (perfil?.rol !== "admin") {
     throw new HttpError(403, "solo_admin", "Se requiere rol administrador");
   }
+
+  const rolPersonal = perfil.rol_personal ?? "superadmin";
+  req.staff = { rolPersonal, permisos: PERMISOS_PERSONAL[rolPersonal] ?? [] };
   next();
 });
+
+export function requirePermiso(modulo) {
+  return (req, _res, next) => {
+    if (!req.staff?.permisos.includes(modulo)) {
+      return next(new HttpError(403, "sin_permiso", "Tu rol no tiene acceso a esta sección"));
+    }
+    next();
+  };
+}

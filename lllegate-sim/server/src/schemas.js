@@ -356,3 +356,8 @@ export const negociosQuerySchema = z.object({
 export const leerNotificacionSchema = z
   .object({ id: z.number().int().positive().optional() })
   .strict();
+
+export const asignarPersonalSchema = z.object({
+  telefono,
+  rol_personal: z.enum(["superadmin", "operaciones", "finanzas", "soporte"]).nullable(),
+});
