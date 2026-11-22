@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { fila, filas, rpc } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
-import { requireAdmin, requireUser } from "../middleware.js";
+import { PERMISOS_PERSONAL, requireAdmin, requirePermiso, requireUser } from "../middleware.js";
 import {
+  asignarPersonalSchema,
   estadoNegocioSchema,
   estadoSolicitudSchema,
   estadoVerificacionSchema,
@@ -15,6 +16,7 @@ import {
 } from "../schemas.js";
 import { urlFirmada } from "../storage.js";
 import { avisoVerificacion, notificar } from "../notificaciones.js";
+import { registrarEvento } from "../eventos.js";
 
 export const adminRouter = Router();
 
@@ -23,12 +25,81 @@ const DRIVER_ADMIN_COLUMNS =
 
 adminRouter.use(requireUser, requireAdmin);
 
+// Quién soy y qué módulos puedo usar: el panel arma su menú con esto.
+adminRouter.get("/yo", (req, res) => {
+  res.json({ ok: true, rol_personal: req.staff.rolPersonal, permisos: req.staff.permisos });
+});
+
+// Personal: solo el superadmin ve y asigna roles. Quien va a ser personal se
+// registra con su teléfono como cualquier persona y el superadmin le da el rol.
+adminRouter.get(
+  "/personal",
+  requirePermiso("personal"),
+  asyncHandler(async (_req, res) => {
+    const personal = await filas(
+      `select id, nombre, telefono, rol_personal, ultimo_acceso_en
+         from public.usuarios
+        where rol = 'admin'
+        order by rol_personal asc, nombre asc`,
+    );
+    res.json({ ok: true, personal });
+  }),
+);
+
+adminRouter.post(
+  "/personal/asignar",
+  requirePermiso("personal"),
+  asyncHandler(async (req, res) => {
+    const { telefono, rol_personal } = parse(asignarPersonalSchema, req.body);
+
+    const destino = await fila("select id, rol, rol_personal from public.usuarios where telefono = $1", [telefono]);
+    if (!destino) {
+      throw new HttpError(404, "usuario_no_encontrado", "Esa persona aún no tiene cuenta; debe registrarse primero");
+    }
+    if (destino.rol === "conductor") {
+      throw new HttpError(409, "cuenta_de_conductor", "Esa cuenta es de piloto; el personal usa una cuenta aparte");
+    }
+    if (destino.id === req.user.id) {
+      throw new HttpError(409, "no_te_cambies_el_rol", "No puedes cambiar tu propio rol de personal");
+    }
+
+    if (rol_personal === null && destino.rol_personal === "superadmin") {
+      const { total } = await fila(
+        "select count(*)::int as total from public.usuarios where rol = 'admin' and rol_personal = 'superadmin'",
+      );
+      if (total <= 1) {
+        throw new HttpError(409, "ultimo_superadmin", "Debe quedar al menos un superadmin");
+      }
+    }
+
+    // Quitar el rol devuelve a la persona a cliente; asignarlo la hace admin.
+    const actualizado = await fila(
+      `update public.usuarios
+          set rol = $2::text::public.rol_usuario,
+              rol_personal = $3,
+              updated_at = now()
+        where id = $1
+        returning id, nombre, telefono, rol, rol_personal`,
+      [destino.id, rol_personal === null ? "cliente" : "admin", rol_personal],
+    );
+
+    await registrarEvento(req.user.id, "personal_asignado", {
+      objetivo: destino.id,
+      antes: destino.rol_personal,
+      despues: rol_personal,
+    });
+
+    res.json({ ok: true, usuario: actualizado });
+  }),
+);
+
 // Meta de arranque: 90 pilotos activos con prepago recurrente al cierre del mes 3.
 // "Activo" = piloto aprobado con una recarga confirmada en los últimos 30 días.
 const META_PILOTOS_ACTIVOS = 90;
 
 adminRouter.get(
   "/metricas/pilotos",
+  requirePermiso("metricas"),
   asyncHandler(async (_req, res) => {
     const resumen = await fila(
       `select
@@ -84,6 +155,7 @@ adminRouter.get(
 
 adminRouter.get(
   "/recargas",
+  requirePermiso("dinero"),
   asyncHandler(async (req, res) => {
     const estado = req.query.estado ?? "pendiente";
     const recargas = await filas(
@@ -104,6 +176,7 @@ adminRouter.get(
 
 adminRouter.post(
   "/recargas/:id/aprobar",
+  requirePermiso("dinero"),
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
     const resultado = await rpc("aprobar_recarga", { p_transaccion_id: id }, { usuarioId: req.user.id });
@@ -114,6 +187,7 @@ adminRouter.post(
 
 adminRouter.post(
   "/recargas/:id/rechazar",
+  requirePermiso("dinero"),
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
     const body = parse(rejectSchema, req.body);
@@ -129,6 +203,7 @@ adminRouter.post(
 
 adminRouter.get(
   "/pagos",
+  requirePermiso("dinero"),
   asyncHandler(async (req, res) => {
     const estado = req.query.estado ?? "en_revision";
     const pagos = await filas(
@@ -150,6 +225,7 @@ adminRouter.get(
 
 adminRouter.post(
   "/pagos/:id/confirmar",
+  requirePermiso("dinero"),
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
     const resultado = await rpc("confirmar_pago_admin", { p_pago_id: id }, { usuarioId: req.user.id });
@@ -160,6 +236,7 @@ adminRouter.post(
 
 adminRouter.post(
   "/pagos/:id/rechazar",
+  requirePermiso("dinero"),
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
     const body = parse(rejectSchema, req.body);
@@ -175,6 +252,7 @@ adminRouter.post(
 
 adminRouter.get(
   "/conductores",
+  requirePermiso("documentos"),
   asyncHandler(async (req, res) => {
     const verificacion = parse(estadoVerificacionSchema, req.query.verificacion ?? "pendiente", "verificacion");
     const conductores = await filas(
@@ -223,6 +301,7 @@ adminRouter.get(
 
 adminRouter.get(
   "/conductores/:usuarioId",
+  requirePermiso("documentos"),
   asyncHandler(async (req, res) => {
     const usuarioId = parse(uuidSchema, req.params.usuarioId, "usuarioId");
 
@@ -274,6 +353,7 @@ adminRouter.get(
 
 adminRouter.post(
   "/conductores/:usuarioId/verificar",
+  requirePermiso("documentos"),
   asyncHandler(async (req, res) => {
     const usuarioId = parse(uuidSchema, req.params.usuarioId, "usuarioId");
     const body = parse(verifyDriverSchema, req.body);
@@ -298,6 +378,7 @@ adminRouter.post(
 
 adminRouter.get(
   "/solicitudes",
+  requirePermiso("soporte"),
   asyncHandler(async (req, res) => {
     const estado = req.query.estado ? parse(estadoSolicitudSchema, req.query.estado, "estado") : null;
     const tipo = req.query.tipo ? parse(tipoSolicitudSchema, req.query.tipo, "tipo") : null;
@@ -319,6 +400,7 @@ adminRouter.get(
 
 adminRouter.post(
   "/solicitudes/:id/estado",
+  requirePermiso("soporte"),
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
     const body = parse(solicitudEstadoSchema, req.body);
@@ -350,6 +432,7 @@ adminRouter.post(
 
 adminRouter.get(
   "/negocios",
+  requirePermiso("negocios"),
   asyncHandler(async (req, res) => {
     const estado = parse(estadoNegocioSchema, req.query.estado ?? "pendiente", "estado");
     const negocios = await filas(
@@ -369,6 +452,7 @@ adminRouter.get(
 
 adminRouter.post(
   "/negocios/:id/estado",
+  requirePermiso("negocios"),
   asyncHandler(async (req, res) => {
     const id = parse(uuidSchema, req.params.id, "id");
     const body = parse(negocioEstadoSchema, req.body);
