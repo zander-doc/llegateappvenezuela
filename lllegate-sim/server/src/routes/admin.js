@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { fila, filas, rpc } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
-import { PERMISOS_PERSONAL, requireAdmin, requirePermiso, requireUser } from "../middleware.js";
+import { requireAdmin, requirePermiso, requireUser } from "../middleware.js";
 import {
   asignarPersonalSchema,
   estadoNegocioSchema,
