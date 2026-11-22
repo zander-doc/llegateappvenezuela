@@ -2,16 +2,27 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Permisos básicos de red e internet -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Permisos de ubicación GPS (FINE = exacto, COARSE = aproximado por red/WiFi) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Permisos de Foreground Service: necesarios en Android 12+ para que el sistema
+         no mate el tracking GPS cuando la app pasa a segundo plano durante el viaje -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- 🚫 ELIMINADO: REQUEST_INSTALL_PACKAGES
+         Este permiso es rechazado por Google Play Store en casi todos los casos.
+         Llégate no instala otras apps, así que no lo necesitas. -->
 
     <application
         android:allowBackup="true"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
         android:networkSecurityConfig="@xml/network_security_config"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -20,6 +31,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -27,10 +39,15 @@
             android:theme="@style/Theme.Llegate.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- NOTA: El <service> de LocationTrackingService lo agregaremos DESPUÉS
+             cuando creemos la clase Kotlin correspondiente. Por ahora, la app
+             rastrea GPS correctamente desde TripActiveScreen.kt sin necesidad
+             de un servicio separado. -->
+
     </application>
 
 </manifest>

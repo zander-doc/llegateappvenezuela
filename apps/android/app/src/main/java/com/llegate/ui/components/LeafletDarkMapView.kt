@@ -543,15 +543,16 @@ private fun generateLeafletHtml(
             }).setView(currentOrigin, 14);
 
             darkLayer = L.tileLayer(
-                'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
                 {
-                    maxZoom: 19,
-                    attribution: 'Tiles © Esri — Sources: Esri, HERE, Garmin, OpenStreetMap contributors'
+                    maxZoom: 20,
+                    subdomains: 'abcd',
+                    attribution: '© OpenStreetMap contributors © CARTO'
                 }
             );
             darkReference = L.tileLayer(
-                'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-                { maxZoom: 19, attribution: '' }
+                'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+                { maxZoom: 20, subdomains: 'abcd', attribution: '' }
             );
             satelliteLayer = L.tileLayer(
                 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
