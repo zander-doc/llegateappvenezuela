@@ -1,0 +1,45 @@
+@Composable
+fun TripActiveScreen(
+    uiState: LlegateUiState,
+    viewModel: LlegateViewModel,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val trip = uiState.activeTrip ?: return
+    val pana = trip.driver
+
+    // Ubicación en vivo
+    val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+    var currentLocation by remember { mutableStateOf<Location?>(null) }
+    var isLocationPermissionGranted by remember { mutableStateOf(false) }
+
+    // Solicitud de ubicación
+    val locationRequest = LocationRequest.create()
+        .setPriority(LocationPriority.PRIORITY_HIGH_ACCURACY)
+        .setInterval(1000L)
+        .setFastestInterval(500L)
+        .setNumUpdates(1)
+
+    // Lanzar actualización de ubicación cuando la pantalla está activa
+    LaunchedEffect(Unit) {
+        if (isLocationPermissionGranted) {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                object : LocationCallback() {
+                    override fun onLocationResult(locationResult: LocationResult) {
+                        currentLocation = locationResult.lastLocation
+                    }
+                },
+                Looper.getMainLooper()
+            )
+        }
+    }
+
+    // Verificar permisos
+    LaunchedEffect(Unit) {
+        val permission = ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+        isLocationPermissionGranted = permission == PackageManager.PERMISSION_GRANTED
+    }

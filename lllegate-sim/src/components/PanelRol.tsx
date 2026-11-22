@@ -7,7 +7,6 @@ import {
   getEnLinea,
   getPilotosFavoritos,
   setEnLinea,
-  updatePerfil,
   type Cuenta,
   type PilotoFavorito,
 } from "../lib/api";
@@ -219,61 +218,9 @@ function Comercio() {
   );
 }
 
-function ElegirRol({ onElegir }: { onElegir: (rol: Rol) => Promise<void> }) {
-  const [guardando, setGuardando] = useState<Rol | null>(null);
-  const opciones: Array<{ id: Rol; titulo: string; detalle: string }> = [
-    { id: "pasajero", titulo: "Quiero pedir viajes", detalle: "Moto o carro, y mis pilotos favoritos." },
-    { id: "piloto", titulo: "Quiero manejar", detalle: "Registro de piloto y saldo prepago." },
-    { id: "comercio", titulo: "Tengo un negocio", detalle: "Anunciarme en el Mercado de Llégate." },
-  ];
-
-  return (
-    <section className={`${tarjeta} mt-6`} aria-label="Cómo vas a usar Llégate">
-      <h3 className="heading text-[15px] font-bold text-white">¿Cómo vas a usar Llégate?</h3>
-      <p className="mt-1 text-[12.5px] text-ink-400">Elige lo principal; luego puedes cambiar de rol cuando quieras.</p>
-      <div className="mt-3 grid gap-2">
-        {opciones.map(({ id, titulo, detalle }) => (
-          <button
-            key={id}
-            type="button"
-            disabled={guardando !== null}
-            onClick={async () => {
-              setGuardando(id);
-              try {
-                await onElegir(id);
-              } finally {
-                setGuardando(null);
-              }
-            }}
-            className="min-h-[52px] rounded-xl border border-asphalt-800 bg-white/[0.03] px-3.5 py-2.5 text-left transition hover:border-brand-500/60 disabled:opacity-60"
-          >
-            <span className="block text-[14px] font-semibold text-white">{titulo}</span>
-            <span className="block text-[12px] text-ink-500">{detalle}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export function PanelRol({ cuenta, onCuentaActualizada }: { cuenta: Cuenta; onCuentaActualizada: () => void }) {
-  const rolGuardado = cuenta.usuario.preferencias.rol_inicial;
-  // Quien ya es piloto abre directo en su pestaña; el resto, en el rol que eligió (o pasajero).
-  const [rol, setRol] = useState<Rol>(cuenta.capacidades.puedeConducir ? "piloto" : (rolGuardado ?? "pasajero"));
-  const [eligiendo, setEligiendo] = useState(!rolGuardado && !cuenta.capacidades.puedeConducir);
-
-  async function elegirRol(nuevo: Rol) {
-    try {
-      await updatePerfil({ preferencias: { rol_inicial: nuevo } });
-      onCuentaActualizada();
-    } catch {
-      // Si no se pudo guardar, igual mostramos el rol elegido en esta sesión.
-    }
-    setRol(nuevo);
-    setEligiendo(false);
-  }
-
-  if (eligiendo) return <ElegirRol onElegir={elegirRol} />;
+  // Quien ya es piloto abre directo en su pestaña; el resto, en la de pasajero.
+  const [rol, setRol] = useState<Rol>(cuenta.capacidades.puedeConducir ? "piloto" : "pasajero");
 
   return (
     <div className="mt-6">

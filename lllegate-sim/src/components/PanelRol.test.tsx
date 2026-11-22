@@ -9,7 +9,6 @@ vi.mock("../lib/api", () => ({
   getCodigoReferido: vi.fn(),
   getEnLinea: vi.fn(),
   setEnLinea: vi.fn(),
-  updatePerfil: vi.fn(),
 }));
 
 vi.mock("./RealWallet", () => ({
@@ -18,7 +17,7 @@ vi.mock("./RealWallet", () => ({
 
 function cuentaDe(extra: Partial<api.Cuenta> = {}, puedeConducir = false): api.Cuenta {
   return {
-    usuario: { nombre: "Ana", preferencias: { rol_inicial: "pasajero" } },
+    usuario: { nombre: "Ana" },
     conductor: null,
     capacidades: { puedePedirViajes: true, puedeConducir },
     ...extra,
@@ -64,17 +63,6 @@ describe("PanelRol", () => {
 
     expect(await screen.findByText("1 en línea ahora")).toBeInTheDocument();
     expect(screen.getByText("En línea")).toBeInTheDocument();
-  });
-
-  it("quien no ha elegido rol lo elige una vez y se guarda en su perfil", async () => {
-    vi.mocked(api.updatePerfil).mockResolvedValue(cuentaDe());
-    const cuenta = cuentaDe({ usuario: { nombre: "Ana", preferencias: {} } as unknown as api.Perfil });
-    renderPanel(cuenta);
-
-    fireEvent.click(screen.getByRole("button", { name: /tengo un negocio/i }));
-
-    expect(await screen.findByRole("tab", { name: "Comercio", selected: true })).toBeInTheDocument();
-    expect(api.updatePerfil).toHaveBeenCalledWith({ preferencias: { rol_inicial: "comercio" } });
   });
 
   it("el piloto verificado se conecta y desconecta con el interruptor", async () => {

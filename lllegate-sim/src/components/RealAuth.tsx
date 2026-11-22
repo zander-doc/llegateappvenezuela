@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
+  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   ChevronDown,
@@ -50,15 +51,6 @@ function ErrorBox({ children }: { children: string }) {
       className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-[12.5px] leading-relaxed text-red-300"
     >
       {children}
-    </p>
-  );
-}
-
-function RealNote() {
-  return (
-    <p className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3.5 py-2.5 text-[12px] leading-relaxed text-ink-300">
-      <span className="font-semibold text-emerald-300">Cuenta real:</span> tu teléfono se envía a la API de Llégate
-      solo para verificar tu identidad. No usamos contraseña ni guardamos tu cédula en este navegador.
     </p>
   );
 }
@@ -499,8 +491,8 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
         )}
 
         <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
-          <Button to="/app">
-            Ver la app <ArrowRight className="h-4 w-4" />
+          <Button to="/">
+            <ArrowLeft className="h-4 w-4" /> Volver al inicio
           </Button>
           <Button variant="secondary" onClick={cerrarSesion} disabled={cargando}>
             {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
@@ -526,11 +518,7 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
           )}
         </div>
 
-        <div className="mt-6 text-left">
-          <RealNote />
-        </div>
-
-        <PanelRol cuenta={cuenta} onCuentaActualizada={actualizarCuenta} />
+        {usuario.rol !== "admin" && <PanelRol cuenta={cuenta} onCuentaActualizada={actualizarCuenta} />}
       </div>
     );
   }
@@ -606,7 +594,6 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
             </button>
           </div>
 
-          <RealNote />
         </form>
       </div>
     );
@@ -764,8 +751,6 @@ export function RealAuth({ mode }: { mode: "login" | "register" }) {
             </>
           )}
         </Button>
-
-        <RealNote />
 
         <p className="text-center text-[12px] text-ink-400">
           {mode === "register" ? (
