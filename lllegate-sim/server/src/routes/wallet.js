@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { filas, rpc, pool } from "../db.js";
 import { asyncHandler, parse, HttpError } from "../http.js";
-import { requireUser, requireAdmin } from "../middleware.js";
+import { requireUser, requireAdmin, requirePermiso } from "../middleware.js";
 import { binanceSchema, pagoMovilSchema } from "../schemas.js";
 import { z } from "zod";
 
@@ -126,6 +126,7 @@ const recargaFisicaSchema = z.object({
 walletRouter.post(
   "/recargar",
   requireAdmin,
+  requirePermiso("dinero"),
   asyncHandler(async (req, res) => {
     const body = parse(recargaFisicaSchema, req.body);
     const { usuario_id, monto, metodo_pago, referencia, banco } = body;
