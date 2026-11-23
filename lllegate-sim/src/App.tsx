@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import { Layout } from "./components/Layout";
@@ -19,6 +19,7 @@ const RegistroPage = lazy(() => import("./pages/Conductores").then((m) => ({ def
 const VerificacionPage = lazy(() =>
   import("./pages/VerificacionConductor").then((m) => ({ default: m.VerificacionConductorPage })),
 );
+const GoogleCallbackPage = lazy(() => import("./pages/GoogleCallback").then((m) => ({ default: m.GoogleCallbackPage })));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })));
 const AdminResumenPage = lazy(() => import("./pages/admin/AdminResumen").then((m) => ({ default: m.AdminResumenPage })));
 const AdminPersonalPage = lazy(() => import("./pages/admin/AdminPersonal").then((m) => ({ default: m.AdminPersonalPage })));
@@ -51,6 +52,7 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         <UIProvider>
           <PilotWalletProvider>
+            <Suspense fallback={null}>
             <Routes>
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminResumenPage />} />
@@ -60,6 +62,7 @@ export default function App() {
                 <Route path="solicitudes" element={<AdminSolicitudesPage />} />
                 <Route path="personal" element={<AdminPersonalPage />} />
               </Route>
+              <Route path="/google/callback" element={<GoogleCallbackPage />} />
               <Route element={<Layout />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/billetera" element={<WalletScreen />} />
@@ -89,6 +92,7 @@ export default function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Routes>
+            </Suspense>
           </PilotWalletProvider>
         </UIProvider>
       </MotionConfig>
