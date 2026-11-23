@@ -108,6 +108,21 @@ class AuthRepository(
     return session
   }
 
+  /** ID de cliente web de Google que publica la API; null si "Ingresar con Google" está apagado. */
+  suspend fun googleClientId(): String? = try {
+    val respuesta = api.get("/auth/google/config")
+    if (respuesta.optBoolean("disponible", false)) respuesta.stringOrNull("client_id") else null
+  } catch (fallo: ApiException) {
+    null
+  }
+
+  /** Cambia el ID token de Google por la sesión de Llégate (la misma cuenta que en la web). */
+  suspend fun ingresarConGoogle(idToken: String): Session {
+    val session = sessionFrom(api.post("/auth/google", JSONObject().put("credential", idToken)))
+    store.save(session)
+    return session
+  }
+
   suspend fun perfil(): Usuario = usuarioFrom(http.get("/auth/me"))
 
   suspend fun cerrarSesion() {
