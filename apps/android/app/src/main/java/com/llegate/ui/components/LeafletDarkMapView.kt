@@ -87,7 +87,7 @@ fun LeafletDarkMapView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var isMapLoaded by remember { mutableStateOf(false) }
     var isSatellite by remember { mutableStateOf(false) }
-    var routeStatus by remember { mutableStateOf("Calculando ruta vial…") }
+    var routeStatus by remember { mutableStateOf("Calculando ruta vial...") }
 
     val origin = uiState.origin
     val destination = uiState.destination
@@ -125,7 +125,7 @@ fun LeafletDarkMapView(
         }
     }
 
-    // 👇 NUEVO: Al cargar el mapa, verificamos y pedimos permiso automáticamente
+    // NEW: Al cargar el mapa, verificamos y pedimos permiso automaticamente
     LaunchedEffect(isMapLoaded) {
         if (!isMapLoaded) return@LaunchedEffect
         
@@ -147,7 +147,7 @@ fun LeafletDarkMapView(
                 )
             )
         } else {
-            // Ya tiene permiso: obtenemos la ubicación real y actualizamos el origen
+            // Ya tiene permiso: obtenemos la ubicacion real y actualizamos el origen
             viewModel.requestCurrentGpsLocation(context)
         }
     }
@@ -261,7 +261,7 @@ fun LeafletDarkMapView(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Cargando mapa…",
+                        text = "Cargando mapa...",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Stone100
@@ -351,7 +351,7 @@ fun LeafletDarkMapView(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.MyLocation,
-                        contentDescription = "Mi ubicación GPS",
+                        contentDescription = "Mi ubicacion GPS",
                         tint = RacingYellow500,
                         modifier = Modifier.size(19.dp)
                     )
@@ -371,7 +371,7 @@ fun LeafletDarkMapView(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.Layers,
-                        contentDescription = if (isSatellite) "Mostrar mapa nocturno" else "Mostrar satélite",
+                        contentDescription = if (isSatellite) "Mostrar mapa nocturno" else "Mostrar satelite",
                         tint = if (isSatellite) Emerald500 else Stone100,
                         modifier = Modifier.size(19.dp)
                     )
@@ -554,7 +554,7 @@ private fun generateLeafletHtml(
                 inertia: true
             }).setView(currentOrigin, 14);
 
-            // 👇 CARTODB TILES (Mejor detalle de calles en Venezuela)
+            // CARTODB TILES (Mejor detalle de calles en Venezuela)
             darkLayer = L.tileLayer(
                 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
                 {
@@ -647,7 +647,7 @@ private fun generateLeafletHtml(
             var requestSequence = ++routeSequence;
             clearRoute();
             if (window.AndroidBridge && window.AndroidBridge.onRouteStatus) {
-                window.AndroidBridge.onRouteStatus('Calculando ruta vial…');
+                window.AndroidBridge.onRouteStatus('Calculando ruta vial...');
             }
             if (!(currentOrigin[0] || currentOrigin[1]) || !(currentDest[0] || currentDest[1])) return;
 
@@ -816,7 +816,7 @@ private class MapDestinationBridge(
     @JavascriptInterface
     fun onRouteStatus(status: String) {
         val safeStatus = when (status) {
-            "Calculando ruta vial…", "Ruta por calles", "Ruta vial no disponible" -> status
+            "Calculando ruta vial...", "Ruta por calles", "Ruta vial no disponible" -> status
             else -> "Ruta vial"
         }
         onRouteStatus.invoke(safeStatus)
