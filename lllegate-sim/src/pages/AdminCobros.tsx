@@ -275,7 +275,7 @@ export function AdminCobrosPage() {
         title={<>Cobros pendientes.</>}
         description="Cada recarga reportada espera una revisión manual. Al confirmar, el saldo se acredita una sola vez y la billetera del piloto se reactiva si alcanza el mínimo."
         actions={
-          <Button variant="secondary" to="/admin">
+          <Button variant="secondary" to="/admin/verificacion">
             Cola de pilotos <ArrowRight className="h-4 w-4" />
           </Button>
         }

@@ -64,6 +64,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusEvent
@@ -79,6 +82,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.llegate.network.ResultadoGoogle
+import com.llegate.network.pedirTokenGoogle
 import com.llegate.ui.components.LlegateOfficialBrandHeader
 import com.llegate.ui.theme.Asphalt600
 import com.llegate.ui.theme.Asphalt700
@@ -299,8 +304,54 @@ private fun OpcionServicioConductor(
 }
 
 @Composable
+private fun BotonGoogle(uiState: LlegateUiState, viewModel: LlegateViewModel) {
+    val contexto = LocalContext.current
+    val alcance = rememberCoroutineScope()
+    var clientId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { clientId = viewModel.googleClientId() }
+    val id = clientId ?: return
+
+    Surface(
+        onClick = {
+            alcance.launch {
+                when (val resultado = pedirTokenGoogle(contexto, id)) {
+                    is ResultadoGoogle.Token -> viewModel.ingresarConGoogle(resultado.idToken)
+                    is ResultadoGoogle.Falla -> viewModel.avisarGoogle(resultado.mensaje)
+                    ResultadoGoogle.Cancelado -> Unit
+                }
+            }
+        },
+        enabled = !uiState.ingresandoGoogle && !uiState.enviandoCodigo,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = if (uiState.ingresandoGoogle) "Entrando…" else "Continuar con Google",
+                color = Color(0xFF1F1F1F),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(14.dp))
+    Text(
+        text = "o con tu teléfono",
+        color = Stone400,
+        fontSize = 12.sp,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(modifier = Modifier.height(14.dp))
+}
+
+@Composable
 private fun PasoTelefono(uiState: LlegateUiState, viewModel: LlegateViewModel) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        BotonGoogle(uiState, viewModel)
         CampoPrefijo(
             valor = uiState.telefono,
             prefijo = "+58",

@@ -9,15 +9,14 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +28,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -40,7 +38,6 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,11 +56,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import com.llegate.model.LocationPoint
 import com.llegate.ui.theme.Asphalt700
-import com.llegate.ui.theme.Asphalt800
 import com.llegate.ui.theme.Asphalt900
 import com.llegate.ui.theme.Asphalt950
 import com.llegate.ui.theme.Emerald500
@@ -74,7 +70,7 @@ import com.llegate.viewmodel.LlegateUiState
 import com.llegate.viewmodel.LlegateViewModel
 
 /**
- * Leaflet map with Esri dark/imagery layers, visible attribution and real road geometry
+ * Leaflet map with CartoDB dark/imagery layers, visible attribution and real road geometry
  * from OSRM. Destination selection is disabled while displaying a completed trip.
  */
 @SuppressLint("SetJavaScriptEnabled")
@@ -95,6 +91,7 @@ fun LeafletDarkMapView(
 
     val origin = uiState.origin
     val destination = uiState.destination
+
     // Update map route when origin or destination changes
     LaunchedEffect(
         origin.lat,
@@ -125,6 +122,33 @@ fun LeafletDarkMapView(
             viewModel.requestCurrentGpsLocation(context) { point ->
                 webViewInstance?.evaluateJavascript("window.recenterMap(${point.lat}, ${point.lng});", null)
             }
+        }
+    }
+
+    // 👇 NUEVO: Al cargar el mapa, verificamos y pedimos permiso automáticamente
+    LaunchedEffect(isMapLoaded) {
+        if (!isMapLoaded) return@LaunchedEffect
+        
+        val hasFine = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        if (!hasFine && !hasCoarse) {
+            // No tiene permiso: se lo pedimos al usuario inmediatamente
+            gpsPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        } else {
+            // Ya tiene permiso: obtenemos la ubicación real y actualizamos el origen
+            viewModel.requestCurrentGpsLocation(context)
         }
     }
 
@@ -205,7 +229,6 @@ fun LeafletDarkMapView(
                         isExpanded = isExpanded,
                         enableDestinationSelection = enableDestinationSelection
                     )
-                    // El HTML es propio y todos sus recursos usan URL absolutas, así que no necesita dominio base.
                     loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
                     webViewInstance = this
                 }
@@ -247,7 +270,7 @@ fun LeafletDarkMapView(
             }
         }
 
-        // FLOATING MAP CONTROLS ON THE RIGHT (AS SHOWN IN ATTACHED SCREENSHOT)
+        // FLOATING MAP CONTROLS ON THE RIGHT
         Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -263,9 +286,7 @@ fun LeafletDarkMapView(
                 shape = RoundedCornerShape(10.dp),
                 color = Asphalt900.copy(alpha = 0.92f),
                 border = BorderStroke(1.dp, Asphalt700),
-                modifier = Modifier
-                    .size(40.dp)
-                    .testTag("map_zoom_in_button")
+                modifier = Modifier.size(40.dp).testTag("map_zoom_in_button")
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -285,9 +306,7 @@ fun LeafletDarkMapView(
                 shape = RoundedCornerShape(10.dp),
                 color = Asphalt900.copy(alpha = 0.92f),
                 border = BorderStroke(1.dp, Asphalt700),
-                modifier = Modifier
-                    .size(40.dp)
-                    .testTag("map_zoom_out_button")
+                modifier = Modifier.size(40.dp).testTag("map_zoom_out_button")
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -327,9 +346,7 @@ fun LeafletDarkMapView(
                 shape = RoundedCornerShape(10.dp),
                 color = Asphalt900.copy(alpha = 0.92f),
                 border = BorderStroke(1.dp, RacingYellow500),
-                modifier = Modifier
-                    .size(40.dp)
-                    .testTag("map_recenter_gps_button")
+                modifier = Modifier.size(40.dp).testTag("map_recenter_gps_button")
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -368,9 +385,7 @@ fun LeafletDarkMapView(
                     shape = RoundedCornerShape(10.dp),
                     color = Asphalt900.copy(alpha = 0.92f),
                     border = BorderStroke(1.dp, Asphalt700),
-                    modifier = Modifier
-                        .size(40.dp)
-                        .testTag("map_expand_button")
+                    modifier = Modifier.size(40.dp).testTag("map_expand_button")
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
@@ -384,7 +399,7 @@ fun LeafletDarkMapView(
             }
         }
 
-        // The destination is visibly editable, and required map attribution stays visible.
+        // Destination info at bottom left
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = Asphalt950.copy(alpha = 0.88f),
@@ -413,8 +428,8 @@ fun LeafletDarkMapView(
 }
 
 /**
- * Generates the Leaflet map. Street geometry and distance come from OSRM; no
- * straight-line route is drawn when routing is unavailable.
+ * Generates the Leaflet map. Street geometry and distance come from OSRM.
+ * Uses CartoDB tiles for better street detail and naming in Venezuela.
  */
 private fun generateLeafletHtml(
     originLat: Double,
@@ -444,7 +459,6 @@ private fun generateLeafletHtml(
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             overflow: hidden;
         }
-        /* Custom Pulse Origin Marker */
         .origin-marker-container {
             display: flex;
             align-items: center;
@@ -470,7 +484,6 @@ private fun generateLeafletHtml(
             border: 3px solid #07090C;
             box-shadow: 0 0 12px #00D19D;
         }
-        /* Destination pin with a bright, high-contrast accent. */
         .dest-marker-container {
             width: 28px;
             height: 36px;
@@ -487,7 +500,6 @@ private fun generateLeafletHtml(
             box-shadow: 0 2px 12px rgba(255, 59, 105, .6);
             transform: rotate(-45deg);
         }
-        /* Vehicle Markers */
         .vehicle-marker {
             display: flex;
             align-items: center;
@@ -542,6 +554,7 @@ private fun generateLeafletHtml(
                 inertia: true
             }).setView(currentOrigin, 14);
 
+            // 👇 CARTODB TILES (Mejor detalle de calles en Venezuela)
             darkLayer = L.tileLayer(
                 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
                 {
