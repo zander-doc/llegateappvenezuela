@@ -113,7 +113,7 @@ export function AdminPilotosPage() {
         title={<>Meta de pilotos.</>}
         description="Seguimiento de los 90 pilotos activos con prepago recurrente. Activo significa aprobado y con una recarga confirmada en los últimos 30 días."
         actions={
-          <Button variant="secondary" to="/admin">
+          <Button variant="secondary" to="/admin/verificacion">
             Cola de pilotos <ArrowRight className="h-4 w-4" />
           </Button>
         }

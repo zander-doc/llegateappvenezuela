@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { fila, filas, rpc } from "../db.js";
 import { asyncHandler, HttpError, parse } from "../http.js";
-import { PERMISOS_PERSONAL, requireAdmin, requirePermiso, requireUser } from "../middleware.js";
+import { requireAdmin, requirePermiso, requireUser } from "../middleware.js";
 import {
   asignarPersonalSchema,
   estadoNegocioSchema,
@@ -97,11 +97,109 @@ adminRouter.post(
 // "Activo" = piloto aprobado con una recarga confirmada en los últimos 30 días.
 const META_PILOTOS_ACTIVOS = 90;
 
+// Resumen para la portada del panel. Cada bloque se entrega solo si el rol de
+// la persona puede usarlo: quien no tiene "dinero" nunca recibe cifras de dinero.
 adminRouter.get(
-  "/metricas/pilotos",
-  requirePermiso("metricas"),
-  asyncHandler(async (_req, res) => {
-    const resumen = await fila(
+  "/resumen",
+  asyncHandler(async (req, res) => {
+    const permisos = req.staff.permisos;
+    const puede = (modulo) => permisos.includes(modulo);
+    const hoyCaracas = "(now() at time zone 'America/Caracas')::date";
+
+    const pilotos = await conteosPilotos();
+
+    const hoy = await fila(
+      `select
+         count(*) filter (where estado = 'finalizado'
+           and (finalizado_en at time zone 'America/Caracas')::date = ${hoyCaracas})::int as completados,
+         count(*) filter (where estado = 'cancelado'
+           and (cancelado_en at time zone 'America/Caracas')::date = ${hoyCaracas})::int as cancelados
+       from public.viajes`,
+    );
+
+    const porDia = await filas(
+      `select to_char(d.dia, 'YYYY-MM-DD') as dia,
+              count(v.id)::int as total
+         from generate_series(${hoyCaracas} - 6, ${hoyCaracas}, interval '1 day') as d(dia)
+         left join public.viajes v
+           on v.estado = 'finalizado'
+          and (v.finalizado_en at time zone 'America/Caracas')::date = d.dia::date
+        group by d.dia
+        order by d.dia`,
+    );
+
+    const cuentas = await fila(
+      `select count(*)::int as total from public.usuarios where rol in ('cliente', 'conductor')`,
+    );
+    const registros = await fila(
+      `select count(*)::int as total from public.conductores_detalles`,
+    );
+
+    const pendientes = {};
+    if (puede("documentos")) {
+      pendientes.pilotos = pilotos.pendientes;
+    }
+    if (puede("soporte")) {
+      pendientes.solicitudes = (
+        await fila("select count(*)::int as total from public.solicitudes where estado = 'nueva'")
+      ).total;
+    }
+    if (puede("negocios")) {
+      pendientes.negocios = (
+        await fila("select count(*)::int as total from public.negocios where estado = 'pendiente'")
+      ).total;
+    }
+
+    let dinero = null;
+    if (puede("dinero")) {
+      dinero = await fila(
+        `select
+           coalesce((select sum(monto_usd) from public.pagos
+                      where estado = 'confirmado'
+                        and (confirmado_en at time zone 'America/Caracas')::date = ${hoyCaracas}), 0)::float8 as recargas_hoy_usd,
+           (select count(*) from public.pagos
+             where estado = 'confirmado'
+               and (confirmado_en at time zone 'America/Caracas')::date = ${hoyCaracas})::int as recargas_hoy,
+           coalesce((select sum(monto_usd) from public.pagos where estado = 'en_revision'), 0)::float8 as por_confirmar_usd,
+           (select count(*) from public.pagos where estado = 'en_revision')::int as por_confirmar,
+           coalesce((select sum(comision_usd) from public.viajes
+                      where estado = 'finalizado'
+                        and date_trunc('month', finalizado_en at time zone 'America/Caracas')
+                            = date_trunc('month', now() at time zone 'America/Caracas')), 0)::float8 as comision_mes_usd`,
+      );
+      const recargasPendientes = await fila(
+        "select count(*)::int as total from public.transacciones_billetera where tipo = 'recarga' and estado = 'pendiente'",
+      );
+      pendientes.cobros = dinero.por_confirmar + recargasPendientes.total;
+    }
+
+    res.json({
+      ok: true,
+      rol_personal: req.staff.rolPersonal,
+      permisos,
+      pilotos: {
+        meta: META_PILOTOS_ACTIVOS,
+        aprobados: pilotos.aprobados,
+        activos_30d: pilotos.activos_30d,
+        con_saldo: pilotos.con_saldo,
+        en_linea: pilotos.en_linea,
+      },
+      viajes: { completados_hoy: hoy.completados, cancelados_hoy: hoy.cancelados, por_dia: porDia },
+      embudo: {
+        cuentas: cuentas.total,
+        registros_piloto: registros.total,
+        aprobados: pilotos.aprobados,
+        activos_30d: pilotos.activos_30d,
+      },
+      pendientes,
+      dinero,
+    });
+  }),
+);
+
+// Conteos de pilotos que comparten el medidor y el resumen.
+function conteosPilotos() {
+  return fila(
       `select
          count(*) filter (where d.verificacion = 'aprobado')::int as aprobados,
          count(*) filter (where d.verificacion = 'pendiente')::int as pendientes,
@@ -129,8 +227,15 @@ adminRouter.get(
                )
              )
          )::int as activos_30d
-       from public.conductores_detalles d`,
-    );
+       from public.conductores_detalles d`
+  );
+}
+
+adminRouter.get(
+  "/metricas/pilotos",
+  requirePermiso("metricas"),
+  asyncHandler(async (_req, res) => {
+    const resumen = await conteosPilotos();
 
     // Pilotos aprobados por semana, las últimas 8 (la más reciente al final).
     const semanas = await filas(

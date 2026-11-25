@@ -1662,3 +1662,109 @@ export function negocioErrorMessage(error: unknown): string {
   const copy = NEGOCIO_ERROR_COPY.find(([pattern]) => pattern.test(`${error.code} ${error.message}`));
   return copy ? copy[1] : error.message;
 }
+
+// ---------------------------------------------------------------------------
+// Panel de administración: rol de personal, resumen y gestión de personal
+// ---------------------------------------------------------------------------
+export type ModuloPanel = "documentos" | "dinero" | "soporte" | "negocios" | "metricas" | "personal";
+export type RolPersonal = "superadmin" | "operaciones" | "finanzas" | "soporte";
+
+export interface PersonalYo {
+  rolPersonal: RolPersonal;
+  permisos: ModuloPanel[];
+}
+
+export async function getAdminYo(): Promise<PersonalYo> {
+  const token = await accessToken();
+  const data = await request<{ rol_personal: RolPersonal; permisos: ModuloPanel[] }>("/admin/yo", { token });
+  return { rolPersonal: data.rol_personal, permisos: data.permisos };
+}
+
+export interface ResumenPanel {
+  permisos: ModuloPanel[];
+  pilotos: { meta: number; aprobados: number; activos30d: number; conSaldo: number; enLinea: number };
+  viajes: { completadosHoy: number; canceladosHoy: number; porDia: Array<{ dia: string; total: number }> };
+  embudo: { cuentas: number; registrosPiloto: number; aprobados: number; activos30d: number };
+  pendientes: { pilotos?: number; solicitudes?: number; negocios?: number; cobros?: number };
+  dinero: { recargasHoyUsd: number; recargasHoy: number; porConfirmarUsd: number; porConfirmar: number; comisionMesUsd: number } | null;
+}
+
+export async function getResumenPanel(): Promise<ResumenPanel> {
+  const token = await accessToken();
+  const d = await request<{
+    permisos: ModuloPanel[];
+    pilotos: { meta: number; aprobados: number; activos_30d: number; con_saldo: number; en_linea: number };
+    viajes: { completados_hoy: number; cancelados_hoy: number; por_dia: Array<{ dia: string; total: number }> };
+    embudo: { cuentas: number; registros_piloto: number; aprobados: number; activos_30d: number };
+    pendientes: { pilotos?: number; solicitudes?: number; negocios?: number; cobros?: number };
+    dinero: {
+      recargas_hoy_usd: number;
+      recargas_hoy: number;
+      por_confirmar_usd: number;
+      por_confirmar: number;
+      comision_mes_usd: number;
+    } | null;
+  }>("/admin/resumen", { token });
+  return {
+    permisos: d.permisos,
+    pilotos: {
+      meta: Number(d.pilotos.meta),
+      aprobados: Number(d.pilotos.aprobados),
+      activos30d: Number(d.pilotos.activos_30d),
+      conSaldo: Number(d.pilotos.con_saldo),
+      enLinea: Number(d.pilotos.en_linea),
+    },
+    viajes: {
+      completadosHoy: Number(d.viajes.completados_hoy),
+      canceladosHoy: Number(d.viajes.cancelados_hoy),
+      porDia: d.viajes.por_dia.map((x) => ({ dia: x.dia, total: Number(x.total) })),
+    },
+    embudo: {
+      cuentas: Number(d.embudo.cuentas),
+      registrosPiloto: Number(d.embudo.registros_piloto),
+      aprobados: Number(d.embudo.aprobados),
+      activos30d: Number(d.embudo.activos_30d),
+    },
+    pendientes: d.pendientes,
+    dinero: d.dinero
+      ? {
+          recargasHoyUsd: Number(d.dinero.recargas_hoy_usd),
+          recargasHoy: Number(d.dinero.recargas_hoy),
+          porConfirmarUsd: Number(d.dinero.por_confirmar_usd),
+          porConfirmar: Number(d.dinero.por_confirmar),
+          comisionMesUsd: Number(d.dinero.comision_mes_usd),
+        }
+      : null,
+  };
+}
+
+export interface MiembroPersonal {
+  id: string;
+  nombre: string;
+  telefono: string;
+  rolPersonal: RolPersonal;
+  ultimoAcceso: string | null;
+}
+
+export async function getPersonal(): Promise<MiembroPersonal[]> {
+  const token = await accessToken();
+  const data = await request<{
+    personal: Array<{ id: string; nombre: string | null; telefono: string; rol_personal: RolPersonal; ultimo_acceso_en: string | null }>;
+  }>("/admin/personal", { token });
+  return data.personal.map((p) => ({
+    id: p.id,
+    nombre: p.nombre ?? "Sin nombre",
+    telefono: p.telefono,
+    rolPersonal: p.rol_personal,
+    ultimoAcceso: p.ultimo_acceso_en,
+  }));
+}
+
+export async function asignarPersonal(telefono: string, rolPersonal: RolPersonal | null) {
+  const token = await accessToken();
+  return request<{ ok: boolean }>("/admin/personal/asignar", {
+    method: "POST",
+    token,
+    body: { telefono, rol_personal: rolPersonal },
+  });
+}

@@ -398,6 +398,7 @@ data class LlegateUiState(
     val revisandoSesion: Boolean = false,
     val enviandoCodigo: Boolean = false,
     val verificandoCodigo: Boolean = false,
+    val ingresandoGoogle: Boolean = false,
     val reenvioEn: Int = 0,
     /** Lo que `/auth/otp` contesta por quÃ© canal saliÃ³ el cÃ³digo; se lee en la pantalla. */
     val mensajeCanal: String? = null,
@@ -746,6 +747,42 @@ class LlegateViewModel(
                 } finally {
                     _uiState.update { it.copy(verificandoCodigo = false) }
                 }
+            }
+        }
+    }
+
+    suspend fun googleClientId(): String? = auth.googleClientId()
+
+    fun avisarGoogle(texto: String) = avisarInicio(texto)
+
+    fun ingresarConGoogle(idToken: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(ingresandoGoogle = true, avisoInicio = null) }
+            try {
+                auth.ingresarConGoogle(idToken)
+                val perfil = auth.perfil()
+                _uiState.update {
+                    it.copy(
+                        cuenta = perfil,
+                        revisandoSesion = false,
+                        pasoInicio = PasoInicio.DATOS,
+                        servicioConductor = null,
+                        codigo = "",
+                        avisoInicio = null,
+                        mensajeCanal = null, canalOtp = null,
+                        statusMessage = "Listo, ${perfil.nombre?.substringBefore(' ') ?: "pana"}. Tu cuenta esta activa."
+                    )
+                }
+                refrescarBilletera(silencioso = true)
+                refrescarFavoritos()
+                refrescarReferidos()
+            } catch (fallo: ApiException) {
+                avisarInicio(fallo.message ?: FALLA_GENERICO)
+            } catch (fallo: Exception) {
+                if (fallo is CancellationException) throw fallo
+                avisarInicio(FALLA_GENERICO)
+            } finally {
+                _uiState.update { it.copy(ingresandoGoogle = false) }
             }
         }
     }
